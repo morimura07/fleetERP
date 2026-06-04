@@ -1,0 +1,243 @@
+// FleetERP — Prisma schema
+// Modeled on the SRS. Every business record carries the §1.1 "Architectural Global
+// Fields": id (Record_ID), legalEntityId (Data_Area_ID), created/updated audit columns,
+// and updatedAt as the Row_Version concurrency marker.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Organization Administration (Module 34) — legal entities / data areas
+// ---------------------------------------------------------------------------
+model LegalEntity {
+  id            String   @id @default(cuid())
+  code          String   @unique // Data_Area_ID, e.g. TZ01, KE01, HQ01
+  name          String
+  countryRegion String // ISO-3: TZA, KEN, UGA, RWA, ZMB, COD
+  currency      String // base currency: TZS, KES, ...
+  isHeadquarter Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  users           User[]
+  vehicles        Vehicle[]
+  drivers         Driver[]
+  bookings        Booking[]
+  invoices        Invoice[]
+  supplierInvoices SupplierInvoice[]
+  bankAccounts    BankAccount[]
+}
+
+// ---------------------------------------------------------------------------
+// RBAC (System Administration, Module 36 + §4.1)
+// ---------------------------------------------------------------------------
+model Role {
+  id    String @id @default(cuid())
+  key   String @unique // SYSTEM_ADMIN, OPERATIONS_PLANNER, FINANCE_CONTROLLER, WORKSHOP_MANAGER
+  name  String
+  users User[]
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  displayName   String
+  passwordHash  String
+  isLocked      Boolean  @default(false)
+  roleId        String
+  role          Role     @relation(fields: [roleId], references: [id])
+  legalEntityId String
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([legalEntityId])
+}
+
+// ---------------------------------------------------------------------------
+// Fleet Management (Module 11)
+// ---------------------------------------------------------------------------
+enum VehicleStatus {
+  ACTIVE // on an active trip
+  PARKED
+  MAINTENANCE
+}
+
+model Vehicle {
+  id                 String        @id @default(cuid())
+  assetId            String        @unique // Vehicle_Asset_ID
+  licensePlate       String
+  makeModel          String
+  status             VehicleStatus @default(PARKED)
+  targetKmPerLiter   Float
+  actualKmPerLiter   Float? // latest telematics reading; null = missing data
+  // Vehicle regulatory documents (dashboard §6 doc lifecycles)
+  insuranceExpiry        DateTime?
+  transitLicenseExpiry   DateTime?
+  speedGovernorExpiry    DateTime?
+  axleLoadCertExpiry     DateTime?
+
+  legalEntityId String
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  bookings            Booking[]
+  maintenanceRecords  MaintenanceRecord[]
+
+  @@index([legalEntityId])
+}
+
+enum DriverStatus {
+  ACTIVE // dispatched
+  REST
+}
+
+model Driver {
+  id                  String       @id @default(cuid())
+  driverId            String       @unique
+  name                String
+  status              DriverStatus @default(REST)
+  licenseExpiry       DateTime?
+  passportExpiry      DateTime?
+  comesaPermitExpiry  DateTime?
+  yellowFeverValid    Boolean      @default(true)
+
+  legalEntityId String
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  bookings Booking[]
+
+  @@index([legalEntityId])
+}
+
+// ---------------------------------------------------------------------------
+// Transportation Management (Module 12) — loads / bookings
+// ---------------------------------------------------------------------------
+enum BookingStatus {
+  PENDING_INVOICE
+  INVOICE_CREATED
+  PAYMENT_RECEIVED
+}
+
+model Booking {
+  id           String        @id @default(cuid())
+  loadId       String        @unique
+  customerName String
+  corridor     String // Northern_Corridor | Central_Corridor
+  originZone   String
+  destZone     String
+  valueUsd     Float
+  status       BookingStatus @default(PENDING_INVOICE)
+
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+  driverId  String?
+  driver    Driver?  @relation(fields: [driverId], references: [id])
+
+  legalEntityId String
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([legalEntityId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Accounts Receivable (Module 2)
+// ---------------------------------------------------------------------------
+enum InvoiceStatus {
+  ISSUED
+  PAID
+}
+
+model Invoice {
+  id           String        @id @default(cuid())
+  invoiceId    String        @unique
+  customerName String
+  amountUsd    Float
+  paidUsd      Float         @default(0)
+  status       InvoiceStatus @default(ISSUED)
+
+  legalEntityId String
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([legalEntityId])
+}
+
+// ---------------------------------------------------------------------------
+// Accounts Payable (Module 1)
+// ---------------------------------------------------------------------------
+enum SupplierInvoiceStatus {
+  OUTSTANDING
+  PAID
+}
+
+model SupplierInvoice {
+  id            String                @id @default(cuid())
+  invoiceNumber String                @unique
+  vendorName    String
+  amountUsd     Float
+  paidUsd       Float                 @default(0)
+  status        SupplierInvoiceStatus @default(OUTSTANDING)
+
+  legalEntityId String
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([legalEntityId])
+}
+
+// ---------------------------------------------------------------------------
+// Cash & Bank Management (Module 4)
+// ---------------------------------------------------------------------------
+model BankAccount {
+  id         String @id @default(cuid())
+  bankName   String // CRDB, KCB, Stanbic
+  accountNo  String
+  currency   String
+  balanceUsd Float  @default(0)
+
+  legalEntityId String
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([legalEntityId])
+}
+
+// ---------------------------------------------------------------------------
+// Asset Maintenance (Module 19.2) — workshop status for dashboard
+// ---------------------------------------------------------------------------
+enum MaintenanceStatus {
+  COMPLETED
+  UPCOMING
+  DUE_SOON
+  OVERDUE
+}
+
+model MaintenanceRecord {
+  id                  String            @id @default(cuid())
+  vehicleId           String
+  vehicle             Vehicle           @relation(fields: [vehicleId], references: [id])
+  status              MaintenanceStatus
+  lastInspectionDate  DateTime?
+  nextInspectionDate  DateTime?
+  costAccumulatedUsd  Float             @default(0)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([vehicleId])
+}
