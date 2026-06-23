@@ -1,34 +1,46 @@
-# Dependencies
-node_modules/
-.pnpm-store/
+# ─── Dependencies ───
+node_modules
+.pnp
+.pnp.js
 
-# Build output
-dist/
-.next/
-out/
-build/
+# ─── Build output ───
+.next
+out
+build
+dist
 *.tsbuildinfo
+next-env.d.ts
 
-# Env
+# ─── Environment ───
 .env
-.env.local
-.env.*.local
+.env*.local
+!.env.example
 
-# Prisma
-apps/api/prisma/*.db
+# ─── Prisma ───
+prisma/*.db
+prisma/*.db-journal
 
-# Logs
+# ─── Testing / coverage ───
+coverage
+.vitest
+
+# ─── Logs ───
 *.log
 npm-debug.log*
-pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# OS / editor
+# ─── Uploads (keep the folder, ignore contents) ───
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# ─── Local artifacts (screenshots, scratch) ───
+screenshots
+*.local
+
+# ─── Editor / OS ───
 .DS_Store
 Thumbs.db
-.idea/
+.idea
 .vscode/*
 !.vscode/extensions.json
-
-# Misc
-coverage/
-*.tgz
