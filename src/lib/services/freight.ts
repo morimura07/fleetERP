@@ -2,6 +2,7 @@ import { Prisma, TripExpenseType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AuthError } from "@/lib/errors";
 import { createJournalEntry } from "@/lib/services/ledger";
+import { consume } from "@/lib/services/budget";
 
 /**
  * Freight domain — orders & trips, and their settlement into the ledger.
@@ -103,8 +104,16 @@ export async function invoiceOrder(orderId: string, createdById?: string | null)
 /**
  * Post a trip expense to the ledger (Dr expense / Cr A/P) and link it.
  * Idempotent guard: an already-posted expense is rejected.
+ *
+ * Before posting, the expense is checked against budget control (M3) for its
+ * GL account. A STRICT_BLOCK ceiling rejects the posting (422) before any ledger
+ * entry is created; WARNING_ONLY / OVERRIDE record the spend and continue.
  */
-export async function postTripExpense(expenseId: string, createdById?: string | null) {
+export async function postTripExpense(
+  expenseId: string,
+  createdById?: string | null,
+  opts: { budgetOverride?: boolean } = {},
+) {
   const expense = await prisma.tripExpense.findUnique({
     where: { id: expenseId },
     include: { trip: { select: { dataAreaId: true, tripCode: true } } },
@@ -116,8 +125,19 @@ export async function postTripExpense(expenseId: string, createdById?: string | 
   const amount = new Prisma.Decimal(expense.amount);
   if (!amount.greaterThan(0)) throw new AuthError("Expense amount is zero", 422);
 
+  const expenseCode = EXPENSE_ACCOUNT[expense.type];
+
+  // Budget control (M3) — runs first so STRICT_BLOCK aborts before any posting.
+  await consume({
+    dataAreaId,
+    fiscalYear: new Date().getFullYear(),
+    accountCode: expenseCode,
+    amount: amount.toString(),
+    override: opts.budgetOverride,
+  });
+
   const [expenseAcctId, apId] = await Promise.all([
-    accountIdByCode(dataAreaId, EXPENSE_ACCOUNT[expense.type]),
+    accountIdByCode(dataAreaId, expenseCode),
     accountIdByCode(dataAreaId, ACCOUNTS_PAYABLE),
   ]);
 

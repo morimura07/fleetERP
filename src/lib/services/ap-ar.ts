@@ -2,6 +2,7 @@ import { Prisma, InvoiceStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AuthError } from "@/lib/errors";
 import { createJournalEntry } from "@/lib/services/ledger";
+import { consume } from "@/lib/services/budget";
 
 /**
  * Accounts Payable (M1) & Accounts Receivable (M2) — invoice settlement into
@@ -55,7 +56,11 @@ async function nextArNumber(dataAreaId: string): Promise<string> {
  *   Cr Accounts Payable (net) + Cr Withholding Tax Payable (wht)
  * Net payable = subtotal + vat − wht.
  */
-export async function postVendorInvoice(invoiceId: string, createdById?: string | null) {
+export async function postVendorInvoice(
+  invoiceId: string,
+  createdById?: string | null,
+  opts: { budgetOverride?: boolean } = {},
+) {
   const inv = await prisma.vendorInvoice.findUnique({ where: { id: invoiceId } });
   if (!inv) throw new AuthError("Vendor invoice not found", 404);
   if (inv.postingEntryId || inv.status !== "DRAFT") {
@@ -67,6 +72,17 @@ export async function postVendorInvoice(invoiceId: string, createdById?: string 
   const wht = D(inv.whtAmount);
   const payable = subtotal.plus(vat).minus(wht); // = inv.total
   if (!payable.greaterThan(0)) throw new AuthError("Bill amount is zero", 422);
+
+  // Budget control (M3) on the expense account — the expense charge is the
+  // subtotal (VAT recoverable / WHT are balance-sheet, not budgeted spend).
+  // Runs first so a STRICT_BLOCK ceiling aborts before any ledger posting.
+  await consume({
+    dataAreaId: inv.dataAreaId,
+    fiscalYear: new Date(inv.invoiceDate).getFullYear(),
+    accountCode: inv.expenseCode,
+    amount: subtotal.toString(),
+    override: opts.budgetOverride,
+  });
 
   const vatRecoverableId = vat.greaterThan(0)
     ? await maybeAccountId(inv.dataAreaId, VAT_RECOVERABLE)

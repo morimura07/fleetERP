@@ -44,7 +44,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = vendorInvoiceSchema.parse(await req.json());
+    const raw = await req.json();
+    const body = vendorInvoiceSchema.parse(raw);
     const user = await requirePermission(body.post ? "payable:post" : "payable:write");
 
     const vendor = await prisma.vendor.findUnique({ where: { id: body.vendorId } });
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
     await logActivity({ userId: user.id, action: "CREATE", target: `VendorInvoice:${invoice.id}` });
 
     if (body.post) {
-      const entry = await postVendorInvoice(invoice.id, user.id);
+      const entry = await postVendorInvoice(invoice.id, user.id, { budgetOverride: raw.budgetOverride === true });
       await logActivity({ userId: user.id, action: "POST", target: `VendorInvoice:${invoice.id}`, detail: { voucherNumber: entry.voucherNumber } });
       return created({ invoice, entry });
     }
