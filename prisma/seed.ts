@@ -307,6 +307,65 @@ async function main() {
     console.log("  Demo AP/AR: skipped (vendors already exist)");
   }
 
+  // ── Demo Phase 2 — Core Finance (M3/M4/M5) — guarded for clean re-runs ──
+  if ((await prisma.bankAccount.count()) === 0) {
+    const { settleTransfer } = await import("../src/lib/services/cash-bank");
+
+    // M8 multi-currency: SPOT + AVERAGE rates for the regional currencies (→ USD).
+    const today = new Date();
+    const rates: [string, "SPOT" | "AVERAGE", string][] = [
+      ["TZS", "SPOT", "0.000385"], ["TZS", "AVERAGE", "0.000380"],
+      ["KES", "SPOT", "0.00775"], ["KES", "AVERAGE", "0.00770"],
+    ];
+    for (const [currency, rateType, rate] of rates) {
+      await prisma.exchangeRate.create({
+        data: { currency, baseCurrency: "USD", rateType, rate, validFrom: today },
+      });
+    }
+
+    // M4 cash & bank: a USD bank + an M-Pesa mobile-money float.
+    const crdb = await prisma.bankAccount.create({
+      data: { code: "BANK-CRDB-USD", name: "CRDB — Main USD", type: "BANK", glCode: "1010", currency: "USD", provider: "CRDB", swift: "CORUTZTZ" },
+    });
+    const mpesa = await prisma.bankAccount.create({
+      data: { code: "MM-MPESA-TZS", name: "M-Pesa Float", type: "MOBILE_MONEY", glCode: "1030", currency: "USD", provider: "Safaricom" },
+    });
+
+    // A pending and a settled driver disbursement.
+    await prisma.moneyTransfer.create({
+      data: { reference: "MM-2026-0002", bankAccountId: mpesa.id, driverId: driver.id, type: "BORDER_FEES", amount: "150.00", currency: "USD", expenseCode: "5020", transferredAt: today },
+    });
+    const settled = await prisma.moneyTransfer.create({
+      data: { reference: "MM-2026-0001", bankAccountId: crdb.id, driverId: driver.id, type: "FUEL_ALLOWANCE", amount: "500.00", currency: "USD", expenseCode: "5030", transferredAt: today },
+    });
+    await settleTransfer(settled.id, admin.id);
+
+    // M3 budgeting: an OpEx budget with two lines under WARNING_ONLY control.
+    await prisma.budget.create({
+      data: {
+        name: "FY2026 Operating Budget", fiscalYear: 2026, control: "WARNING_ONLY", createdById: admin.id,
+        lines: {
+          create: [
+            { kind: "OPEX", costCenter: "Fleet Operations", accountCode: "5000", amount: "100000.00", consumed: "32000.00" },
+            { kind: "OPEX", costCenter: "Fleet Operations", accountCode: "5020", amount: "20000.00", consumed: "18500.00" },
+          ],
+        },
+      },
+    });
+
+    // M5 consolidations: map a KE01 subsidiary revenue/AR account into HQ01.
+    await prisma.consolidationMap.createMany({
+      data: [
+        { parentArea: "HQ01", subsidiary: "KE01", subAccount: "4000", parentAccount: "4000" },
+        { parentArea: "HQ01", subsidiary: "KE01", subAccount: "1100", parentAccount: "1100" },
+      ],
+    });
+
+    console.log("  Demo Phase 2: 4 FX rates, 2 bank accounts, 2 disbursements, 1 budget, 2 consolidation maps");
+  } else {
+    console.log("  Demo Phase 2: skipped (bank accounts already exist)");
+  }
+
   console.log("✅ Seed complete.\n  admin@fleetflow.local / admin1234\n  dispatcher@fleetflow.local / dispatch1234\n  finance@fleetflow.local / finance1234\n  driver@fleetflow.local / driver1234\n  staff@fleetflow.local / staff1234");
 }
 

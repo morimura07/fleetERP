@@ -13,6 +13,12 @@ import type {
   InvoiceStatus,
   PaymentTerm,
   VendorGroup,
+  RateType,
+  BankAccountType,
+  DisbursementType,
+  TransferStatus,
+  BudgetKind,
+  BudgetControl,
 } from "@prisma/client";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -165,4 +171,51 @@ export const VENDOR_GROUP_LABEL: Record<VendorGroup, string> = {
   SUBCONTRACTED_FLEET: "Subcontracted Fleet",
   STATUTORY: "Statutory",
   OTHER: "Other",
+};
+
+// ───────── Phase 2: Core Finance ─────────
+export const RATE_TYPE_LABEL: Record<RateType, string> = {
+  SPOT: "Spot",
+  AVERAGE: "Average",
+  HISTORICAL: "Historical",
+};
+
+export const BANK_ACCOUNT_TYPE_LABEL: Record<BankAccountType, string> = {
+  BANK: "Bank",
+  MOBILE_MONEY: "Mobile Money",
+  CASH: "Cash",
+};
+
+export const DISBURSEMENT_TYPE_LABEL: Record<DisbursementType, string> = {
+  FUEL_ALLOWANCE: "Fuel Allowance",
+  TOLLS: "Tolls",
+  BORDER_FEES: "Border Fees",
+  EMERGENCY_REPAIR: "Emergency Repair",
+  DRIVER_ADVANCE: "Driver Advance",
+  OTHER: "Other",
+};
+
+export const TRANSFER_STATUS_LABEL: Record<TransferStatus, string> = {
+  PENDING: "Pending",
+  SUCCESS: "Success",
+  FAILED: "Failed",
+  TIMEOUT: "Timeout",
+};
+
+export const TRANSFER_STATUS_VARIANT: Record<TransferStatus, BadgeVariant> = {
+  PENDING: "warning",
+  SUCCESS: "success",
+  FAILED: "destructive",
+  TIMEOUT: "destructive",
+};
+
+export const BUDGET_KIND_LABEL: Record<BudgetKind, string> = {
+  CAPEX: "CapEx",
+  OPEX: "OpEx",
+};
+
+export const BUDGET_CONTROL_LABEL: Record<BudgetControl, string> = {
+  STRICT_BLOCK: "Strict Block",
+  WARNING_ONLY: "Warning Only",
+  OVERRIDE: "Director Override",
 };

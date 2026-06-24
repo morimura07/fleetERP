@@ -47,6 +47,15 @@ export type Permission =
   | "tax:read" // VAT/WHT return prep
   | "tax:write"
   | "collection:read" // AR aging / collections
+  | "bank:read" // cash & bank accounts (M4)
+  | "bank:write" // maintain bank/mobile-money accounts
+  | "bank:disburse" // post driver disbursements to the ledger
+  | "budget:read" // budgets & budget control (M3)
+  | "budget:write"
+  | "fx:read" // exchange rates (M8 multi-currency)
+  | "fx:write"
+  | "consolidation:read" // subsidiary→parent mapping & rollup (M5)
+  | "consolidation:run"
   | "export:run"
   | "activity:read"
   | "user:manage";
@@ -91,6 +100,15 @@ const ALL: Permission[] = [
   "tax:read",
   "tax:write",
   "collection:read",
+  "bank:read",
+  "bank:write",
+  "bank:disburse",
+  "budget:read",
+  "budget:write",
+  "fx:read",
+  "fx:write",
+  "consolidation:read",
+  "consolidation:run",
   "export:run",
   "activity:read",
   "user:manage",
@@ -122,6 +140,9 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "customer:read",
     "receivable:read",
     "collection:read",
+    "bank:read",
+    "budget:read",
+    "fx:read",
     "export:run",
   ],
   // Finance Controller — accounting authority, read-only on operations.
@@ -153,6 +174,15 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "tax:read",
     "tax:write",
     "collection:read",
+    "bank:read",
+    "bank:write",
+    "bank:disburse",
+    "budget:read",
+    "budget:write",
+    "fx:read",
+    "fx:write",
+    "consolidation:read",
+    "consolidation:run",
     "report:read",
     "activity:read",
     "export:run",
@@ -181,6 +211,10 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "receivable:read",
     "tax:read",
     "collection:read",
+    "bank:read",
+    "budget:read",
+    "fx:read",
+    "consolidation:read",
   ],
 };
 
@@ -213,6 +247,10 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/receivables", permission: "receivable:read" },
   { prefix: "/tax", permission: "tax:read" },
   { prefix: "/collections", permission: "collection:read" },
+  { prefix: "/bank", permission: "bank:read" },
+  { prefix: "/budgets", permission: "budget:read" },
+  { prefix: "/fx", permission: "fx:read" },
+  { prefix: "/consolidation", permission: "consolidation:read" },
   { prefix: "/activity", permission: "activity:read" },
   { prefix: "/users", permission: "user:manage" },
 ];
