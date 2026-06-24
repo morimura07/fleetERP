@@ -33,7 +33,8 @@ export async function POST(
     // recording an unposted expense only needs trip:write.
     const { id } = await params;
     idSchema.parse(id);
-    const body = tripExpenseSchema.parse(await req.json());
+    const raw = await req.json();
+    const body = tripExpenseSchema.parse(raw);
     const user = await requirePermission(body.post ? "order:invoice" : "trip:write");
 
     const trip = await prisma.trip.findUnique({ where: { id }, select: { id: true } });
@@ -51,7 +52,7 @@ export async function POST(
     await logActivity({ userId: user.id, action: "CREATE", target: `TripExpense:${expense.id}` });
 
     if (body.post) {
-      const entry = await postTripExpense(expense.id, user.id);
+      const entry = await postTripExpense(expense.id, user.id, { budgetOverride: raw.budgetOverride === true });
       await logActivity({
         userId: user.id,
         action: "POST",

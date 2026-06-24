@@ -55,29 +55,40 @@ export function checkBudget(
 
 /**
  * Evaluate and (if allowed) record spend against the active budget line for an
- * account + cost center in a fiscal year. No matching line ⇒ unconstrained
- * (allowed, no warning). Throws 422 when STRICT_BLOCK rejects.
+ * account (optionally narrowed to a cost center) in a fiscal year. When no cost
+ * center is supplied, the most-constrained matching line for the account wins
+ * (lowest remaining headroom) so the tightest control applies. No matching line
+ * ⇒ unconstrained (allowed, no warning). Throws 422 when STRICT_BLOCK rejects.
+ *
+ * Runs in its own transaction and locks via the row update, so concurrent
+ * postings to the same line cannot both slip past a STRICT_BLOCK ceiling.
  */
 export async function consume(input: {
   dataAreaId: string;
   fiscalYear: number;
   accountCode: string;
-  costCenter: string;
+  costCenter?: string;
   amount: Prisma.Decimal.Value;
   override?: boolean;
+  tx?: Prisma.TransactionClient;
 }): Promise<BudgetDecision> {
-  return prisma.$transaction(async (tx) => {
-    const line = await tx.budgetLine.findFirst({
+  const run = async (tx: Prisma.TransactionClient): Promise<BudgetDecision> => {
+    const lines = await tx.budgetLine.findMany({
       where: {
         accountCode: input.accountCode,
-        costCenter: input.costCenter,
+        ...(input.costCenter ? { costCenter: input.costCenter } : {}),
         budget: { dataAreaId: input.dataAreaId, fiscalYear: input.fiscalYear, isActive: true },
       },
       include: { budget: { select: { control: true } } },
     });
 
     // No budget line governs this account/cost-center — nothing to constrain.
-    if (!line) return { allowed: true, warning: null, remaining: "0.00" };
+    if (lines.length === 0) return { allowed: true, warning: null, remaining: "0.00" };
+
+    // Tightest line first: smallest remaining headroom (amount − consumed).
+    const line = lines.reduce((tightest, l) =>
+      D(l.amount).minus(l.consumed).lessThan(D(tightest.amount).minus(tightest.consumed)) ? l : tightest,
+    );
 
     const decision = checkBudget(
       line.budget.control,
@@ -97,7 +108,10 @@ export async function consume(input: {
     });
 
     return decision;
-  });
+  };
+
+  // Join the caller's transaction when given, else open our own.
+  return input.tx ? run(input.tx) : prisma.$transaction(run);
 }
 
 export interface BudgetLineStatus {

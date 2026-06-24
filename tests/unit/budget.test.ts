@@ -48,4 +48,10 @@ describe("lineStatus", () => {
     const s = lineStatus({ id: "1", kind: "OPEX", costCenter: "X", accountCode: "5000", amount: D("0"), consumed: D("0") });
     expect(s.utilizationPct).toBe(0);
   });
+
+  it("flags over-100% utilization when consumed exceeds the ceiling", () => {
+    const s = lineStatus({ id: "1", kind: "OPEX", costCenter: "X", accountCode: "5020", amount: D("20000"), consumed: D("22000") });
+    expect(s.remaining).toBe("-2000.00");
+    expect(s.utilizationPct).toBe(110);
+  });
 });

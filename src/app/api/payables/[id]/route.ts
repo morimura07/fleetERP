@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (body.action === "post") {
       const user = await requirePermission("payable:post");
-      const entry = await postVendorInvoice(id, user.id);
+      const entry = await postVendorInvoice(id, user.id, { budgetOverride: body.budgetOverride === true });
       await logActivity({ userId: user.id, action: "POST", target: `VendorInvoice:${id}`, detail: { voucherNumber: entry.voucherNumber } });
       return ok(entry);
     }
