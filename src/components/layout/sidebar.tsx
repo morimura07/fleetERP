@@ -7,6 +7,7 @@ import {
   ClipboardList, Route, BookOpen, BookText,
   ReceiptText, HandCoins, Store, Contact,
   Percent, AlarmClock,
+  Landmark, PiggyBank, Combine, Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Role } from "@prisma/client";
@@ -39,7 +40,11 @@ const GROUPS: NavGroup[] = [
       { href: "/customers", label: "Customers", icon: Contact, perm: "customer:read" },
       { href: "/receivables", label: "Receivables (AR)", icon: HandCoins, perm: "receivable:read" },
       { href: "/collections", label: "Collections", icon: AlarmClock, perm: "collection:read" },
+      { href: "/bank", label: "Cash & Bank", icon: Landmark, perm: "bank:read" },
+      { href: "/budgets", label: "Budgets", icon: PiggyBank, perm: "budget:read" },
       { href: "/tax", label: "Tax", icon: Percent, perm: "tax:read" },
+      { href: "/fx", label: "Exchange Rates", icon: Coins, perm: "fx:read" },
+      { href: "/consolidation", label: "Consolidation", icon: Combine, perm: "consolidation:read" },
       { href: "/payments", label: "Payments", icon: Wallet, perm: "payment:read" },
     ],
   },

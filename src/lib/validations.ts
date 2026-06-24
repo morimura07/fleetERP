@@ -327,6 +327,79 @@ export const customerReceiptSchema = z.object({
   reference: z.string().max(100).optional(),
 });
 
+// ───────── Phase 2: Exchange Rate (M8 multi-currency) ─────────
+const rateValue = z
+  .string()
+  .regex(/^\d+(\.\d{1,6})?$/, "Rate must be a positive number with up to 6 decimals");
+
+export const exchangeRateSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  currency: z.string().length(3, "3-letter ISO 4217 code"),
+  baseCurrency: z.string().length(3).default("USD"),
+  rateType: z.enum(["SPOT", "AVERAGE", "HISTORICAL"]).default("SPOT"),
+  rate: rateValue,
+  validFrom: z.coerce.date(),
+});
+
+// ───────── Phase 2: Bank Account (M4) ─────────
+export const bankAccountSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  code: z.string().min(1, "Code is required").max(40),
+  name: z.string().min(1, "Name is required").max(150),
+  type: z.enum(["BANK", "MOBILE_MONEY", "CASH"]).default("BANK"),
+  glCode: z.string().min(1, "GL account code is required").max(20),
+  currency: z.string().length(3).default("USD"),
+  iban: z.string().max(40).optional().or(z.literal("")),
+  swift: z.string().max(20).optional().or(z.literal("")),
+  provider: z.string().max(60).optional().or(z.literal("")),
+  accountNo: z.string().max(40).optional().or(z.literal("")),
+  isActive: z.boolean().default(true),
+});
+
+// ───────── Phase 2: Money Transfer / disbursement (M4) ─────────
+export const moneyTransferSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  reference: z.string().min(1, "Reference is required").max(60),
+  bankAccountId: idSchema,
+  driverId: idSchema.optional(),
+  type: z
+    .enum(["FUEL_ALLOWANCE", "TOLLS", "BORDER_FEES", "EMERGENCY_REPAIR", "DRIVER_ADVANCE", "OTHER"])
+    .default("OTHER"),
+  amount: decimalAmount,
+  currency: z.string().length(3).default("USD"),
+  expenseCode: z.string().min(1).max(20).default("5030"),
+  externalRef: z.string().max(100).optional(),
+  transferredAt: z.coerce.date(),
+  memo: z.string().max(255).optional(),
+  post: z.boolean().optional().default(false), // settle (SUCCESS) immediately
+});
+
+// ───────── Phase 2: Budget & lines (M3) ─────────
+export const budgetLineSchema = z.object({
+  kind: z.enum(["CAPEX", "OPEX"]).default("OPEX"),
+  costCenter: z.string().min(1, "Cost center is required").max(100),
+  accountCode: z.string().min(1, "Account code is required").max(20),
+  amount: decimalAmount,
+  note: z.string().max(255).optional(),
+});
+
+export const budgetSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  name: z.string().min(1, "Name is required").max(150),
+  fiscalYear: z.coerce.number().int().min(2000).max(2100),
+  control: z.enum(["STRICT_BLOCK", "WARNING_ONLY", "OVERRIDE"]).default("WARNING_ONLY"),
+  isActive: z.boolean().default(true),
+  lines: z.array(budgetLineSchema).default([]),
+});
+
+// ───────── Phase 2: Consolidation mapping (M5) ─────────
+export const consolidationMapSchema = z.object({
+  parentArea: z.string().min(1).max(10).default("HQ01"),
+  subsidiary: z.string().min(1, "Subsidiary entity is required").max(10),
+  subAccount: z.string().min(1).max(20),
+  parentAccount: z.string().min(1).max(20),
+});
+
 export type DriverInput = z.infer<typeof driverSchema>;
 export type VehicleInput = z.infer<typeof vehicleSchema>;
 export type ClientInput = z.infer<typeof clientSchema>;
@@ -342,3 +415,8 @@ export type VendorInput = z.infer<typeof vendorSchema>;
 export type VendorInvoiceInput = z.infer<typeof vendorInvoiceSchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;
 export type CustomerInvoiceInput = z.infer<typeof customerInvoiceSchema>;
+export type ExchangeRateInput = z.infer<typeof exchangeRateSchema>;
+export type BankAccountInput = z.infer<typeof bankAccountSchema>;
+export type MoneyTransferInput = z.infer<typeof moneyTransferSchema>;
+export type BudgetInput = z.infer<typeof budgetSchema>;
+export type ConsolidationMapInput = z.infer<typeof consolidationMapSchema>;

@@ -143,6 +143,54 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+// ───────────────────────── Phase 2 — Core Finance (M3 / M4 / M5) ─────────────────────────
+
+// Exchange-rate type selectable per posting / consolidation run (PRD §7, M5).
+enum RateType {
+  SPOT // transaction-date market rate
+  AVERAGE // period-average rate (P&L revaluation)
+  HISTORICAL // rate at acquisition (equity / fixed assets)
+}
+
+// Cash & Bank (M4) — account kind so mobile-money floats are distinguished from banks.
+enum BankAccountType {
+  BANK // CRDB, KCB, Stanbic … (IBAN/SWIFT)
+  MOBILE_MONEY // M-Pesa / Airtel float
+  CASH // petty cash drawer
+}
+
+// Mobile-money / bank disbursement category to a driver (PRD M4).
+enum DisbursementType {
+  FUEL_ALLOWANCE
+  TOLLS
+  BORDER_FEES
+  EMERGENCY_REPAIR
+  DRIVER_ADVANCE
+  OTHER
+}
+
+// Disbursement settlement lifecycle, mirroring the external API callback (PRD §5).
+//   PENDING → SUCCESS (ledgered) | FAILED | TIMEOUT
+enum TransferStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  TIMEOUT
+}
+
+// Budget kind (M3).
+enum BudgetKind {
+  CAPEX
+  OPEX
+}
+
+// Budget control behavior when a posting would exceed the line (PRD M3).
+enum BudgetControl {
+  STRICT_BLOCK // reject the transaction
+  WARNING_ONLY // allow but flag
+  OVERRIDE // allow only with director override
+}
+
 // ───────────────────────── Auth / User ─────────────────────────
 
 model User {
@@ -169,6 +217,8 @@ model User {
   trips            Trip[]            @relation("TripCreatedBy")
   vendorInvoices   VendorInvoice[]   @relation("VendorInvoiceCreatedBy")
   customerInvoices CustomerInvoice[] @relation("CustomerInvoiceCreatedBy")
+  moneyTransfers   MoneyTransfer[]   @relation("MoneyTransferCreatedBy")
+  budgets          Budget[]          @relation("BudgetCreatedBy")
 
   @@index([role])
   @@map("users")
@@ -196,6 +246,7 @@ model Driver {
   dailyReports DailyReport[]
   payments     Payment[]
   trips        Trip[]
+  transfers    MoneyTransfer[]
 
   @@index([status])
   @@map("drivers")
@@ -467,6 +518,7 @@ model JournalEntry {
   vendorPayment          VendorPayment?   @relation("VendorPaymentEntry")
   customerInvoicePosting CustomerInvoice? @relation("CustomerInvoicePosting")
   customerReceipt        CustomerReceipt? @relation("CustomerReceiptEntry")
+  moneyTransfer          MoneyTransfer?   @relation("MoneyTransferEntry")
 
   @@unique([dataAreaId, voucherNumber])
   @@index([status])
@@ -745,4 +797,142 @@ model CustomerReceipt {
 
   @@index([invoiceId])
   @@map("customer_receipts")
+}
+
+// ───────────────────────── Multi-currency (M8 / M5) ─────────────────────────
+
+// A dated exchange rate from `currency` to `baseCurrency` for a given rate type.
+// Lookups take the most recent rate on/before the posting date (PRD §7).
+model ExchangeRate {
+  id           String   @id @default(cuid())
+  dataAreaId   String   @default("HQ01")
+  currency     String // ISO 4217 of the foreign currency (TZS, KES …)
+  baseCurrency String   @default("USD")
+  rateType     RateType @default(SPOT)
+  rate         Decimal  @db.Decimal(18, 6) // multiply foreign × rate → base
+  validFrom    DateTime @db.Date
+  createdAt    DateTime @default(now())
+
+  @@unique([dataAreaId, currency, baseCurrency, rateType, validFrom])
+  @@index([dataAreaId, currency, rateType])
+  @@map("exchange_rates")
+}
+
+// ───────────────────────── Cash & Bank (M4) ─────────────────────────
+
+// A bank / mobile-money / cash account, linked to its GL control account (glCode).
+model BankAccount {
+  id         String          @id @default(cuid())
+  dataAreaId String          @default("HQ01")
+  code       String // internal code, e.g. BANK-CRDB-USD
+  name       String // "CRDB — Main USD"
+  type       BankAccountType @default(BANK)
+  glCode     String // COA account this cash account maps to (1010, 1030 …)
+  currency   String          @default("USD")
+  iban       String?
+  swift      String?
+  provider   String? // Safaricom / Airtel / CRDB …
+  accountNo  String? // bank account or mobile MSISDN
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  transfers MoneyTransfer[]
+
+  @@unique([dataAreaId, code])
+  @@index([type])
+  @@map("bank_accounts")
+}
+
+// A disbursement to a driver from a bank/mobile-money account. When SUCCESS it
+// posts Dr <disbursement expense> / Cr <bank gl> and links the journal entry.
+model MoneyTransfer {
+  id            String           @id @default(cuid())
+  dataAreaId    String           @default("HQ01")
+  reference     String // internal reference / receipt no
+  bankAccountId String
+  bankAccount   BankAccount      @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  driverId      String?
+  driver        Driver?          @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  type          DisbursementType @default(OTHER)
+  amount        Decimal          @db.Decimal(18, 2)
+  currency      String           @default("USD")
+  expenseCode   String           @default("5030") // COA expense debited (driver allowance default)
+  externalRef   String? // M-Pesa/Airtel transaction id from the callback
+  status        TransferStatus   @default(PENDING)
+  transferredAt DateTime         @db.Date
+  memo          String?
+
+  // Ledger link: the disbursement journal entry, created when status → SUCCESS.
+  entryId String?       @unique
+  entry   JournalEntry? @relation("MoneyTransferEntry", fields: [entryId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?    @relation("MoneyTransferCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([bankAccountId])
+  @@index([driverId])
+  @@index([status])
+  @@map("money_transfers")
+}
+
+// ───────────────────────── Budgeting (M3) ─────────────────────────
+
+// A budget period (typically a fiscal year) per legal entity.
+model Budget {
+  id          String        @id @default(cuid())
+  dataAreaId  String        @default("HQ01")
+  name        String // "FY2026 Operating Budget"
+  fiscalYear  Int
+  control     BudgetControl @default(WARNING_ONLY)
+  isActive    Boolean       @default(true)
+  createdById String?
+  createdBy   User?         @relation("BudgetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  lines BudgetLine[]
+
+  @@unique([dataAreaId, fiscalYear, name])
+  @@index([fiscalYear])
+  @@map("budgets")
+}
+
+// A budgeted amount for a cost center + GL account. `consumed` is updated in
+// real time as financial postings hit the account (PRD M3).
+model BudgetLine {
+  id          String     @id @default(cuid())
+  budgetId    String
+  budget      Budget     @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  kind        BudgetKind @default(OPEX)
+  costCenter  String // "Fleet Operations", "Workshop Mombasa"
+  accountCode String // COA account this line governs
+  amount      Decimal    @db.Decimal(18, 2) // budgeted ceiling
+  consumed    Decimal    @default(0) @db.Decimal(18, 2) // posted-to-date
+  note        String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([budgetId, costCenter, accountCode])
+  @@index([budgetId])
+  @@map("budget_lines")
+}
+
+// ───────────────────────── Consolidations (M5) ─────────────────────────
+
+// Maps a subsidiary entity's account to a parent (HQ) ledger account, so a
+// consolidation run can roll subsidiary balances up into the parent (PRD M5).
+model ConsolidationMap {
+  id            String   @id @default(cuid())
+  parentArea    String   @default("HQ01") // consolidating entity
+  subsidiary    String // source entity (TZ01, KE01 …)
+  subAccount    String // account code in the subsidiary
+  parentAccount String // account code in the parent
+  createdAt     DateTime @default(now())
+
+  @@unique([parentArea, subsidiary, subAccount])
+  @@index([parentArea, subsidiary])
+  @@map("consolidation_maps")
 }
