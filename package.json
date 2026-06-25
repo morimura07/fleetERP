@@ -2,7 +2,7 @@
   "name": "fleetflow",
   "version": "1.0.0",
   "private": true,
-  "description": "軽貨物運送会社向け配送管理システム (Light-cargo delivery management system)",
+  "description": "Transport & Logistics ERP for East & Central Africa cross-border freight (double-entry accounting core).",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",

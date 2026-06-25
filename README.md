@@ -103,7 +103,7 @@ An integrated ERP for cross-border logistics across the East & Central Africa tr
 
 ## 4. Data Model
 
-The Prisma schema (`prisma/schema.prisma`) defines **19 models**, grouped by domain:
+The Prisma schema (`prisma/schema.prisma`) defines **31 models**, grouped by domain:
 
 **Auth & org**
 - `User` (5 roles) / `ActivityLog` (audit log) / `Notification`
@@ -120,7 +120,13 @@ The Prisma schema (`prisma/schema.prisma`) defines **19 models**, grouped by dom
 **Domestic delivery & payroll**
 - `Client` / `DeliveryJob` / `Dispatch` / `DailyReport` / `Payment`
 
-> See [docs/DATABASE.md](docs/DATABASE.md) for detailed table definitions and relations.
+**AP / AR (M1 / M2)**
+- `Vendor` / `VendorInvoice` / `VendorPayment` / `Customer` / `CustomerInvoice` / `CustomerReceipt`
+
+**Core Finance (M3 / M4 / M5 / multi-currency)**
+- `Budget` / `BudgetLine` / `BankAccount` / `MoneyTransfer` / `ConsolidationMap` / `ExchangeRate`
+
+> See [docs/DATABASE.md](docs/DATABASE.md) for detailed table definitions and relations, and [docs/PRD-STATUS.md](docs/PRD-STATUS.md) for the 36-module PRD coverage map.
 
 ---
 
@@ -158,6 +164,14 @@ Permissions are centralized in a "role → permission" map in `lib/rbac.ts`, enf
 | `/trips` | Trips (CRUD, expenses, trip P&L) | ADMIN, DISPATCHER |
 | `/accounts` | Chart of Accounts | ADMIN, FINANCE |
 | `/ledger` | Journal (post / reverse) | ADMIN, FINANCE |
+| `/vendors` · `/payables` | Vendors & AP bills (post, pay) | ADMIN, FINANCE |
+| `/customers` · `/receivables` | Customers & AR invoices (post, receipt) | ADMIN, FINANCE |
+| `/collections` | AR aging buckets | ADMIN, FINANCE, DISPATCHER, STAFF (read) |
+| `/bank` | Cash & bank accounts + driver disbursements (M4) | ADMIN, FINANCE |
+| `/budgets` | CapEx/OpEx budget control (M3) | ADMIN, FINANCE |
+| `/tax` | VAT/WHT return preparation (M10) | ADMIN, FINANCE |
+| `/fx` | Exchange rates — Spot/Average/Historical | ADMIN, FINANCE |
+| `/consolidation` | Subsidiary→parent rollup (M5) | ADMIN, FINANCE |
 | `/payments` | Monthly payment aggregation, finalize, PDF | ADMIN, FINANCE |
 | `/jobs` | Delivery jobs CRUD (search, status filter, CSV) | ADMIN, DISPATCHER |
 | `/dispatch` | Dispatch (free driver/vehicle lookup, conflict check, dispatch-sheet PDF) | ADMIN, DISPATCHER |
@@ -181,9 +195,9 @@ Permissions are centralized in a "role → permission" map in `lib/rbac.ts`, enf
 ```
 fleetflow/
 ├─ prisma/
-│  ├─ schema.prisma          # 19 model definitions
-│  ├─ migrations/            # init / orders_trips / finance_role / accounting_ledger
-│  └─ seed.ts                # seed data (users per role, chart of accounts, demo orders/trips)
+│  ├─ schema.prisma          # 31 model definitions
+│  ├─ migrations/            # init / orders_trips / finance_role / accounting_ledger / ap_ar / core_finance
+│  └─ seed.ts                # seed data (users per role, chart of accounts, demo orders/trips/AP-AR/finance)
 ├─ src/
 │  ├─ middleware.ts          # auth + RBAC route guard
 │  ├─ auth.ts / auth.config.ts  # NextAuth config (Node / Edge split)
@@ -201,12 +215,14 @@ fleetflow/
 │  │  ├─ prisma.ts  rbac.ts  auth-guard.ts  validations.ts
 │  │  ├─ api.ts  activity.ts  notifications.ts  rate-limit.ts
 │  │  ├─ mail.ts  password.ts  fetcher.ts  labels.ts  utils.ts
-│  │  └─ services/  ledger.ts  freight.ts  dispatch.ts  payment.ts  dashboard.ts  pdf.ts  csv.ts
+│  │  └─ services/  ledger.ts  freight.ts  ap-ar.ts  dispatch.ts  payment.ts  tax.ts
+│  │                collections.ts  budget.ts  cash-bank.ts  fx.ts  consolidation.ts
+│  │                dashboard.ts  pdf.ts  csv.ts
 │  └─ types/next-auth.d.ts
 ├─ tests/
-│  ├─ unit/                  # rbac, ledger, freight, dispatch, payment, validations, api-error
+│  ├─ unit/                  # rbac, ledger, freight, ap-ar, budget, fx, dispatch, payment, validations, api-error
 │  └─ integration/           # dispatch-conflict test (requires DB)
-└─ docs/                     # DATABASE.md, API.md (this README also serves as ARCHITECTURE)
+└─ docs/                     # DATABASE.md, API.md, PRD-STATUS.md (this README also serves as ARCHITECTURE)
 ```
 
 ---
