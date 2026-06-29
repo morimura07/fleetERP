@@ -44,43 +44,43 @@ An integrated ERP for cross-border logistics across the East & Central Africa tr
 
 ## 2. System Architecture
 
+The app is split into **two independently-deployable services** — a Next.js web
+frontend and a standalone Hono API backend — that communicate over HTTP. The
+**backend owns all database access**; the frontend holds no Prisma/DB dependency
+and talks to the API with a JWT bearer token.
+
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                    Browser (PC / Tablet / SP)                  │
 │   shadcn/ui + React Hook Form + Zod (client-side validation)   │
 └───────────────┬──────────────────────────────┬────────────────┘
-                │ App Router (Server Components) │ fetch /api/*
+   Server Comp. │ serverApi() (bearer)          │ apiFetch() (bearer)
                 ▼                                ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    Next.js 15 (App Router)                     │
-│                                                                │
-│  middleware.ts ── auth check + RBAC route guard                │
-│                                                                │
-│  Route Handlers (/api/*)        Server Components (pages)      │
-│   ├─ requirePermission()         ├─ session via auth()         │
-│   ├─ Zod input validation        └─ direct Prisma reads        │
-│   ├─ services/ domain logic                                    │
-│   ├─ activity log / notifications                              │
-│   └─ api.ts unified error handling                             │
-│                                                                │
-│  lib/services/  ledger | freight | dispatch | payment |        │
-│                 dashboard | pdf | csv                          │
-└───────────────┬──────────────────────────────┬────────────────┘
-                │ Prisma ORM                     │ nodemailer
-                ▼                                ▼
-        ┌──────────────┐                  ┌──────────────┐
-        │  PostgreSQL  │                  │   SMTP       │
-        └──────────────┘                  └──────────────┘
+┌──────────────────────────────────────────────────────────────┐         ┌──────────────────────────────────────────────┐
+│             frontend/  — Next.js 15 (App Router)               │  HTTP   │            backend/  — Hono API                 │
+│                                                                │ ──────▶ │                                                │
+│  middleware.ts ── auth check + RBAC route guard (lib/rbac)     │  /api/* │  requireAuth + requirePermission (JWT, RBAC)   │
+│  NextAuth (Auth.js v5) — login delegates to backend            │         │  routes/  — REST handlers (Zod validated)      │
+│  Server Components — fetch initial data via serverApi()        │         │  services/  ledger | freight | dispatch | …    │
+│  Client managers — mutate via apiFetch() (localStorage token)  │ ◀────── │  lib/  prisma | rbac | http | auth | mail | …  │
+│  NO database access                                            │  JSON   │  unified error mapping (onError)               │
+└────────────────────────────────────────────────────────────────┘        └───────────────┬──────────────────┬─────────────┘
+                                                                                            │ Prisma ORM       │ nodemailer
+                                                                                            ▼                  ▼
+                                                                                    ┌──────────────┐   ┌──────────────┐
+                                                                                    │  PostgreSQL  │   │   SMTP       │
+                                                                                    └──────────────┘   └──────────────┘
 ```
 
 **Layer responsibilities**
 
 | Layer | Responsibility |
 |-------|----------------|
-| **middleware** | Redirect unauthenticated users, role-based route guards (`ROUTE_GUARDS`), isolate drivers to `/driver` |
-| **Route Handlers** | REST API. Per-call authorization via `requirePermission()`, Zod validation, pagination/search/sort, exceptions → HTTP via `handleError()` |
-| **services/** | Framework-independent domain logic (double-entry balancing, trip P&L, dispatch conflict checks). Unit-tested |
-| **Server Components** | List/detail initial render reads Prisma directly; the client uses `fetch` for follow-up actions |
+| **frontend/middleware** | Redirect unauthenticated users, role-based route guards (`ROUTE_GUARDS`), isolate drivers to `/driver` |
+| **frontend/Server Components** | Render initial data fetched from the backend via `serverApi()` (forwards the session's bearer token); the client mutates via `apiFetch()` |
+| **frontend auth** | NextAuth credential login delegates to the backend's `POST /api/auth/login`; the returned token is carried in the NextAuth JWT and bridged to the client API wrapper |
+| **backend/routes** | REST API. Per-call authorization via `requireAuth` + `requirePermission()` middleware, Zod validation, pagination/search/sort, exceptions → HTTP via `onError()` |
+| **backend/services** | Framework-independent domain logic (double-entry balancing, trip P&L, dispatch conflict checks). Unit-tested |
 
 ---
 
@@ -88,16 +88,16 @@ An integrated ERP for cross-border logistics across the East & Central Africa tr
 
 | Area | Technology |
 |------|-----------|
-| Frontend | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui, React Hook Form, Zod |
-| Backend | Next.js Route Handlers, Server Components, Prisma ORM |
-| Database | PostgreSQL (works with managed Postgres such as Neon) |
-| Auth | NextAuth (Auth.js v5), Credentials Provider, JWT sessions, RBAC |
+| Frontend (`frontend/`) | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui, React Hook Form, Zod — no DB dependency |
+| Backend (`backend/`) | Hono (Node server), Prisma ORM, Zod |
+| Database | PostgreSQL (works with managed Postgres such as Neon) — owned by the backend |
+| Auth | NextAuth (Auth.js v5) on the web app; stateless JWT bearer tokens (`jose`) issued by the API; shared RBAC map |
 | Accounting | In-house double-entry engine (`Decimal`-based, multi-currency) |
-| Documents | PDFKit (PDF), PapaParse (CSV) |
-| Email | nodemailer (password reset) |
-| Testing | Vitest (unit & integration) |
+| Documents | PDFKit (PDF), PapaParse (CSV) — on the backend |
+| Email | nodemailer (password reset) — on the backend |
+| Testing | Vitest (unit & integration) — on the backend |
 | UI/UX | Dark-first theme (light toggle), custom loading indicator |
-| Deployment | Node.js (`next build` / `next start`) |
+| Deployment | Two Node services: `frontend` (`next build`/`next start`) + `backend` (`tsx src/main.ts`) |
 
 ---
 
@@ -197,37 +197,42 @@ Permissions are centralized in a "role → permission" map in `lib/rbac.ts`, enf
 
 ## 7. Project Structure
 
+The repository holds **two self-contained, independently-deployable apps**
+(`backend/` and `frontend/`), each with its own `package.json`, lockfile,
+tsconfig, and `.env`. There is no workspace/monorepo manifest — they are built
+and deployed separately.
+
 ```
-fleetflow/
-├─ prisma/
-│  ├─ schema.prisma          # 31 model definitions
-│  ├─ migrations/            # init / orders_trips / finance_role / accounting_ledger / ap_ar / core_finance
-│  └─ seed.ts                # seed data (users per role, chart of accounts, demo orders/trips/AP-AR/finance)
-├─ src/
-│  ├─ middleware.ts          # auth + RBAC route guard
-│  ├─ auth.ts / auth.config.ts  # NextAuth config (Node / Edge split)
+fleetERP/
+├─ backend/                  # @fleeterp/api — standalone Hono API (owns the DB)
+│  ├─ package.json  tsconfig.json  .env.example  vitest.config.ts
+│  ├─ prisma/
+│  │  ├─ schema.prisma        # 34 model definitions
+│  │  ├─ migrations/          # init / orders_trips / finance_role / accounting_ledger / ap_ar / core_finance / operations
+│  │  └─ seed.ts              # seed data (users per role, chart of accounts, demo data)
+│  ├─ uploads/                # proof-of-delivery images (served at /uploads)
+│  ├─ src/
+│  │  ├─ main.ts              # Hono bootstrap — CORS, static, mounts all routes under /api
+│  │  ├─ lib/                 # prisma  rbac  http (ok/created/onError)  auth (JWT + guards)
+│  │  │                       # validations  activity  notifications  mail  password  rate-limit  format  errors
+│  │  ├─ services/            # ledger  freight  ap-ar  dispatch  payment  tax  collections
+│  │  │                       # budget  cash-bank  fx  consolidation  compliance  fuel  dashboard  pdf  csv
+│  │  └─ routes/              # one file per domain (orders, trips, ledger, payables, … 30 routers)
+│  └─ tests/  unit/ + integration/
+├─ frontend/                 # @fleeterp/web — standalone Next.js app (no DB dependency)
+│  ├─ package.json  tsconfig.json  next.config.mjs  tailwind.config.ts  .env.example
+│  ├─ middleware.ts           # auth + RBAC route guard (lib/rbac)
+│  ├─ auth.ts / auth.config.ts  # NextAuth — login delegates to the backend, carries the bearer token
 │  ├─ app/
 │  │  ├─ (auth)/             # login / forgot-password / reset-password
 │  │  ├─ (admin)/            # admin console (each screen has a loading.tsx skeleton)
 │  │  ├─ (driver)/driver/    # driver portal
-│  │  ├─ api/                # REST Route Handlers
+│  │  ├─ api/auth/[...nextauth]/  # the ONLY route handler kept (NextAuth)
 │  │  └─ forbidden/          # 403
-│  ├─ components/
-│  │  ├─ ui/                 # shadcn/ui primitives + loader.tsx (custom loader)
-│  │  ├─ layout/             # sidebar / topbar / theme-toggle / page-header
-│  │  └─ data/               # data-table.tsx (generic table), empty-state, split-gauge
-│  ├─ lib/
-│  │  ├─ prisma.ts  rbac.ts  auth-guard.ts  validations.ts
-│  │  ├─ api.ts  activity.ts  notifications.ts  rate-limit.ts
-│  │  ├─ mail.ts  password.ts  fetcher.ts  labels.ts  utils.ts
-│  │  └─ services/  ledger.ts  freight.ts  ap-ar.ts  dispatch.ts  payment.ts  tax.ts
-│  │                collections.ts  budget.ts  cash-bank.ts  fx.ts  consolidation.ts
-│  │                dashboard.ts  pdf.ts  csv.ts
-│  └─ types/next-auth.d.ts
-├─ tests/
-│  ├─ unit/                  # rbac, ledger, freight, ap-ar, budget, fx, dispatch, payment, validations, api-error
-│  └─ integration/           # dispatch-conflict test (requires DB)
-└─ docs/                     # DATABASE.md, API.md, PRD-STATUS.md (this README also serves as ARCHITECTURE)
+│  ├─ components/  ui/ (shadcn) · layout/ (sidebar, topbar, token-sync) · data/
+│  └─ lib/  server-api.ts (SSR fetch) · fetcher.ts (client fetch) · auth-token.ts
+│           rbac.ts · enums.ts · validations.ts · api-types.ts · labels.ts · utils.ts
+└─ docs/                     # DATABASE.md, API.md, DEPLOY.md, MIGRATION.md, PRD-STATUS.md
 ```
 
 ---
@@ -238,26 +243,25 @@ fleetflow/
 - Node.js 20+
 - PostgreSQL (local, or managed such as Neon)
 
-### Steps
+### Backend (`backend/` — start this first)
 ```bash
-# 1. Install dependencies
+cd backend
 npm install
-
-# 2. Environment variables
 cp .env.example .env
-#   Generate AUTH_SECRET: openssl rand -base64 32
-#   Edit DATABASE_URL to point at your Postgres
-
-# 3. Apply migrations + generate the client
+#   Set DATABASE_URL, JWT_SECRET (openssl rand -base64 32), CORS_ORIGIN, PORT
 npx prisma migrate deploy
 npx prisma generate
-
-# 4. Seed initial data
 npm run prisma:seed
+npm run dev          # → http://localhost:4000/api
+```
 
-# 5. Start the dev server
-npm run dev
-# → http://localhost:3000
+### Frontend (`frontend/`)
+```bash
+cd frontend
+npm install
+cp .env.example .env
+#   Set AUTH_SECRET, API_URL + NEXT_PUBLIC_API_URL (→ the backend, e.g. http://localhost:4000)
+npm run dev          # → http://localhost:3000
 ```
 
 ### Seeded logins
@@ -269,22 +273,29 @@ npm run dev
 | DRIVER | driver@fleetflow.local | driver1234 |
 | STAFF | staff@fleetflow.local | staff1234 |
 
-> The seed includes the chart of accounts (32 accounts) and demo orders/trips with accounting integration.
+> The seed includes the chart of accounts and demo orders/trips with accounting integration.
 
 ### Production
 ```bash
-npx prisma migrate deploy   # apply schema to the production DB
-npm run build               # prisma generate + next build
-npm start                   # http://localhost:3000
+# Backend
+cd backend && npx prisma migrate deploy && npm start   # → :4000
+
+# Frontend (separate host/process)
+cd frontend && npm run build && npm start              # → :3000
 ```
 
 ---
 
 ## 9. Testing
 
+Tests live with the backend (they cover the domain services):
 ```bash
+cd backend
 npm test                 # unit tests (RBAC, double-entry balancing, trip P&L, dispatch conflict, validation, error mapping)
 npm run test:integration # integration tests (requires DATABASE_URL + migrate deploy)
+npm run typecheck        # type check
+
+cd ../frontend
 npm run typecheck        # type check
 npm run build            # production build check
 ```
@@ -295,7 +306,8 @@ npm run build            # production build check
 
 | Area | Implementation |
 |------|----------------|
-| RBAC | Role→permission map in `lib/rbac.ts` + `middleware` (routes) + `requirePermission` (API), enforced in two layers |
+| RBAC | Role→permission map (`backend/src/lib/rbac.ts`, authoritative; mirrored in `frontend/lib/rbac.ts` for nav/route guards) enforced in two layers: frontend `middleware` (routes) + backend `requireAuth`+`requirePermission` (every API call) |
+| API auth | Stateless JWT bearer tokens issued by `POST /api/auth/login`; the web app's NextAuth session carries the token and forwards it on SSR (`serverApi`) and client (`apiFetch`) requests |
 | Separation of duties | Accounting posting (FINANCE) separated from operations editing (DISPATCHER) |
 | Authentication | bcrypt(12) hashing, JWT sessions; drivers can only see their own jobs (enforced at the query layer) |
 | Input validation | Shared Zod schemas across all APIs and forms |

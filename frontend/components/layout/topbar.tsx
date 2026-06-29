@@ -8,7 +8,7 @@ import {
 import { ROLE_LABEL } from "@frontend/lib/labels";
 import { NotificationBell } from "@frontend/components/layout/notification-bell";
 import { ThemeToggle } from "@frontend/components/layout/theme-toggle";
-import type { Role } from "@prisma/client";
+import type { Role } from "@frontend/lib/enums";
 
 export function Topbar({ name, role }: { name: string; role: Role }) {
   const initial = (name || "U").charAt(0).toUpperCase();

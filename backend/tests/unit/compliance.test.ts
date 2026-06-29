@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { docStatus } from "@/lib/services/compliance";
+import { docStatus } from "@backend/services/compliance";
 
 const asOf = new Date("2026-06-25");
 const plus = (days: number) => new Date(asOf.getTime() + days * 86_400_000);

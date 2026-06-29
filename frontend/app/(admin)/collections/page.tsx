@@ -1,9 +1,10 @@
-import { PageHeader } from "@/components/layout/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PageHeader } from "@frontend/components/layout/page-header";
+import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
+import { Badge } from "@frontend/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@frontend/components/ui/table";
 import { Inbox } from "lucide-react";
-import { computeAgingReport } from "@/lib/services/collections";
+import { serverApi } from "@frontend/lib/server-api";
+import type { AgingReport } from "@frontend/lib/api-types";
 
 export const metadata = { title: "Collections | FleetFlow" };
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ const BUCKETS = [
 ] as const;
 
 export default async function CollectionsPage() {
-  const report = await computeAgingReport();
+  const report = await serverApi<AgingReport>("/api/collections");
   const cur = report.customers[0]?.currency ?? "USD";
   const money = (v: string) => `${cur} ${parseFloat(v).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 

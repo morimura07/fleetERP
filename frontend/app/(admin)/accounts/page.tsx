@@ -1,4 +1,4 @@
-import { PageHeader } from "@/components/layout/page-header";
+import { PageHeader } from "@frontend/components/layout/page-header";
 import { AccountsManager } from "./accounts-manager";
 
 export const metadata = { title: "Chart of Accounts | FleetFlow" };

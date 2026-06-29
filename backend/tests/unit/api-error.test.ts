@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
-import { mapError } from "@/lib/api";
-import { AuthError } from "@/lib/errors";
+import { mapError } from "@backend/lib/http";
+import { AuthError } from "@backend/lib/errors";
 import { Prisma } from "@prisma/client";
 
 describe("mapError — error → HTTP status mapping", () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { can } from "@/lib/rbac";
+import { can } from "@backend/lib/rbac";
 
 describe("RBAC", () => {
   it("ADMIN can do everything", () => {

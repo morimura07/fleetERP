@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { intervalsOverlap } from "@/lib/services/dispatch";
+import { intervalsOverlap } from "@backend/services/dispatch";
 
 describe("intervalsOverlap", () => {
   const d = (h: number) => new Date(2026, 5, 1, h);

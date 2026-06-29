@@ -1,4 +1,4 @@
-import { PageHeader } from "@/components/layout/page-header";
+import { PageHeader } from "@frontend/components/layout/page-header";
 import { ClientsManager } from "./clients-manager";
 
 export const metadata = { title: "Clients | FleetFlow" };

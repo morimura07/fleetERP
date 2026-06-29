@@ -1,8 +1,8 @@
 "use client";
-import { DataTable, type Column } from "@/components/data/data-table";
-import { Button } from "@/components/ui/button";
+import { DataTable, type Column } from "@frontend/components/data/data-table";
+import { Button } from "@frontend/components/ui/button";
 import { Download } from "lucide-react";
-import { formatDate } from "@/lib/utils";
+import { formatDate } from "@frontend/lib/utils";
 
 interface Report {
   id: string; mileage: number; workStart: string; workEnd: string; note: string | null;

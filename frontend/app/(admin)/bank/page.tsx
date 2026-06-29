@@ -1,4 +1,4 @@
-import { PageHeader } from "@/components/layout/page-header";
+import { PageHeader } from "@frontend/components/layout/page-header";
 import { BankManager } from "./bank-manager";
 
 export const metadata = { title: "Cash & Bank | FleetFlow" };

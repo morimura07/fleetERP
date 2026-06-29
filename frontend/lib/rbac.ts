@@ -1,0 +1,193 @@
+/**
+ * Role-Based Access Control — frontend copy.
+ *
+ * The backend owns the authoritative RBAC map (it gates every API call); this
+ * client-side copy drives nav rendering and the middleware route guard. The two
+ * must be kept in sync. Roles are a local string-literal union (the frontend has
+ * no Prisma dependency).
+ */
+export type Role = "ADMIN" | "DISPATCHER" | "FINANCE" | "DRIVER" | "STAFF";
+
+export type Permission =
+  | "dashboard:view"
+  | "driver:read"
+  | "driver:write"
+  | "vehicle:read"
+  | "vehicle:write"
+  | "client:read"
+  | "client:write"
+  | "job:read"
+  | "job:write"
+  | "dispatch:read"
+  | "dispatch:write"
+  | "report:read"
+  | "report:write"
+  | "report:review"
+  | "payment:read"
+  | "payment:write"
+  | "account:read"
+  | "account:write"
+  | "ledger:read"
+  | "ledger:write"
+  | "ledger:post"
+  | "order:read"
+  | "order:write"
+  | "order:invoice"
+  | "trip:read"
+  | "trip:write"
+  | "vendor:read"
+  | "vendor:write"
+  | "payable:read"
+  | "payable:write"
+  | "payable:post"
+  | "customer:read"
+  | "customer:write"
+  | "receivable:read"
+  | "receivable:write"
+  | "receivable:post"
+  | "tax:read"
+  | "tax:write"
+  | "collection:read"
+  | "bank:read"
+  | "bank:write"
+  | "bank:disburse"
+  | "budget:read"
+  | "budget:write"
+  | "fx:read"
+  | "fx:write"
+  | "consolidation:read"
+  | "consolidation:run"
+  | "compliance:read"
+  | "waypoint:read"
+  | "waypoint:write"
+  | "tracking:read"
+  | "export:run"
+  | "activity:read"
+  | "user:manage";
+
+const ALL: Permission[] = [
+  "dashboard:view",
+  "driver:read", "driver:write",
+  "vehicle:read", "vehicle:write",
+  "client:read", "client:write",
+  "job:read", "job:write",
+  "dispatch:read", "dispatch:write",
+  "report:read", "report:write", "report:review",
+  "payment:read", "payment:write",
+  "account:read", "account:write",
+  "ledger:read", "ledger:write", "ledger:post",
+  "order:read", "order:write", "order:invoice",
+  "trip:read", "trip:write",
+  "vendor:read", "vendor:write",
+  "payable:read", "payable:write", "payable:post",
+  "customer:read", "customer:write",
+  "receivable:read", "receivable:write", "receivable:post",
+  "tax:read", "tax:write",
+  "collection:read",
+  "bank:read", "bank:write", "bank:disburse",
+  "budget:read", "budget:write",
+  "fx:read", "fx:write",
+  "consolidation:read", "consolidation:run",
+  "compliance:read",
+  "waypoint:read", "waypoint:write",
+  "tracking:read",
+  "export:run",
+  "activity:read",
+  "user:manage",
+];
+
+const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
+  ADMIN: ALL,
+  DISPATCHER: [
+    "dashboard:view",
+    "driver:read", "vehicle:read",
+    "client:read", "client:write",
+    "job:read", "job:write",
+    "dispatch:read", "dispatch:write",
+    "report:read", "report:review",
+    "payment:read", "account:read", "ledger:read",
+    "order:read", "order:write",
+    "trip:read", "trip:write",
+    "vendor:read", "payable:read", "customer:read", "receivable:read",
+    "collection:read", "bank:read", "budget:read", "fx:read",
+    "compliance:read", "waypoint:read", "waypoint:write", "tracking:read",
+    "export:run",
+  ],
+  FINANCE: [
+    "dashboard:view",
+    "client:read", "driver:read", "vehicle:read",
+    "order:read", "order:invoice", "trip:read",
+    "account:read", "account:write",
+    "ledger:read", "ledger:write", "ledger:post",
+    "payment:read", "payment:write",
+    "vendor:read", "vendor:write",
+    "payable:read", "payable:write", "payable:post",
+    "customer:read", "customer:write",
+    "receivable:read", "receivable:write", "receivable:post",
+    "tax:read", "tax:write", "collection:read",
+    "bank:read", "bank:write", "bank:disburse",
+    "budget:read", "budget:write",
+    "fx:read", "fx:write",
+    "consolidation:read", "consolidation:run",
+    "compliance:read", "waypoint:read", "tracking:read",
+    "report:read", "activity:read", "export:run",
+  ],
+  DRIVER: ["job:read", "report:read", "report:write"],
+  STAFF: [
+    "dashboard:view",
+    "driver:read", "vehicle:read", "client:read", "job:read", "dispatch:read",
+    "report:read", "payment:read", "account:read", "ledger:read",
+    "order:read", "trip:read", "vendor:read", "payable:read",
+    "customer:read", "receivable:read", "tax:read", "collection:read",
+    "bank:read", "budget:read", "fx:read", "consolidation:read",
+    "compliance:read", "waypoint:read", "tracking:read",
+  ],
+};
+
+export function can(role: Role | undefined | null, permission: Permission): boolean {
+  if (!role) return false;
+  return ROLE_PERMISSIONS[role].includes(permission);
+}
+
+export function permissionsFor(role: Role): Permission[] {
+  return ROLE_PERMISSIONS[role];
+}
+
+export const ROLE_LABELS: Record<Role, string> = {
+  ADMIN: "Administrator",
+  DISPATCHER: "Operations Planner",
+  FINANCE: "Finance Controller",
+  DRIVER: "Driver",
+  STAFF: "Staff",
+};
+
+/** Route prefixes each role is allowed to enter (used by middleware). */
+export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
+  { prefix: "/dashboard", permission: "dashboard:view" },
+  { prefix: "/drivers", permission: "driver:read" },
+  { prefix: "/vehicles", permission: "vehicle:read" },
+  { prefix: "/clients", permission: "client:read" },
+  { prefix: "/jobs", permission: "job:read" },
+  { prefix: "/dispatch", permission: "dispatch:read" },
+  { prefix: "/reports", permission: "report:read" },
+  { prefix: "/payments", permission: "payment:read" },
+  { prefix: "/accounts", permission: "account:read" },
+  { prefix: "/ledger", permission: "ledger:read" },
+  { prefix: "/orders", permission: "order:read" },
+  { prefix: "/trips", permission: "trip:read" },
+  { prefix: "/vendors", permission: "vendor:read" },
+  { prefix: "/payables", permission: "payable:read" },
+  { prefix: "/customers", permission: "customer:read" },
+  { prefix: "/receivables", permission: "receivable:read" },
+  { prefix: "/tax", permission: "tax:read" },
+  { prefix: "/collections", permission: "collection:read" },
+  { prefix: "/bank", permission: "bank:read" },
+  { prefix: "/budgets", permission: "budget:read" },
+  { prefix: "/fx", permission: "fx:read" },
+  { prefix: "/consolidation", permission: "consolidation:read" },
+  { prefix: "/compliance", permission: "compliance:read" },
+  { prefix: "/waypoints", permission: "waypoint:read" },
+  { prefix: "/tracking", permission: "tracking:read" },
+  { prefix: "/activity", permission: "activity:read" },
+  { prefix: "/users", permission: "user:manage" },
+];

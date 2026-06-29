@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock the prisma client used by the payment service.
 const findMany = vi.fn();
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@backend/lib/prisma", () => ({
   prisma: { deliveryJob: { findMany: (...a: unknown[]) => findMany(...a) } },
 }));
 
-import { computeMonthlyPayments } from "@/lib/services/payment";
+import { computeMonthlyPayments } from "@backend/services/payment";
 
 describe("computeMonthlyPayments", () => {
   beforeEach(() => findMany.mockReset());

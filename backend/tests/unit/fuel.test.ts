@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fuelEfficiency } from "@/lib/services/fuel";
+import { fuelEfficiency } from "@backend/services/fuel";
 
 describe("fuelEfficiency", () => {
   it("computes actual km/L and flags meeting target", () => {

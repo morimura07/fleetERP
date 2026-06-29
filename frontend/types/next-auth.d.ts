@@ -1,4 +1,4 @@
-import type { Role } from "@prisma/client";
+import type { Role } from "@frontend/lib/rbac";
 import type { DefaultSession } from "next-auth";
 
 declare module "next-auth" {
@@ -8,11 +8,15 @@ declare module "next-auth" {
       role: Role;
       driverId: string | null;
     } & DefaultSession["user"];
+    /** Backend API bearer token, forwarded on server-side fetches. */
+    accessToken: string;
   }
 
   interface User {
     role: Role;
     driverId: string | null;
+    /** Backend API bearer token issued by POST /api/auth/login. */
+    accessToken?: string;
   }
 }
 
@@ -21,5 +25,6 @@ declare module "next-auth/jwt" {
     id: string;
     role: Role;
     driverId: string | null;
+    accessToken?: string;
   }
 }

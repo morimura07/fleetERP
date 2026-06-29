@@ -1,6 +1,6 @@
 import { PrismaClient, AccountType } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { invoiceOrder, postTripExpense } from "../src/lib/services/freight";
+import { invoiceOrder, postTripExpense } from "@backend/services/freight";
 
 const prisma = new PrismaClient();
 const hash = (p: string) => bcrypt.hash(p, 12);
@@ -274,7 +274,7 @@ async function main() {
   // ── Demo AP / AR (M1 / M2) — guarded so re-runs stay clean ──
   if ((await prisma.vendor.count()) === 0) {
     const { postVendorInvoice, payVendorInvoice, postCustomerInvoice, receiveCustomerInvoice } =
-      await import("../src/lib/services/ap-ar");
+      await import("../backend/services/ap-ar");
 
     // AP: vendor + posted, fully-paid bill
     const vendor = await prisma.vendor.create({
@@ -309,7 +309,7 @@ async function main() {
 
   // ── Demo Phase 2 — Core Finance (M3/M4/M5) — guarded for clean re-runs ──
   if ((await prisma.bankAccount.count()) === 0) {
-    const { settleTransfer } = await import("../src/lib/services/cash-bank");
+    const { settleTransfer } = await import("../backend/services/cash-bank");
 
     // M8 multi-currency: SPOT + AVERAGE rates for the regional currencies (→ USD).
     const today = new Date();

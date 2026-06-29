@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Prisma } from "@prisma/client";
-import { convert } from "@/lib/services/fx";
+import { convert } from "@backend/services/fx";
 
 describe("convert", () => {
   it("multiplies a foreign amount by the rate to reach base", () => {

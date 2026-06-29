@@ -1,18 +1,18 @@
 "use client";
 import { useState } from "react";
 import { Plus, FileText, Banknote } from "lucide-react";
-import { DataTable, type Column } from "@/components/data/data-table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/components/ui/toast";
-import { INVOICE_STATUS_LABEL, INVOICE_STATUS_VARIANT } from "@/lib/labels";
-import { formatDate } from "@/lib/utils";
-import { apiFetch, ApiError } from "@/lib/fetcher";
-import type { InvoiceStatus } from "@prisma/client";
+import { DataTable, type Column } from "@frontend/components/data/data-table";
+import { Button } from "@frontend/components/ui/button";
+import { Input } from "@frontend/components/ui/input";
+import { Label } from "@frontend/components/ui/label";
+import { Badge } from "@frontend/components/ui/badge";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
+import { useToast } from "@frontend/components/ui/toast";
+import { INVOICE_STATUS_LABEL, INVOICE_STATUS_VARIANT } from "@frontend/lib/labels";
+import { formatDate } from "@frontend/lib/utils";
+import { apiFetch, ApiError } from "@frontend/lib/fetcher";
+import type { InvoiceStatus } from "@frontend/lib/enums";
 
 interface CustomerOpt { id: string; code: string; name: string; currency: string; }
 interface Invoice {

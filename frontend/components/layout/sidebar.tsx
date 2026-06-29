@@ -11,8 +11,7 @@ import {
   ShieldCheck, MapPin,
 } from "lucide-react";
 import { cn } from "@frontend/lib/utils";
-import type { Role } from "@prisma/client";
-import { can, type Permission } from "@backend/rbac";
+import { can, type Permission, type Role } from "@frontend/lib/rbac";
 
 type NavItem = { href: string; label: string; icon: typeof Users; perm: Permission };
 type NavGroup = { label: string; items: NavItem[] };

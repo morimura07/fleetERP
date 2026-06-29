@@ -3,16 +3,16 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "lucide-react";
-import { DataTable, type Column } from "@/components/data/data-table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/components/ui/toast";
-import { waypointSchema, type WaypointInput } from "@/lib/validations";
-import { apiFetch, ApiError } from "@/lib/fetcher";
+import { DataTable, type Column } from "@frontend/components/data/data-table";
+import { Button } from "@frontend/components/ui/button";
+import { Input } from "@frontend/components/ui/input";
+import { Label } from "@frontend/components/ui/label";
+import { Badge } from "@frontend/components/ui/badge";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
+import { useToast } from "@frontend/components/ui/toast";
+import { waypointSchema, type WaypointInput } from "@frontend/lib/validations";
+import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 
 interface Waypoint { id: string; code: string; name: string; kind: string; lat: string; lng: string; country: string | null; }
 

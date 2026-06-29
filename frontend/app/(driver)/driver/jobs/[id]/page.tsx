@@ -1,11 +1,32 @@
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { JOB_STATUS_LABEL, JOB_STATUS_VARIANT } from "@/lib/labels";
-import { formatDate, formatYen } from "@/lib/utils";
+import { serverApi, ServerApiError } from "@frontend/lib/server-api";
+import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
+import { Badge } from "@frontend/components/ui/badge";
+import { JOB_STATUS_LABEL, JOB_STATUS_VARIANT } from "@frontend/lib/labels";
+import type { JobStatus } from "@frontend/lib/enums";
+import { formatDate, formatYen } from "@frontend/lib/utils";
 import { DailyReportForm } from "./daily-report-form";
+
+type DriverJob = {
+  id: string;
+  jobCode: string;
+  status: JobStatus;
+  pickupAddress: string;
+  deliveryAddress: string;
+  deliveryDate: string;
+  cargoDescription: string;
+  rewardAmount: number;
+  note: string | null;
+  client: { companyName: string };
+  dailyReport: {
+    workStart: string;
+    workEnd: string;
+    mileage: number;
+    note: string | null;
+    proofImageUrl: string | null;
+  } | null;
+};
 
 export default async function DriverJobDetail({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -13,16 +34,14 @@ export default async function DriverJobDetail({ params }: { params: Promise<{ id
   if (!driverId) redirect("/login");
   const { id } = await params;
 
-  const job = await prisma.deliveryJob.findUnique({
-    where: { id },
-    include: {
-      client: { select: { companyName: true } },
-      dispatch: { select: { driverId: true } },
-      dailyReport: true,
-    },
-  });
-  // Authorization: only the assigned driver can view.
-  if (!job || job.dispatch?.driverId !== driverId) notFound();
+  // Backend scopes the lookup to the authenticated driver (404 otherwise).
+  let job: DriverJob;
+  try {
+    job = await serverApi<DriverJob>(`/api/driver/jobs/${id}`);
+  } catch (e) {
+    if (e instanceof ServerApiError && e.status === 404) notFound();
+    throw e;
+  }
 
   return (
     <div className="space-y-4">

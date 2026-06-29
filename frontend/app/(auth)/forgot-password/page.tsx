@@ -3,13 +3,13 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { forgotPasswordSchema } from "@/lib/validations";
-import { apiFetch } from "@/lib/fetcher";
+import { forgotPasswordSchema } from "@frontend/lib/validations";
+import { apiFetch } from "@frontend/lib/fetcher";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@frontend/components/ui/button";
+import { Input } from "@frontend/components/ui/input";
+import { Label } from "@frontend/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@frontend/components/ui/card";
 
 type FormData = z.infer<typeof forgotPasswordSchema>;
 

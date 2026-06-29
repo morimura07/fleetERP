@@ -3,25 +3,25 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, CheckCircle2 } from "lucide-react";
-import { DataTable, type Column } from "@/components/data/data-table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/components/ui/toast";
+import { DataTable, type Column } from "@frontend/components/data/data-table";
+import { Button } from "@frontend/components/ui/button";
+import { Input } from "@frontend/components/ui/input";
+import { Label } from "@frontend/components/ui/label";
+import { Badge } from "@frontend/components/ui/badge";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@frontend/components/ui/tabs";
+import { useToast } from "@frontend/components/ui/toast";
 import {
   bankAccountSchema, type BankAccountInput,
   moneyTransferSchema, type MoneyTransferInput,
-} from "@/lib/validations";
+} from "@frontend/lib/validations";
 import {
   BANK_ACCOUNT_TYPE_LABEL, DISBURSEMENT_TYPE_LABEL,
   TRANSFER_STATUS_LABEL, TRANSFER_STATUS_VARIANT,
-} from "@/lib/labels";
-import { apiFetch, ApiError } from "@/lib/fetcher";
-import type { BankAccountType, DisbursementType, TransferStatus } from "@prisma/client";
+} from "@frontend/lib/labels";
+import { apiFetch, ApiError } from "@frontend/lib/fetcher";
+import type { BankAccountType, DisbursementType, TransferStatus } from "@frontend/lib/enums";
 
 interface BankAccount extends BankAccountInput { id: string; }
 interface Transfer {

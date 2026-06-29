@@ -1,4 +1,4 @@
-import { PageHeader } from "@/components/layout/page-header";
+import { PageHeader } from "@frontend/components/layout/page-header";
 import { BudgetsManager } from "./budgets-manager";
 
 export const metadata = { title: "Budgets | FleetFlow" };

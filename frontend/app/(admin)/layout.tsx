@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { SessionProvider } from "next-auth/react";
 import { auth } from "@/auth";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Topbar } from "@/components/layout/topbar";
+import { Sidebar } from "@frontend/components/layout/sidebar";
+import { Topbar } from "@frontend/components/layout/topbar";
+import { TokenSync } from "@frontend/components/layout/token-sync";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -11,6 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <SessionProvider session={session}>
+      <TokenSync />
       <div className="flex min-h-screen">
         <Sidebar role={session.user.role} />
         <div className="flex flex-1 flex-col">

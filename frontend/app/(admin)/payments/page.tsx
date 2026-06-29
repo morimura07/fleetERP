@@ -1,13 +1,13 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { Download } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useToast } from "@/components/ui/toast";
-import { apiFetch } from "@/lib/fetcher";
-import { formatYen } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
+import { Button } from "@frontend/components/ui/button";
+import { Input } from "@frontend/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@frontend/components/ui/table";
+import { useToast } from "@frontend/components/ui/toast";
+import { apiFetch } from "@frontend/lib/fetcher";
+import { formatYen } from "@frontend/lib/utils";
 
 interface Row { driverId: string; driverName: string; jobCount: number; totalAmount: number; }
 

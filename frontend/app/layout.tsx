@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { ToastProvider } from "@/components/ui/toast";
+import { ToastProvider } from "@frontend/components/ui/toast";
 
 export const metadata: Metadata = {
   title: "FleetFlow | Logistics ERP",

@@ -1,0 +1,70 @@
+/**
+ * Domain enums — frontend copy.
+ *
+ * Mirrors the enums in the backend's Prisma schema so the web app needs no
+ * Prisma (or database) dependency. These are stable domain vocabulary; keep in
+ * sync with backend/prisma/schema.prisma.
+ */
+
+export type Role = "ADMIN" | "DISPATCHER" | "FINANCE" | "DRIVER" | "STAFF";
+export type DriverStatus = "ACTIVE" | "VACATION" | "INACTIVE";
+export type ContractType = "EMPLOYEE" | "CONTRACTOR" | "PARTTIME";
+export type VehicleStatus = "AVAILABLE" | "MAINTENANCE" | "UNAVAILABLE";
+export type JobStatus =
+  | "PENDING"
+  | "WAITING_DISPATCH"
+  | "ASSIGNED"
+  | "DELIVERING"
+  | "COMPLETED"
+  | "CANCELLED";
+export type DispatchStatus = "SCHEDULED" | "IN_PROGRESS" | "DONE" | "CANCELLED";
+export type NotificationType = "DISPATCH" | "JOB_UPDATE" | "COMPLETION" | "SYSTEM";
+export type AccountType = "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+export type JournalStatus = "DRAFT" | "POSTED" | "REVERSED";
+export type OrderStatus =
+  | "DRAFT"
+  | "CONFIRMED"
+  | "IN_TRANSIT"
+  | "DELIVERED"
+  | "INVOICED"
+  | "CANCELLED";
+export type TripStatus = "PLANNED" | "DISPATCHED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+export type CorridorType = "NORTHERN" | "CENTRAL" | "DOMESTIC";
+export type TripExpenseType =
+  | "FUEL"
+  | "TOLLS"
+  | "BORDER_FEES"
+  | "DRIVER_ALLOWANCE"
+  | "DEMURRAGE"
+  | "MAINTENANCE"
+  | "OTHER";
+export type PaymentTerm = "NET_30" | "NET_60" | "COD";
+export type VendorGroup =
+  | "FUEL_SUPPLIER"
+  | "SPARE_PARTS"
+  | "CLEARING_AGENT"
+  | "SUBCONTRACTED_FLEET"
+  | "STATUTORY"
+  | "OTHER";
+export type InvoiceStatus = "DRAFT" | "POSTED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
+export type RateType = "SPOT" | "AVERAGE" | "HISTORICAL";
+export type BankAccountType = "BANK" | "MOBILE_MONEY" | "CASH";
+export type DisbursementType =
+  | "FUEL_ALLOWANCE"
+  | "TOLLS"
+  | "BORDER_FEES"
+  | "EMERGENCY_REPAIR"
+  | "DRIVER_ADVANCE"
+  | "OTHER";
+export type TransferStatus = "PENDING" | "SUCCESS" | "FAILED" | "TIMEOUT";
+export type BudgetKind = "CAPEX" | "OPEX";
+export type BudgetControl = "STRICT_BLOCK" | "WARNING_ONLY" | "OVERRIDE";
+export type DriverDocType =
+  | "LICENSE"
+  | "PASSPORT"
+  | "COMESA_PERMIT"
+  | "YELLOW_FEVER"
+  | "WORK_PERMIT"
+  | "OTHER";
+export type ReconStatus = "UNRECONCILED" | "MATCHED" | "DISCREPANCY";
+export type PositionSource = "STUB" | "GPS" | "MANUAL";

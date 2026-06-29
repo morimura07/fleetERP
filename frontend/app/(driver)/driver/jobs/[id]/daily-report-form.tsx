@@ -3,13 +3,13 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { dailyReportSchema, type DailyReportInput } from "@/lib/validations";
-import { apiFetch, ApiError } from "@/lib/fetcher";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/toast";
+import { dailyReportSchema, type DailyReportInput } from "@frontend/lib/validations";
+import { apiFetch, ApiError } from "@frontend/lib/fetcher";
+import { Button } from "@frontend/components/ui/button";
+import { Input } from "@frontend/components/ui/input";
+import { Label } from "@frontend/components/ui/label";
+import { Textarea } from "@frontend/components/ui/textarea";
+import { useToast } from "@frontend/components/ui/toast";
 
 export function DailyReportForm({ jobId }: { jobId: string }) {
   const { toast } = useToast();

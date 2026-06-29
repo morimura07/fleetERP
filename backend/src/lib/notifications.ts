@@ -1,4 +1,4 @@
-import { prisma } from "@backend/prisma";
+import { prisma } from "@backend/lib/prisma";
 import type { NotificationType } from "@prisma/client";
 
 export async function notify(params: {

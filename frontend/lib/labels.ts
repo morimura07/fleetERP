@@ -21,7 +21,7 @@ import type {
   BudgetControl,
   DriverDocType,
   ReconStatus,
-} from "@prisma/client";
+} from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
 

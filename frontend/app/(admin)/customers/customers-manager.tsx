@@ -3,15 +3,15 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "lucide-react";
-import { DataTable, type Column } from "@/components/data/data-table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useToast } from "@/components/ui/toast";
-import { customerSchema, type CustomerInput } from "@/lib/validations";
-import { apiFetch, ApiError } from "@/lib/fetcher";
+import { DataTable, type Column } from "@frontend/components/data/data-table";
+import { Button } from "@frontend/components/ui/button";
+import { Input } from "@frontend/components/ui/input";
+import { Label } from "@frontend/components/ui/label";
+import { Badge } from "@frontend/components/ui/badge";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
+import { useToast } from "@frontend/components/ui/toast";
+import { customerSchema, type CustomerInput } from "@frontend/lib/validations";
+import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 
 interface Customer extends CustomerInput { id: string; }
 

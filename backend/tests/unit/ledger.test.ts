@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkBalanced, type LineInput } from "@/lib/services/ledger";
+import { checkBalanced, type LineInput } from "@backend/services/ledger";
 
 describe("checkBalanced", () => {
   const line = (debit: string, credit: string): LineInput => ({

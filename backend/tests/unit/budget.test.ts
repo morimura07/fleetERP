@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Prisma } from "@prisma/client";
-import { checkBudget, lineStatus } from "@/lib/services/budget";
+import { checkBudget, lineStatus } from "@backend/services/budget";
 
 const D = (v: string) => new Prisma.Decimal(v);
 

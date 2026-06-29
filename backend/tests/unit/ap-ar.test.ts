@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { vendorInvoiceTotal, customerInvoiceTotal, agingBucket } from "@/lib/services/ap-ar";
+import { vendorInvoiceTotal, customerInvoiceTotal, agingBucket } from "@backend/services/ap-ar";
 
 describe("vendorInvoiceTotal", () => {
   it("computes net payable = subtotal + vat − wht", () => {

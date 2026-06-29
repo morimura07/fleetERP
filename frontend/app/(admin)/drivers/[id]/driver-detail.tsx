@@ -1,13 +1,13 @@
 "use client";
 import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/toast";
-import { WEEKDAYS } from "@/lib/labels";
-import { apiFetch } from "@/lib/fetcher";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@frontend/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
+import { Button } from "@frontend/components/ui/button";
+import { Input } from "@frontend/components/ui/input";
+import { Label } from "@frontend/components/ui/label";
+import { useToast } from "@frontend/components/ui/toast";
+import { WEEKDAYS } from "@frontend/lib/labels";
+import { apiFetch } from "@frontend/lib/fetcher";
 import { Trash2 } from "lucide-react";
 
 interface Availability { weekday: number; startTime: string; endTime: string; isActive: boolean; }

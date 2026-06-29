@@ -2,12 +2,13 @@ import {
   Package, Truck, Users, CheckCircle2, TrendingUp, Navigation,
   ClipboardList, FileText, Wallet, Gauge, type LucideIcon,
 } from "lucide-react";
-import { getDashboardStats, getExecutiveStats } from "@/lib/services/dashboard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/layout/page-header";
-import { SplitGauge } from "@/components/data/split-gauge";
-import { formatYen } from "@/lib/utils";
+import { serverApi } from "@frontend/lib/server-api";
+import type { DashboardStats, ExecutiveStats } from "@frontend/lib/api-types";
+import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
+import { Badge } from "@frontend/components/ui/badge";
+import { PageHeader } from "@frontend/components/layout/page-header";
+import { SplitGauge } from "@frontend/components/data/split-gauge";
+import { formatYen } from "@frontend/lib/utils";
 
 const usd = (v: string, currency = "USD") =>
   `${currency} ${Math.round(parseFloat(v)).toLocaleString()}`;
@@ -45,7 +46,10 @@ function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; children: Re
 }
 
 export default async function DashboardPage() {
-  const [stats, exec] = await Promise.all([getDashboardStats(), getExecutiveStats()]);
+  const [stats, exec] = await Promise.all([
+    serverApi<DashboardStats>("/api/dashboard/stats"),
+    serverApi<ExecutiveStats>("/api/dashboard/executive"),
+  ]);
   const maxRev = Math.max(...stats.monthlySeries.map((m) => m.revenue), 1);
   const profit = parseFloat(exec.tripProfit);
 

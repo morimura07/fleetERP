@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { prisma } from "@/lib/prisma";
-import { checkDispatchConflict, availableDrivers } from "@/lib/services/dispatch";
+import { prisma } from "@backend/lib/prisma";
+import { checkDispatchConflict, availableDrivers } from "@backend/services/dispatch";
 
 /**
  * Integration test — requires a reachable PostgreSQL (DATABASE_URL) with the

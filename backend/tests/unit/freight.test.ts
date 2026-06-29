@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { tripPnL } from "@/lib/services/freight";
+import { tripPnL } from "@backend/services/freight";
 
 describe("tripPnL", () => {
   it("computes profit as revenue minus expenses", () => {

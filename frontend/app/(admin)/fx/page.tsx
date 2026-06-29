@@ -1,4 +1,4 @@
-import { PageHeader } from "@/components/layout/page-header";
+import { PageHeader } from "@frontend/components/layout/page-header";
 import { FxManager } from "./fx-manager";
 
 export const metadata = { title: "Exchange Rates | FleetFlow" };

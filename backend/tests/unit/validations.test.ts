@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { dispatchSchema, dailyReportSchema, vehicleSchema, paginationSchema } from "@/lib/validations";
+import { dispatchSchema, dailyReportSchema, vehicleSchema, paginationSchema } from "@backend/lib/validations";
 
 describe("dispatchSchema", () => {
   const base = { jobId: "c".repeat(25), driverId: "c".repeat(25), vehicleId: "c".repeat(25) };

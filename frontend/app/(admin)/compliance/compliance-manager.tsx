@@ -1,13 +1,13 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { ShieldCheck, AlertTriangle, XCircle, HelpCircle, Truck, User, Fuel } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Loader } from "@/components/ui/loader";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { apiFetch } from "@/lib/fetcher";
-import { DOC_BUCKET_LABEL, DOC_BUCKET_VARIANT, FUEL_STATUS_LABEL, FUEL_STATUS_VARIANT } from "@/lib/labels";
+import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
+import { Badge } from "@frontend/components/ui/badge";
+import { Loader } from "@frontend/components/ui/loader";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@frontend/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@frontend/components/ui/table";
+import { apiFetch } from "@frontend/lib/fetcher";
+import { DOC_BUCKET_LABEL, DOC_BUCKET_VARIANT, FUEL_STATUS_LABEL, FUEL_STATUS_VARIANT } from "@frontend/lib/labels";
 import type { LucideIcon } from "lucide-react";
 
 interface ComplianceItem {

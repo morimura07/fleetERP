@@ -1,4 +1,4 @@
-import { prisma } from "@backend/prisma";
+import { prisma } from "@backend/lib/prisma";
 
 /** Record an audit-log entry. Failures must never break the main flow. */
 export async function logActivity(params: {

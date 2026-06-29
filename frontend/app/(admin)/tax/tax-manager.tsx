@@ -1,12 +1,12 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { Receipt, ArrowDownToLine, ArrowUpFromLine, Scale, Landmark } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Loader } from "@/components/ui/loader";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { apiFetch } from "@/lib/fetcher";
+import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
+import { Input } from "@frontend/components/ui/input";
+import { Badge } from "@frontend/components/ui/badge";
+import { Loader } from "@frontend/components/ui/loader";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@frontend/components/ui/table";
+import { apiFetch } from "@frontend/lib/fetcher";
 import type { LucideIcon } from "lucide-react";
 
 interface TaxReturn {

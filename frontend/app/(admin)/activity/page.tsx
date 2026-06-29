@@ -1,6 +1,6 @@
 "use client";
-import { DataTable, type Column } from "@/components/data/data-table";
-import { formatDate } from "@/lib/utils";
+import { DataTable, type Column } from "@frontend/components/data/data-table";
+import { formatDate } from "@frontend/lib/utils";
 
 interface Log {
   id: string; action: string; target: string; ipAddress: string | null; createdAt: string;

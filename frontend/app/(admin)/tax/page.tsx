@@ -1,4 +1,4 @@
-import { PageHeader } from "@/components/layout/page-header";
+import { PageHeader } from "@frontend/components/layout/page-header";
 import { TaxManager } from "./tax-manager";
 
 export const metadata = { title: "Tax | FleetFlow" };

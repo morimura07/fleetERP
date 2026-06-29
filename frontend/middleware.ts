@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/auth.config";
-import { ROUTE_GUARDS, can } from "@/lib/rbac";
+import { ROUTE_GUARDS, can } from "@frontend/lib/rbac";
 
 const { auth } = NextAuth(authConfig);
 
