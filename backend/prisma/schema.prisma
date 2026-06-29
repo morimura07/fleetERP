@@ -1,0 +1,1042 @@
+// FleetFlow — 軽貨物運送会社向け配送管理システム
+// Prisma schema. PostgreSQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── Enums ─────────────────────────
+
+enum Role {
+  ADMIN
+  DISPATCHER
+  FINANCE // Finance Controller — GL/AP/AR/budget/tax/payroll, no fleet ops
+  DRIVER
+  STAFF
+}
+
+enum DriverStatus {
+  ACTIVE
+  VACATION
+  INACTIVE
+}
+
+enum ContractType {
+  EMPLOYEE // 社員
+  CONTRACTOR // 業務委託
+  PARTTIME // アルバイト
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  MAINTENANCE
+  UNAVAILABLE
+}
+
+enum JobStatus {
+  PENDING // 受付
+  WAITING_DISPATCH // 配車待ち
+  ASSIGNED // 配車済
+  DELIVERING // 配送中
+  COMPLETED // 完了
+  CANCELLED // キャンセル
+}
+
+enum DispatchStatus {
+  SCHEDULED
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum NotificationType {
+  DISPATCH // 配車通知
+  JOB_UPDATE // 案件更新通知
+  COMPLETION // 完了通知
+  SYSTEM
+}
+
+// ───────────────────────── Accounting (Ledger) ─────────────────────────
+
+// Double-entry chart-of-accounts classification.
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+// A journal entry is immutable once POSTED; corrections are made by REVERSED contra-entries.
+enum JournalStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+// ───────────────────────── Freight (Orders & Trips) ─────────────────────────
+
+enum OrderStatus {
+  DRAFT // quote / not yet confirmed
+  CONFIRMED // accepted by customer, awaiting trip
+  IN_TRANSIT // a trip is executing
+  DELIVERED // cargo delivered
+  INVOICED // AR invoice posted to the ledger
+  CANCELLED
+}
+
+enum TripStatus {
+  PLANNED
+  DISPATCHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// Northern: Mombasa→Uganda→Rwanda/DRC. Central: Dar es Salaam→Zambia→DRC.
+enum CorridorType {
+  NORTHERN
+  CENTRAL
+  DOMESTIC
+}
+
+// Trip cost categories — map 1:1 to expense accounts in the chart of accounts.
+enum TripExpenseType {
+  FUEL // 5000
+  TOLLS // 5010
+  BORDER_FEES // 5020
+  DRIVER_ALLOWANCE // 5030
+  DEMURRAGE // 5040
+  MAINTENANCE // 5100
+  OTHER
+}
+
+// ───────────────────────── AP / AR (M1 / M2) ─────────────────────────
+
+enum PaymentTerm {
+  NET_30
+  NET_60
+  COD // cash on delivery
+}
+
+enum VendorGroup {
+  FUEL_SUPPLIER
+  SPARE_PARTS
+  CLEARING_AGENT
+  SUBCONTRACTED_FLEET
+  STATUTORY
+  OTHER
+}
+
+// Invoice lifecycle for both AP bills and AR invoices.
+//   DRAFT → POSTED (ledger entry created) → PAID (settlement posted) | CANCELLED
+enum InvoiceStatus {
+  DRAFT
+  POSTED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+// ───────────────────────── Phase 2 — Core Finance (M3 / M4 / M5) ─────────────────────────
+
+// Exchange-rate type selectable per posting / consolidation run (PRD §7, M5).
+enum RateType {
+  SPOT // transaction-date market rate
+  AVERAGE // period-average rate (P&L revaluation)
+  HISTORICAL // rate at acquisition (equity / fixed assets)
+}
+
+// Cash & Bank (M4) — account kind so mobile-money floats are distinguished from banks.
+enum BankAccountType {
+  BANK // CRDB, KCB, Stanbic … (IBAN/SWIFT)
+  MOBILE_MONEY // M-Pesa / Airtel float
+  CASH // petty cash drawer
+}
+
+// Mobile-money / bank disbursement category to a driver (PRD M4).
+enum DisbursementType {
+  FUEL_ALLOWANCE
+  TOLLS
+  BORDER_FEES
+  EMERGENCY_REPAIR
+  DRIVER_ADVANCE
+  OTHER
+}
+
+// Disbursement settlement lifecycle, mirroring the external API callback (PRD §5).
+//   PENDING → SUCCESS (ledgered) | FAILED | TIMEOUT
+enum TransferStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  TIMEOUT
+}
+
+// Budget kind (M3).
+enum BudgetKind {
+  CAPEX
+  OPEX
+}
+
+// Budget control behavior when a posting would exceed the line (PRD M3).
+enum BudgetControl {
+  STRICT_BLOCK // reject the transaction
+  WARNING_ONLY // allow but flag
+  OVERRIDE // allow only with director override
+}
+
+// ───────────────────────── Phase 3 — Operations (M11 / M12 / M30) ─────────────────────────
+
+// Driver compliance document categories (PRD M11). Each has its own expiry that
+// must be flagged before a border crossing.
+enum DriverDocType {
+  LICENSE // driving licence
+  PASSPORT
+  COMESA_PERMIT // cross-border transit permit
+  YELLOW_FEVER // health certificate
+  WORK_PERMIT
+  OTHER
+}
+
+// Freight-bill reconciliation against the carrier invoice (PRD M12).
+enum ReconStatus {
+  UNRECONCILED
+  MATCHED
+  DISCREPANCY
+}
+
+// Source of a vehicle position ping. STUB until a telematics provider is wired
+// up (PRD §5 live tracking — integration-gated on provider credentials).
+enum PositionSource {
+  STUB
+  GPS
+  MANUAL
+}
+
+// ───────────────────────── Auth / User ─────────────────────────
+
+model User {
+  id                String    @id @default(cuid())
+  name              String
+  email             String    @unique
+  passwordHash      String
+  role              Role      @default(STAFF)
+  isActive          Boolean   @default(true)
+  emailVerified     DateTime?
+  image             String?
+  resetToken        String?   @unique
+  resetTokenExpires DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // 1:1 — a DRIVER user is linked to a Driver record
+  driver           Driver?
+  notifications    Notification[]
+  activityLogs     ActivityLog[]
+  dispatches       Dispatch[]        @relation("DispatchCreatedBy")
+  journalEntries   JournalEntry[]    @relation("JournalCreatedBy")
+  orders           Order[]           @relation("OrderCreatedBy")
+  trips            Trip[]            @relation("TripCreatedBy")
+  vendorInvoices   VendorInvoice[]   @relation("VendorInvoiceCreatedBy")
+  customerInvoices CustomerInvoice[] @relation("CustomerInvoiceCreatedBy")
+  moneyTransfers   MoneyTransfer[]   @relation("MoneyTransferCreatedBy")
+  budgets          Budget[]          @relation("BudgetCreatedBy")
+
+  @@index([role])
+  @@map("users")
+}
+
+// ───────────────────────── Driver ─────────────────────────
+
+model Driver {
+  id           String       @id @default(cuid())
+  userId       String?      @unique
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name         String
+  email        String       @unique
+  phone        String
+  address      String
+  contractType ContractType @default(CONTRACTOR)
+  joinedAt     DateTime
+  status       DriverStatus @default(ACTIVE)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  availability DriverAvailability[]
+  holidays     Holiday[]
+  dispatches   Dispatch[]
+  dailyReports DailyReport[]
+  payments     Payment[]
+  trips        Trip[]
+  transfers    MoneyTransfer[]
+  documents    DriverDocument[]
+
+  @@index([status])
+  @@map("drivers")
+}
+
+// 稼働設定 (per weekday working hours)
+model DriverAvailability {
+  id        String   @id @default(cuid())
+  driverId  String
+  driver    Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  weekday   Int // 0 = Sunday .. 6 = Saturday
+  startTime String // "HH:mm"
+  endTime   String // "HH:mm"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([driverId, weekday])
+  @@map("driver_availabilities")
+}
+
+// 休日管理
+model Holiday {
+  id        String   @id @default(cuid())
+  driverId  String
+  driver    Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@unique([driverId, date])
+  @@index([date])
+  @@map("holidays")
+}
+
+// ───────────────────────── Vehicle ─────────────────────────
+
+model Vehicle {
+  id               String        @id @default(cuid())
+  vehicleNumber    String        @unique // 社内管理番号
+  plateNumber      String        @unique // ナンバープレート
+  maker            String
+  model            String
+  insuranceExpiry  DateTime      @db.Date
+  inspectionExpiry DateTime      @db.Date // 車検満了
+  status           VehicleStatus @default(AVAILABLE)
+
+  // M11 cross-border compliance (PRD §4.2). Optional so existing rows stay valid.
+  comesaPermitExpiry DateTime? @db.Date // COMESA transit permit
+  yellowCardExpiry   DateTime? @db.Date // Yellow Card insurance (cross-border)
+  // Fuel-efficiency target: km per litre when loaded, for siphoning/efficiency checks.
+  fuelTargetKmPerL   Decimal?  @db.Decimal(6, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  maintenances VehicleMaintenance[]
+  dispatches   Dispatch[]
+  trips        Trip[]
+  position     VehiclePosition?
+
+  @@index([status])
+  @@map("vehicles")
+}
+
+model VehicleMaintenance {
+  id              String   @id @default(cuid())
+  vehicleId       String
+  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  maintenanceType String // 整備種別 (オイル交換, 車検, タイヤ など)
+  date            DateTime @db.Date
+  cost            Int // 円
+  note            String?
+  createdAt       DateTime @default(now())
+
+  @@index([vehicleId])
+  @@map("vehicle_maintenances")
+}
+
+// ───────────────────────── Client (荷主) ─────────────────────────
+
+model Client {
+  id            String   @id @default(cuid())
+  companyName   String
+  contactPerson String
+  phone         String
+  address       String
+  email         String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  jobs   DeliveryJob[]
+  orders Order[]
+
+  @@index([companyName])
+  @@map("clients")
+}
+
+// ───────────────────────── DeliveryJob (配送案件) ─────────────────────────
+
+model DeliveryJob {
+  id               String    @id @default(cuid())
+  jobCode          String    @unique
+  clientId         String
+  client           Client    @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  pickupAddress    String
+  deliveryAddress  String
+  deliveryDate     DateTime
+  cargoDescription String
+  rewardAmount     Int // 報酬 (円)
+  note             String?
+  status           JobStatus @default(PENDING)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  dispatch    Dispatch?
+  dailyReport DailyReport?
+
+  @@index([status])
+  @@index([deliveryDate])
+  @@index([clientId])
+  @@map("delivery_jobs")
+}
+
+// ───────────────────────── Dispatch (配車) ─────────────────────────
+
+model Dispatch {
+  id             String         @id @default(cuid())
+  jobId          String         @unique
+  job            DeliveryJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  driverId       String
+  driver         Driver         @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  vehicleId      String
+  vehicle        Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  scheduledStart DateTime
+  scheduledEnd   DateTime
+  status         DispatchStatus @default(SCHEDULED)
+  createdById    String?
+  createdBy      User?          @relation("DispatchCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([driverId, scheduledStart])
+  @@index([vehicleId, scheduledStart])
+  @@map("dispatches")
+}
+
+// ───────────────────────── DailyReport (日報) ─────────────────────────
+
+model DailyReport {
+  id            String      @id @default(cuid())
+  jobId         String      @unique
+  job           DeliveryJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  driverId      String
+  driver        Driver      @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  workStart     DateTime
+  workEnd       DateTime
+  mileage       Int // km
+  note          String?
+  proofImageUrl String? // 配送完了証跡
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([driverId])
+  @@map("daily_reports")
+}
+
+// ───────────────────────── Payment (報酬) ─────────────────────────
+
+model Payment {
+  id          String    @id @default(cuid())
+  driverId    String
+  driver      Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  year        Int
+  month       Int // 1-12
+  totalAmount Int // 集計報酬 (円)
+  jobCount    Int
+  finalizedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([driverId, year, month])
+  @@map("payments")
+}
+
+// ───────────────────────── Notification ─────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+// ───────────────────────── ActivityLog (監査ログ) ─────────────────────────
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String // CREATE / UPDATE / DELETE / LOGIN ...
+  target    String // "Driver:abc123"
+  detail    String? // JSON string of changes
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+// ───────────────────────── Account (勘定科目) ─────────────────────────
+
+// Chart of accounts. `code` is the human-facing account number (e.g. "1000").
+// `dataAreaId` carries the legal-entity partition (PRD §7) so a single ledger
+// table can serve multiple companies without re-migrating later.
+model Account {
+  id         String      @id @default(cuid())
+  dataAreaId String      @default("HQ01") // legal entity (TZ01, KE01, HQ01 …)
+  code       String
+  name       String
+  type       AccountType
+  parentId   String?
+  parent     Account?    @relation("AccountTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children   Account[]   @relation("AccountTree")
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  lines JournalLine[]
+
+  @@unique([dataAreaId, code])
+  @@index([type])
+  @@map("accounts")
+}
+
+// ───────────────────────── JournalEntry (仕訳伝票) ─────────────────────────
+
+// A balanced double-entry voucher. Once POSTED it is immutable; a correction is
+// a new entry that REVERSES it (see `reversalOfId`).
+model JournalEntry {
+  id            String        @id @default(cuid())
+  dataAreaId    String        @default("HQ01")
+  voucherNumber String
+  postingDate   DateTime      @db.Date
+  currency      String        @default("USD") // ISO 4217 (USD, TZS, KES …)
+  exchangeRate  Decimal       @default(1) @db.Decimal(18, 6) // to base currency, recorded per posting
+  memo          String?
+  status        JournalStatus @default(DRAFT)
+
+  // Correction trail: a REVERSED entry points back to the entry it cancels.
+  reversalOfId String?       @unique
+  reversalOf   JournalEntry? @relation("Reversal", fields: [reversalOfId], references: [id], onDelete: SetNull)
+  reversedBy   JournalEntry? @relation("Reversal")
+
+  postedAt    DateTime?
+  createdById String?
+  createdBy   User?     @relation("JournalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  lines JournalLine[]
+
+  // Reverse links from freight settlements (a posting may settle an order or expense).
+  orderInvoice           Order?           @relation("OrderInvoice")
+  tripExpense            TripExpense?     @relation("TripExpenseEntry")
+  // AP / AR settlement links.
+  vendorInvoicePosting   VendorInvoice?   @relation("VendorInvoicePosting")
+  vendorPayment          VendorPayment?   @relation("VendorPaymentEntry")
+  customerInvoicePosting CustomerInvoice? @relation("CustomerInvoicePosting")
+  customerReceipt        CustomerReceipt? @relation("CustomerReceiptEntry")
+  moneyTransfer          MoneyTransfer?   @relation("MoneyTransferEntry")
+
+  @@unique([dataAreaId, voucherNumber])
+  @@index([status])
+  @@index([postingDate])
+  @@map("journal_entries")
+}
+
+// One side of a posting. Exactly one of debit/credit is non-zero per line, and
+// SUM(debit) == SUM(credit) across an entry (enforced in services/ledger.ts).
+model JournalLine {
+  id        String       @id @default(cuid())
+  entryId   String
+  entry     JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  accountId String
+  account   Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  debit     Decimal      @default(0) @db.Decimal(18, 2)
+  credit    Decimal      @default(0) @db.Decimal(18, 2)
+  memo      String?
+  // Free-form dimension for branch / cost-object tagging (PRD M8 dimensions).
+  dimension String?
+
+  @@index([entryId])
+  @@index([accountId])
+  @@map("journal_lines")
+}
+
+// ───────────────────────── Order (受注 / Freight Booking) ─────────────────────────
+
+// A cross-border freight order/booking (PRD M2 billing + M12 load). Revenue side
+// of the business; settled to the ledger as an AR invoice when INVOICED.
+model Order {
+  id               String       @id @default(cuid())
+  dataAreaId       String       @default("HQ01")
+  orderCode        String       @unique
+  clientId         String
+  client           Client       @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  originZone       String // e.g. "Dar es Salaam Port"
+  destinationZone  String // e.g. "Kigali Depot"
+  corridor         CorridorType @default(DOMESTIC)
+  cargoDescription String
+  grossWeightKg    Decimal      @default(0) @db.Decimal(12, 2)
+  volumeCbm        Decimal      @default(0) @db.Decimal(12, 2)
+  freightAmount    Decimal      @db.Decimal(18, 2) // quoted/agreed revenue
+  demurrageAmount  Decimal      @default(0) @db.Decimal(18, 2)
+  currency         String       @default("USD")
+  bookingDate      DateTime     @db.Date
+  status           OrderStatus  @default(DRAFT)
+
+  // Ledger link: the AR invoice journal entry created on invoicing.
+  invoiceEntryId String?       @unique
+  invoiceEntry   JournalEntry? @relation("OrderInvoice", fields: [invoiceEntryId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?    @relation("OrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trip Trip?
+
+  @@index([status])
+  @@index([clientId])
+  @@index([bookingDate])
+  @@map("orders")
+}
+
+// ───────────────────────── Trip (運行 / Execution) ─────────────────────────
+
+// Execution of an order by a driver+vehicle over a route. Holds the operational
+// expenses whose sum feeds Trip P&L = order revenue − trip expenses.
+model Trip {
+  id             String       @id @default(cuid())
+  dataAreaId     String       @default("HQ01")
+  tripCode       String       @unique
+  orderId        String       @unique
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driverId       String
+  driver         Driver       @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  vehicleId      String
+  vehicle        Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  corridor       CorridorType @default(DOMESTIC)
+  mileageKm      Decimal      @default(0) @db.Decimal(12, 2)
+  transitHours   Decimal      @default(0) @db.Decimal(10, 2)
+  scheduledStart DateTime
+  scheduledEnd   DateTime
+  status         TripStatus   @default(PLANNED)
+
+  // M11 fuel efficiency: actual litres consumed → actual km/L vs vehicle target.
+  fuelLitres Decimal? @db.Decimal(10, 2)
+
+  // M12 freight-bill reconciliation against the carrier invoice.
+  reconStatus       ReconStatus @default(UNRECONCILED)
+  carrierInvoiceRef String?
+
+  createdById String?
+  createdBy   User?    @relation("TripCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  expenses TripExpense[]
+
+  @@index([driverId, scheduledStart])
+  @@index([vehicleId, scheduledStart])
+  @@index([status])
+  @@index([reconStatus])
+  @@map("trips")
+}
+
+// A single operational cost on a trip. When posted, references its journal entry.
+model TripExpense {
+  id       String          @id @default(cuid())
+  tripId   String
+  trip     Trip            @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  type     TripExpenseType
+  amount   Decimal         @db.Decimal(18, 2)
+  currency String          @default("USD")
+  note     String?
+
+  // Ledger link: the expense journal entry created when this cost is posted.
+  entryId String?       @unique
+  entry   JournalEntry? @relation("TripExpenseEntry", fields: [entryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([tripId])
+  @@map("trip_expenses")
+}
+
+// ───────────────────────── Vendor (M1 — Accounts Payable) ─────────────────────────
+
+model Vendor {
+  id          String      @id @default(cuid())
+  dataAreaId  String      @default("HQ01")
+  code        String // AP-VND-001
+  legalName   String
+  group       VendorGroup @default(OTHER)
+  tin         String? // tax identification number (country-validated)
+  vrn         String? // VAT registration number
+  paymentTerm PaymentTerm @default(NET_30)
+  currency    String      @default("USD")
+  email       String?
+  phone       String?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  invoices VendorInvoice[]
+
+  @@unique([dataAreaId, code])
+  @@index([group])
+  @@map("vendors")
+}
+
+// AP bill. Posted to the ledger as Dr <expense/asset> + Dr VAT recoverable
+// / Cr Accounts Payable (2000) − Cr Withholding Tax Payable (2110).
+model VendorInvoice {
+  id            String        @id @default(cuid())
+  dataAreaId    String        @default("HQ01")
+  invoiceNumber String // vendor's invoice no (unique per vendor)
+  vendorId      String
+  vendor        Vendor        @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  invoiceDate   DateTime      @db.Date
+  dueDate       DateTime?     @db.Date
+  currency      String        @default("USD")
+  subtotal      Decimal       @db.Decimal(18, 2)
+  vatAmount     Decimal       @default(0) @db.Decimal(18, 2)
+  whtAmount     Decimal       @default(0) @db.Decimal(18, 2) // withholding tax
+  total         Decimal       @db.Decimal(18, 2) // subtotal + vat − wht (net payable)
+  paidAmount    Decimal       @default(0) @db.Decimal(18, 2)
+  expenseCode   String        @default("6100") // COA expense account this bill hits
+  memo          String?
+  status        InvoiceStatus @default(DRAFT)
+
+  // Ledger links
+  postingEntryId String?       @unique
+  postingEntry   JournalEntry? @relation("VendorInvoicePosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?    @relation("VendorInvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  payments VendorPayment[]
+
+  @@unique([vendorId, invoiceNumber])
+  @@index([status])
+  @@index([dueDate])
+  @@map("vendor_invoices")
+}
+
+// A settlement against an AP bill: Dr Accounts Payable / Cr Bank.
+model VendorPayment {
+  id        String        @id @default(cuid())
+  invoiceId String
+  invoice   VendorInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount    Decimal       @db.Decimal(18, 2)
+  paidAt    DateTime      @db.Date
+  bankCode  String        @default("1010") // COA bank/cash account credited
+  reference String?
+
+  entryId String?       @unique
+  entry   JournalEntry? @relation("VendorPaymentEntry", fields: [entryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId])
+  @@map("vendor_payments")
+}
+
+// ───────────────────────── Customer (M2 — Accounts Receivable) ─────────────────────────
+
+model Customer {
+  id          String   @id @default(cuid())
+  dataAreaId  String   @default("HQ01")
+  code        String // AR-CST-001
+  name        String
+  tin         String?
+  creditLimit Decimal  @default(0) @db.Decimal(18, 2)
+  creditDays  Int      @default(30)
+  taxExempt   Boolean  @default(false) // diplomatic / transit
+  currency    String   @default("USD")
+  email       String?
+  phone       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  invoices CustomerInvoice[]
+
+  @@unique([dataAreaId, code])
+  @@index([name])
+  @@map("customers")
+}
+
+// AR invoice. Posted as Dr Accounts Receivable (1100)
+// / Cr <revenue> + Cr VAT Payable (2100).
+model CustomerInvoice {
+  id            String        @id @default(cuid())
+  dataAreaId    String        @default("HQ01")
+  invoiceNumber String // system AR no (AR-INV-000001)
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  invoiceDate   DateTime      @db.Date
+  dueDate       DateTime?     @db.Date
+  currency      String        @default("USD")
+  subtotal      Decimal       @db.Decimal(18, 2)
+  vatAmount     Decimal       @default(0) @db.Decimal(18, 2)
+  total         Decimal       @db.Decimal(18, 2)
+  paidAmount    Decimal       @default(0) @db.Decimal(18, 2)
+  revenueCode   String        @default("4000") // COA revenue account this invoice credits
+  tripId        String? // optional link to a trip (demurrage / freight billing)
+  memo          String?
+  status        InvoiceStatus @default(DRAFT)
+
+  postingEntryId String?       @unique
+  postingEntry   JournalEntry? @relation("CustomerInvoicePosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?    @relation("CustomerInvoiceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  receipts CustomerReceipt[]
+
+  @@unique([dataAreaId, invoiceNumber])
+  @@index([status])
+  @@index([dueDate])
+  @@map("customer_invoices")
+}
+
+// A receipt against an AR invoice: Dr Bank / Cr Accounts Receivable.
+model CustomerReceipt {
+  id         String          @id @default(cuid())
+  invoiceId  String
+  invoice    CustomerInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount     Decimal         @db.Decimal(18, 2)
+  receivedAt DateTime        @db.Date
+  bankCode   String          @default("1010")
+  reference  String?
+
+  entryId String?       @unique
+  entry   JournalEntry? @relation("CustomerReceiptEntry", fields: [entryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId])
+  @@map("customer_receipts")
+}
+
+// ───────────────────────── Multi-currency (M8 / M5) ─────────────────────────
+
+// A dated exchange rate from `currency` to `baseCurrency` for a given rate type.
+// Lookups take the most recent rate on/before the posting date (PRD §7).
+model ExchangeRate {
+  id           String   @id @default(cuid())
+  dataAreaId   String   @default("HQ01")
+  currency     String // ISO 4217 of the foreign currency (TZS, KES …)
+  baseCurrency String   @default("USD")
+  rateType     RateType @default(SPOT)
+  rate         Decimal  @db.Decimal(18, 6) // multiply foreign × rate → base
+  validFrom    DateTime @db.Date
+  createdAt    DateTime @default(now())
+
+  @@unique([dataAreaId, currency, baseCurrency, rateType, validFrom])
+  @@index([dataAreaId, currency, rateType])
+  @@map("exchange_rates")
+}
+
+// ───────────────────────── Cash & Bank (M4) ─────────────────────────
+
+// A bank / mobile-money / cash account, linked to its GL control account (glCode).
+model BankAccount {
+  id         String          @id @default(cuid())
+  dataAreaId String          @default("HQ01")
+  code       String // internal code, e.g. BANK-CRDB-USD
+  name       String // "CRDB — Main USD"
+  type       BankAccountType @default(BANK)
+  glCode     String // COA account this cash account maps to (1010, 1030 …)
+  currency   String          @default("USD")
+  iban       String?
+  swift      String?
+  provider   String? // Safaricom / Airtel / CRDB …
+  accountNo  String? // bank account or mobile MSISDN
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  transfers MoneyTransfer[]
+
+  @@unique([dataAreaId, code])
+  @@index([type])
+  @@map("bank_accounts")
+}
+
+// A disbursement to a driver from a bank/mobile-money account. When SUCCESS it
+// posts Dr <disbursement expense> / Cr <bank gl> and links the journal entry.
+model MoneyTransfer {
+  id            String           @id @default(cuid())
+  dataAreaId    String           @default("HQ01")
+  reference     String // internal reference / receipt no
+  bankAccountId String
+  bankAccount   BankAccount      @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  driverId      String?
+  driver        Driver?          @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  type          DisbursementType @default(OTHER)
+  amount        Decimal          @db.Decimal(18, 2)
+  currency      String           @default("USD")
+  expenseCode   String           @default("5030") // COA expense debited (driver allowance default)
+  externalRef   String? // M-Pesa/Airtel transaction id from the callback
+  status        TransferStatus   @default(PENDING)
+  transferredAt DateTime         @db.Date
+  memo          String?
+
+  // Ledger link: the disbursement journal entry, created when status → SUCCESS.
+  entryId String?       @unique
+  entry   JournalEntry? @relation("MoneyTransferEntry", fields: [entryId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?    @relation("MoneyTransferCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([bankAccountId])
+  @@index([driverId])
+  @@index([status])
+  @@map("money_transfers")
+}
+
+// ───────────────────────── Budgeting (M3) ─────────────────────────
+
+// A budget period (typically a fiscal year) per legal entity.
+model Budget {
+  id          String        @id @default(cuid())
+  dataAreaId  String        @default("HQ01")
+  name        String // "FY2026 Operating Budget"
+  fiscalYear  Int
+  control     BudgetControl @default(WARNING_ONLY)
+  isActive    Boolean       @default(true)
+  createdById String?
+  createdBy   User?         @relation("BudgetCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  lines BudgetLine[]
+
+  @@unique([dataAreaId, fiscalYear, name])
+  @@index([fiscalYear])
+  @@map("budgets")
+}
+
+// A budgeted amount for a cost center + GL account. `consumed` is updated in
+// real time as financial postings hit the account (PRD M3).
+model BudgetLine {
+  id          String     @id @default(cuid())
+  budgetId    String
+  budget      Budget     @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  kind        BudgetKind @default(OPEX)
+  costCenter  String // "Fleet Operations", "Workshop Mombasa"
+  accountCode String // COA account this line governs
+  amount      Decimal    @db.Decimal(18, 2) // budgeted ceiling
+  consumed    Decimal    @default(0) @db.Decimal(18, 2) // posted-to-date
+  note        String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([budgetId, costCenter, accountCode])
+  @@index([budgetId])
+  @@map("budget_lines")
+}
+
+// ───────────────────────── Consolidations (M5) ─────────────────────────
+
+// Maps a subsidiary entity's account to a parent (HQ) ledger account, so a
+// consolidation run can roll subsidiary balances up into the parent (PRD M5).
+model ConsolidationMap {
+  id            String   @id @default(cuid())
+  parentArea    String   @default("HQ01") // consolidating entity
+  subsidiary    String // source entity (TZ01, KE01 …)
+  subAccount    String // account code in the subsidiary
+  parentAccount String // account code in the parent
+  createdAt     DateTime @default(now())
+
+  @@unique([parentArea, subsidiary, subAccount])
+  @@index([parentArea, subsidiary])
+  @@map("consolidation_maps")
+}
+
+// ───────────────────────── Driver Documents (M11) ─────────────────────────
+
+// A compliance document for a driver, with its own expiry. Drives the
+// border-impound risk warnings on the compliance dashboard (PRD §2.2, §8.3).
+model DriverDocument {
+  id        String        @id @default(cuid())
+  driverId  String
+  driver    Driver        @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  type      DriverDocType
+  number    String? // document / certificate number
+  issuedAt  DateTime?     @db.Date
+  expiresAt DateTime      @db.Date
+  note      String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([driverId, type])
+  @@index([expiresAt])
+  @@map("driver_documents")
+}
+
+// ───────────────────────── GPS Waypoints (M30 Common) ─────────────────────────
+
+// A named checkpoint on the corridors (Chalinze, Malaba, Namanga …) with
+// coordinates. Master data for route planning and the border-turnaround tracker.
+model GpsWaypoint {
+  id        String   @id @default(cuid())
+  code      String   @unique // CHALINZE, MALABA …
+  name      String
+  kind      String   @default("CHECKPOINT") // CHECKPOINT / BORDER / WEIGHBRIDGE / DEPOT
+  lat       Decimal  @db.Decimal(9, 6)
+  lng       Decimal  @db.Decimal(9, 6)
+  country   String? // ISO country of the point
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind])
+  @@map("gps_waypoints")
+}
+
+// Last-known position of a vehicle. One row per vehicle, updated by the tracking
+// feed. `source` stays STUB until a telematics provider is wired up (PRD §5).
+model VehiclePosition {
+  id           String         @id @default(cuid())
+  vehicleId    String         @unique
+  vehicle      Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  lat          Decimal        @db.Decimal(9, 6)
+  lng          Decimal        @db.Decimal(9, 6)
+  speedKph     Decimal?       @db.Decimal(6, 2)
+  headingDeg   Int?
+  source       PositionSource @default(STUB)
+  nearWaypoint String? // resolved nearest waypoint code, if any
+  pingedAt     DateTime
+  updatedAt    DateTime       @updatedAt
+
+  @@map("vehicle_positions")
+}
