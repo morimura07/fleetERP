@@ -1,3 +1,4 @@
+import "../src/lib/load-env";
 import { PrismaClient, AccountType } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { invoiceOrder, postTripExpense } from "@backend/services/freight";
