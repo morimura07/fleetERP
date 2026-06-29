@@ -19,6 +19,8 @@ import type {
   TransferStatus,
   BudgetKind,
   BudgetControl,
+  DriverDocType,
+  ReconStatus,
 } from "@prisma/client";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -218,4 +220,54 @@ export const BUDGET_CONTROL_LABEL: Record<BudgetControl, string> = {
   STRICT_BLOCK: "Strict Block",
   WARNING_ONLY: "Warning Only",
   OVERRIDE: "Director Override",
+};
+
+// ───────── Phase 3: Operations ─────────
+export const DRIVER_DOC_LABEL: Record<DriverDocType, string> = {
+  LICENSE: "Driving Licence",
+  PASSPORT: "Passport",
+  COMESA_PERMIT: "COMESA Permit",
+  YELLOW_FEVER: "Yellow Fever Cert",
+  WORK_PERMIT: "Work Permit",
+  OTHER: "Other",
+};
+
+export const RECON_STATUS_LABEL: Record<ReconStatus, string> = {
+  UNRECONCILED: "Unreconciled",
+  MATCHED: "Matched",
+  DISCREPANCY: "Discrepancy",
+};
+
+export const RECON_STATUS_VARIANT: Record<ReconStatus, BadgeVariant> = {
+  UNRECONCILED: "secondary",
+  MATCHED: "success",
+  DISCREPANCY: "destructive",
+};
+
+// Document lifecycle bucket (compliance dashboard) — string keys, not a Prisma enum.
+export const DOC_BUCKET_LABEL: Record<string, string> = {
+  CURRENT: "Current",
+  EXPIRING_SOON: "Expiring Soon",
+  EXPIRED: "Expired",
+  MISSING: "Missing",
+};
+
+export const DOC_BUCKET_VARIANT: Record<string, BadgeVariant> = {
+  CURRENT: "success",
+  EXPIRING_SOON: "warning",
+  EXPIRED: "destructive",
+  MISSING: "secondary",
+};
+
+// Fuel-efficiency status.
+export const FUEL_STATUS_LABEL: Record<string, string> = {
+  MEETS_TARGET: "Meets Target",
+  BELOW_EXPECTED: "Below Expected",
+  NO_DATA: "No Data",
+};
+
+export const FUEL_STATUS_VARIANT: Record<string, BadgeVariant> = {
+  MEETS_TARGET: "success",
+  BELOW_EXPECTED: "destructive",
+  NO_DATA: "secondary",
 };

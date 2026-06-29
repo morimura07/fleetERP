@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/auth-guard";
 import { ok, handleError, error } from "@/lib/api";
-import { idSchema, tripBaseSchema } from "@/lib/validations";
+import { idSchema, tripBaseSchema, tripReconSchema } from "@/lib/validations";
 import { computeTripPnL } from "@/lib/services/freight";
 import { logActivity } from "@/lib/activity";
 
@@ -54,6 +54,31 @@ export async function PATCH(
     const body = tripBaseSchema.partial().parse(await req.json());
     const trip = await prisma.trip.update({ where: { id }, data: body });
     await logActivity({ userId: user.id, action: "UPDATE", target: `Trip:${id}` });
+    return ok(trip);
+  } catch (e) {
+    return handleError(e);
+  }
+}
+
+/** Freight-bill reconciliation (M12): set recon status, carrier ref, fuel litres. */
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const user = await requirePermission("trip:write");
+    const { id } = await params;
+    idSchema.parse(id);
+    const body = tripReconSchema.parse(await req.json());
+    const trip = await prisma.trip.update({
+      where: { id },
+      data: {
+        reconStatus: body.reconStatus,
+        carrierInvoiceRef: body.carrierInvoiceRef,
+        ...(body.fuelLitres !== undefined ? { fuelLitres: body.fuelLitres } : {}),
+      },
+    });
+    await logActivity({ userId: user.id, action: "RECONCILE", target: `Trip:${id}`, detail: { reconStatus: body.reconStatus } });
     return ok(trip);
   } catch (e) {
     return handleError(e);

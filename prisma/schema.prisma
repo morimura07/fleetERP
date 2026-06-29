@@ -191,6 +191,34 @@ enum BudgetControl {
   OVERRIDE // allow only with director override
 }
 
+// ───────────────────────── Phase 3 — Operations (M11 / M12 / M30) ─────────────────────────
+
+// Driver compliance document categories (PRD M11). Each has its own expiry that
+// must be flagged before a border crossing.
+enum DriverDocType {
+  LICENSE // driving licence
+  PASSPORT
+  COMESA_PERMIT // cross-border transit permit
+  YELLOW_FEVER // health certificate
+  WORK_PERMIT
+  OTHER
+}
+
+// Freight-bill reconciliation against the carrier invoice (PRD M12).
+enum ReconStatus {
+  UNRECONCILED
+  MATCHED
+  DISCREPANCY
+}
+
+// Source of a vehicle position ping. STUB until a telematics provider is wired
+// up (PRD §5 live tracking — integration-gated on provider credentials).
+enum PositionSource {
+  STUB
+  GPS
+  MANUAL
+}
+
 // ───────────────────────── Auth / User ─────────────────────────
 
 model User {
@@ -247,6 +275,7 @@ model Driver {
   payments     Payment[]
   trips        Trip[]
   transfers    MoneyTransfer[]
+  documents    DriverDocument[]
 
   @@index([status])
   @@map("drivers")
@@ -293,12 +322,20 @@ model Vehicle {
   insuranceExpiry  DateTime      @db.Date
   inspectionExpiry DateTime      @db.Date // 車検満了
   status           VehicleStatus @default(AVAILABLE)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+
+  // M11 cross-border compliance (PRD §4.2). Optional so existing rows stay valid.
+  comesaPermitExpiry DateTime? @db.Date // COMESA transit permit
+  yellowCardExpiry   DateTime? @db.Date // Yellow Card insurance (cross-border)
+  // Fuel-efficiency target: km per litre when loaded, for siphoning/efficiency checks.
+  fuelTargetKmPerL   Decimal?  @db.Decimal(6, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   maintenances VehicleMaintenance[]
   dispatches   Dispatch[]
   trips        Trip[]
+  position     VehiclePosition?
 
   @@index([status])
   @@map("vehicles")
@@ -605,6 +642,13 @@ model Trip {
   scheduledEnd   DateTime
   status         TripStatus   @default(PLANNED)
 
+  // M11 fuel efficiency: actual litres consumed → actual km/L vs vehicle target.
+  fuelLitres Decimal? @db.Decimal(10, 2)
+
+  // M12 freight-bill reconciliation against the carrier invoice.
+  reconStatus       ReconStatus @default(UNRECONCILED)
+  carrierInvoiceRef String?
+
   createdById String?
   createdBy   User?    @relation("TripCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
@@ -615,6 +659,7 @@ model Trip {
   @@index([driverId, scheduledStart])
   @@index([vehicleId, scheduledStart])
   @@index([status])
+  @@index([reconStatus])
   @@map("trips")
 }
 
@@ -935,4 +980,63 @@ model ConsolidationMap {
   @@unique([parentArea, subsidiary, subAccount])
   @@index([parentArea, subsidiary])
   @@map("consolidation_maps")
+}
+
+// ───────────────────────── Driver Documents (M11) ─────────────────────────
+
+// A compliance document for a driver, with its own expiry. Drives the
+// border-impound risk warnings on the compliance dashboard (PRD §2.2, §8.3).
+model DriverDocument {
+  id        String        @id @default(cuid())
+  driverId  String
+  driver    Driver        @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  type      DriverDocType
+  number    String? // document / certificate number
+  issuedAt  DateTime?     @db.Date
+  expiresAt DateTime      @db.Date
+  note      String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([driverId, type])
+  @@index([expiresAt])
+  @@map("driver_documents")
+}
+
+// ───────────────────────── GPS Waypoints (M30 Common) ─────────────────────────
+
+// A named checkpoint on the corridors (Chalinze, Malaba, Namanga …) with
+// coordinates. Master data for route planning and the border-turnaround tracker.
+model GpsWaypoint {
+  id        String   @id @default(cuid())
+  code      String   @unique // CHALINZE, MALABA …
+  name      String
+  kind      String   @default("CHECKPOINT") // CHECKPOINT / BORDER / WEIGHBRIDGE / DEPOT
+  lat       Decimal  @db.Decimal(9, 6)
+  lng       Decimal  @db.Decimal(9, 6)
+  country   String? // ISO country of the point
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind])
+  @@map("gps_waypoints")
+}
+
+// Last-known position of a vehicle. One row per vehicle, updated by the tracking
+// feed. `source` stays STUB until a telematics provider is wired up (PRD §5).
+model VehiclePosition {
+  id           String         @id @default(cuid())
+  vehicleId    String         @unique
+  vehicle      Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  lat          Decimal        @db.Decimal(9, 6)
+  lng          Decimal        @db.Decimal(9, 6)
+  speedKph     Decimal?       @db.Decimal(6, 2)
+  headingDeg   Int?
+  source       PositionSource @default(STUB)
+  nearWaypoint String? // resolved nearest waypoint code, if any
+  pingedAt     DateTime
+  updatedAt    DateTime       @updatedAt
+
+  @@map("vehicle_positions")
 }

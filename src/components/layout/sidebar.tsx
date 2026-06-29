@@ -8,6 +8,7 @@ import {
   ReceiptText, HandCoins, Store, Contact,
   Percent, AlarmClock,
   Landmark, PiggyBank, Combine, Coins,
+  ShieldCheck, MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Role } from "@prisma/client";
@@ -54,6 +55,8 @@ const GROUPS: NavGroup[] = [
       { href: "/drivers", label: "Drivers", icon: Users, perm: "driver:read" },
       { href: "/vehicles", label: "Vehicles", icon: Truck, perm: "vehicle:read" },
       { href: "/clients", label: "Clients", icon: Building2, perm: "client:read" },
+      { href: "/compliance", label: "Compliance", icon: ShieldCheck, perm: "compliance:read" },
+      { href: "/waypoints", label: "GPS Waypoints", icon: MapPin, perm: "waypoint:read" },
       { href: "/reports", label: "Daily Reports", icon: FileText, perm: "report:read" },
     ],
   },

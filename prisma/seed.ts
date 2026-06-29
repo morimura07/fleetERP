@@ -366,6 +366,52 @@ async function main() {
     console.log("  Demo Phase 2: skipped (bank accounts already exist)");
   }
 
+  // ── Demo Phase 3 — Operations (M11/M12/M30) — guarded for clean re-runs ──
+  if ((await prisma.gpsWaypoint.count()) === 0) {
+    const day = 86_400_000;
+    const now = Date.now();
+
+    // M11 vehicle compliance + fuel target on V-001 (one doc expiring soon).
+    await prisma.vehicle.update({
+      where: { id: vehicle.id },
+      data: {
+        comesaPermitExpiry: new Date(now + 10 * day), // within 14-day window → EXPIRING_SOON
+        yellowCardExpiry: new Date(now + 200 * day),
+        fuelTargetKmPerL: "3.50",
+      },
+    });
+
+    // M11 driver compliance documents (one expired, the rest current).
+    await prisma.driverDocument.createMany({
+      data: [
+        { driverId: driver.id, type: "LICENSE", number: "DL-TZ-0091", expiresAt: new Date(now + 300 * day) },
+        { driverId: driver.id, type: "PASSPORT", number: "P-TZ-7781", expiresAt: new Date(now + 365 * day) },
+        { driverId: driver.id, type: "COMESA_PERMIT", number: "CMS-2025-22", expiresAt: new Date(now - 5 * day) }, // EXPIRED
+        { driverId: driver.id, type: "YELLOW_FEVER", number: "YF-3310", expiresAt: new Date(now + 8 * day) }, // EXPIRING_SOON
+      ],
+    });
+
+    // M30 GPS waypoints — real corridor checkpoints.
+    await prisma.gpsWaypoint.createMany({
+      data: [
+        { code: "CHALINZE", name: "Chalinze Junction", kind: "CHECKPOINT", lat: "-6.638000", lng: "38.357000", country: "TZ" },
+        { code: "TUNDUMA", name: "Tunduma Border", kind: "BORDER", lat: "-9.300000", lng: "32.770000", country: "TZ" },
+        { code: "MALABA", name: "Malaba Border Post", kind: "BORDER", lat: "0.636000", lng: "34.275000", country: "KE" },
+        { code: "NAMANGA", name: "Namanga Border", kind: "BORDER", lat: "-2.545000", lng: "36.792000", country: "KE" },
+        { code: "NAKURU", name: "Nakuru Weighbridge", kind: "WEIGHBRIDGE", lat: "-0.303000", lng: "36.080000", country: "KE" },
+      ],
+    });
+
+    // Stubbed last-known position for V-001 (telematics provider pending).
+    await prisma.vehiclePosition.create({
+      data: { vehicleId: vehicle.id, lat: "-6.638000", lng: "38.357000", source: "STUB", nearWaypoint: "CHALINZE", pingedAt: new Date(), speedKph: "62.00", headingDeg: 270 },
+    });
+
+    console.log("  Demo Phase 3: vehicle compliance + 4 driver docs, 5 waypoints, 1 stub position");
+  } else {
+    console.log("  Demo Phase 3: skipped (waypoints already exist)");
+  }
+
   console.log("✅ Seed complete.\n  admin@fleetflow.local / admin1234\n  dispatcher@fleetflow.local / dispatch1234\n  finance@fleetflow.local / finance1234\n  driver@fleetflow.local / driver1234\n  staff@fleetflow.local / staff1234");
 }
 

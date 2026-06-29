@@ -56,6 +56,10 @@ export type Permission =
   | "fx:write"
   | "consolidation:read" // subsidiary→parent mapping & rollup (M5)
   | "consolidation:run"
+  | "compliance:read" // vehicle & driver document-expiry dashboard (M11)
+  | "waypoint:read" // GPS waypoint registry (M30 Common)
+  | "waypoint:write"
+  | "tracking:read" // live vehicle positions (M12 / §5)
   | "export:run"
   | "activity:read"
   | "user:manage";
@@ -109,6 +113,10 @@ const ALL: Permission[] = [
   "fx:write",
   "consolidation:read",
   "consolidation:run",
+  "compliance:read",
+  "waypoint:read",
+  "waypoint:write",
+  "tracking:read",
   "export:run",
   "activity:read",
   "user:manage",
@@ -143,6 +151,10 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "bank:read",
     "budget:read",
     "fx:read",
+    "compliance:read",
+    "waypoint:read",
+    "waypoint:write",
+    "tracking:read",
     "export:run",
   ],
   // Finance Controller — accounting authority, read-only on operations.
@@ -183,6 +195,9 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "fx:write",
     "consolidation:read",
     "consolidation:run",
+    "compliance:read",
+    "waypoint:read",
+    "tracking:read",
     "report:read",
     "activity:read",
     "export:run",
@@ -215,6 +230,9 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "budget:read",
     "fx:read",
     "consolidation:read",
+    "compliance:read",
+    "waypoint:read",
+    "tracking:read",
   ],
 };
 
@@ -251,6 +269,9 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/budgets", permission: "budget:read" },
   { prefix: "/fx", permission: "fx:read" },
   { prefix: "/consolidation", permission: "consolidation:read" },
+  { prefix: "/compliance", permission: "compliance:read" },
+  { prefix: "/waypoints", permission: "waypoint:read" },
+  { prefix: "/tracking", permission: "tracking:read" },
   { prefix: "/activity", permission: "activity:read" },
   { prefix: "/users", permission: "user:manage" },
 ];

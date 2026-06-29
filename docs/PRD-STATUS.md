@@ -10,12 +10,12 @@ Maps the implementation against the contracted scope in `ERP_PRD_v1.0.pdf` (Mori
 
 | Metric | Value |
 |--------|-------|
-| Prisma models | 31 |
-| Migrations applied | 6 |
-| Admin screens | 25 |
-| RBAC permissions | 51 |
+| Prisma models | 34 |
+| Migrations applied | 7 |
+| Admin screens | 27 |
+| RBAC permissions | 58 |
 | Roles | 5 (ADMIN, DISPATCHER, FINANCE, DRIVER, STAFF) |
-| Unit tests | 58 passing |
+| Unit tests | 68 passing |
 
 ## Phase status
 
@@ -23,7 +23,7 @@ Maps the implementation against the contracted scope in `ERP_PRD_v1.0.pdf` (Mori
 |-------|-------|--------|
 | **1 — Foundation** | RBAC, GL, basic AP/AR, multi-company, audit | ✅ Done (see foundation gaps below) |
 | **2 — Core Finance** | Budgeting, Cash & Bank, Tax, Consolidations, multi-currency | ✅ Done |
-| **3 — Operations** | Fleet, Transport, GPS, Common | 🟡 Partial |
+| **3 — Operations** | Fleet, Transport, GPS, Common | ✅ Done (live GPS feed integration-gated) |
 | **4 — Inventory & Payroll** | Inventory, Warehouse, Procurement, Payroll, Expense | ⬜ Not started |
 | **5 — Assets & HR** | Fixed Assets, Service Mgmt, HR, Time & Attendance | ⬜ Not started |
 | **6 — Commercial & Dashboard** | Sales, Retail/POS, Projects, Cost Acct, Master Planning, Dashboard | 🟡 Partial |
@@ -39,7 +39,7 @@ Maps the implementation against the contracted scope in `ERP_PRD_v1.0.pdf` (Mori
 | M3 | Budgeting | ✅ | CapEx/OpEx lines per cost center; STRICT_BLOCK / WARNING_ONLY / OVERRIDE; consumed wired into trip-expense & AP posting (account-level). |
 | M4 | Cash & Bank | ✅ | Bank / mobile-money / cash accounts; driver disbursements with PENDING→SUCCESS\|FAILED\|TIMEOUT lifecycle, ledgered on settle. **Live M-Pesa/Airtel & bank-feed APIs are stubs.** |
 | M5 | Consolidations | ✅ | Subsidiary→parent account mapping, rate-type rollup, unmapped/missing-rate flags. |
-| M6 | Cost Accounting | 🟡 | Per-trip P&L exists (`computeTripPnL`). **Per-truck / per-corridor / per-contract profitability not built.** |
+| M6 | Cost Accounting | 🟡 | Per-trip P&L exists (`computeTripPnL`) + fuel efficiency per vehicle. **Per-corridor / per-contract profitability not built.** |
 | M7 | Credit & Collections | 🟡 | Aging buckets (`agingBucket`) + collections view. **Collection statuses (Dispute/Legal/Blocked) not modeled.** |
 | M8 | General Ledger | ✅ | Double-entry, immutable POSTED + contra-reversal, dimensions, per-posting FX rate. **Multi-currency revaluation not built.** |
 | M9 | Payroll | ⬜ | Driver `Payment` aggregation exists but **no PAYE/NSSF/SHIF tax computation**. |
@@ -49,8 +49,8 @@ Maps the implementation against the contracted scope in `ERP_PRD_v1.0.pdf` (Mori
 
 | # | Module | Status | Notes |
 |---|--------|--------|-------|
-| M11 | Fleet Management | 🟡 | Vehicle registry + maintenance + insurance/inspection expiry. **Missing: COMESA permit, Yellow Card, passport, Yellow Fever, fuel-efficiency targets.** |
-| M12 | Transportation Mgmt | 🟡 | Orders, Trips, corridors, weight/CBM, Trip P&L. **Freight-bill reconciliation status not modeled; no live tracking.** |
+| M11 | Fleet Management | ✅ | Vehicle registry + maintenance + insurance/inspection/COMESA/Yellow Card expiry; driver documents (licence/passport/Yellow Fever/COMESA); fuel-efficiency targets & monitoring. Unified compliance dashboard with 14-day warning window. |
+| M12 | Transportation Mgmt | ✅ | Orders, Trips, corridors, weight/CBM, Trip P&L, freight-bill reconciliation (Unreconciled/Matched/Discrepancy). **Live GPS tracking is integration-gated** (positions modeled, feed stubbed). |
 
 ### Inventory & Supply Chain (M13–M18)
 
@@ -81,7 +81,7 @@ Maps the implementation against the contracted scope in `ERP_PRD_v1.0.pdf` (Mori
 
 | # | Module | Status | Notes |
 |---|--------|--------|-------|
-| M30 | Common (GPS waypoints, UoM) | ⬜ | |
+| M30 | Common (GPS waypoints, UoM) | 🟡 | GPS waypoint registry (named checkpoints/borders/weighbridges + lat/long) built. **Units-of-measure registry not yet.** |
 | M31 | Audit Workbench | 🟡 | `ActivityLog` records writes. **Field-level old/new-value diff not captured per §7.** |
 | M32 | Demo / Sandbox | 🟡 | Seed data exists; **no isolated sandbox partition.** |
 | M33 | Master Planning | ⬜ | |

@@ -103,7 +103,7 @@ An integrated ERP for cross-border logistics across the East & Central Africa tr
 
 ## 4. Data Model
 
-The Prisma schema (`prisma/schema.prisma`) defines **31 models**, grouped by domain:
+The Prisma schema (`prisma/schema.prisma`) defines **34 models**, grouped by domain:
 
 **Auth & org**
 - `User` (5 roles) / `ActivityLog` (audit log) / `Notification`
@@ -125,6 +125,9 @@ The Prisma schema (`prisma/schema.prisma`) defines **31 models**, grouped by dom
 
 **Core Finance (M3 / M4 / M5 / multi-currency)**
 - `Budget` / `BudgetLine` / `BankAccount` / `MoneyTransfer` / `ConsolidationMap` / `ExchangeRate`
+
+**Operations (M11 / M12 / M30)**
+- `DriverDocument` / `GpsWaypoint` / `VehiclePosition` (+ compliance & fuel fields on `Vehicle`/`Trip`)
 
 > See [docs/DATABASE.md](docs/DATABASE.md) for detailed table definitions and relations, and [docs/PRD-STATUS.md](docs/PRD-STATUS.md) for the 36-module PRD coverage map.
 
@@ -178,6 +181,8 @@ Permissions are centralized in a "role → permission" map in `lib/rbac.ts`, enf
 | `/drivers` · `/drivers/[id]` | Driver CRUD / availability & holidays | ADMIN |
 | `/vehicles` | Vehicle CRUD + maintenance history | ADMIN |
 | `/clients` | Client CRUD | ADMIN, DISPATCHER |
+| `/compliance` | Document-expiry dashboard + fuel-efficiency monitor (M11) | ADMIN, DISPATCHER, FINANCE, STAFF |
+| `/waypoints` | GPS waypoint registry (M30) | ADMIN, DISPATCHER |
 | `/reports` | Daily report review (PDF export) | ADMIN, DISPATCHER, STAFF |
 | `/activity` | Audit log | ADMIN |
 | `/users` | User management | ADMIN |

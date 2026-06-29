@@ -71,6 +71,47 @@ export const vehicleSchema = z.object({
   insuranceExpiry: z.coerce.date(),
   inspectionExpiry: z.coerce.date(),
   status: z.enum(["AVAILABLE", "MAINTENANCE", "UNAVAILABLE"]).default("AVAILABLE"),
+  // M11 cross-border compliance (optional)
+  comesaPermitExpiry: z.coerce.date().optional().nullable(),
+  yellowCardExpiry: z.coerce.date().optional().nullable(),
+  fuelTargetKmPerL: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/, "km/L must be a positive number")
+    .optional()
+    .nullable(),
+});
+
+// ───────── Phase 3: Driver compliance documents (M11) ─────────
+export const driverDocumentSchema = z.object({
+  type: z.enum(["LICENSE", "PASSPORT", "COMESA_PERMIT", "YELLOW_FEVER", "WORK_PERMIT", "OTHER"]),
+  number: z.string().max(60).optional(),
+  issuedAt: z.coerce.date().optional().nullable(),
+  expiresAt: z.coerce.date(),
+  note: z.string().max(255).optional(),
+});
+
+// ───────── Phase 3: GPS waypoint (M30 Common) ─────────
+const coord = (min: number, max: number) =>
+  z.coerce.number().min(min).max(max);
+export const waypointSchema = z.object({
+  code: z.string().min(1, "Code is required").max(40).transform((s) => s.toUpperCase()),
+  name: z.string().min(1, "Name is required").max(120),
+  kind: z.enum(["CHECKPOINT", "BORDER", "WEIGHBRIDGE", "DEPOT"]).default("CHECKPOINT"),
+  lat: coord(-90, 90),
+  lng: coord(-180, 180),
+  country: z.string().max(40).optional(),
+  isActive: z.boolean().default(true),
+});
+
+// ───────── Phase 3: Trip freight-bill reconciliation (M12) ─────────
+export const tripReconSchema = z.object({
+  reconStatus: z.enum(["UNRECONCILED", "MATCHED", "DISCREPANCY"]),
+  carrierInvoiceRef: z.string().max(80).optional(),
+  fuelLitres: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/, "Litres must be a positive number")
+    .optional()
+    .nullable(),
 });
 
 export const maintenanceSchema = z.object({
@@ -420,3 +461,6 @@ export type BankAccountInput = z.infer<typeof bankAccountSchema>;
 export type MoneyTransferInput = z.infer<typeof moneyTransferSchema>;
 export type BudgetInput = z.infer<typeof budgetSchema>;
 export type ConsolidationMapInput = z.infer<typeof consolidationMapSchema>;
+export type DriverDocumentInput = z.infer<typeof driverDocumentSchema>;
+export type WaypointInput = z.infer<typeof waypointSchema>;
+export type TripReconInput = z.infer<typeof tripReconSchema>;
