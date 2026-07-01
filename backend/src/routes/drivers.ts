@@ -14,6 +14,7 @@ import { hashPassword } from "@backend/lib/password";
 import { rateLimit } from "@backend/lib/rate-limit";
 import { AuthError } from "@backend/lib/errors";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { updateWithVersion, requireVersion } from "@backend/lib/concurrency";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 export const drivers = new Hono();
@@ -101,18 +102,17 @@ drivers.get("/:id", requireAuth, requirePermission("driver:read"), async (c) => 
 drivers.patch("/:id", requireAuth, requirePermission("driver:write"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
-  const body = driverSchema.partial().parse(await c.req.json());
-  const driver = await prisma.driver.update({
-    where: { id },
-    data: {
-      name: body.name,
-      email: body.email?.toLowerCase(),
-      phone: body.phone,
-      address: body.address,
-      contractType: body.contractType,
-      joinedAt: body.joinedAt,
-      status: body.status,
-    },
+  const raw = await c.req.json();
+  const version = requireVersion(raw);
+  const body = driverSchema.partial().parse(raw);
+  const driver = await updateWithVersion(prisma.driver, id, version, user.id, {
+    name: body.name,
+    email: body.email?.toLowerCase(),
+    phone: body.phone,
+    address: body.address,
+    contractType: body.contractType,
+    joinedAt: body.joinedAt,
+    status: body.status,
   });
   await logActivity({ userId: user.id, action: "UPDATE", target: `Driver:${id}`, detail: body });
   return ok(c, driver);

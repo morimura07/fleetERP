@@ -11,16 +11,19 @@ import { logActivity } from "@backend/lib/activity";
 import { can } from "@backend/lib/rbac";
 import { AuthError } from "@backend/lib/errors";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 export const ledger = new Hono();
 
 ledger.get("/", requireAuth, requirePermission("ledger:read"), async (c) => {
+  const user = c.get("user");
   const sp = c.req.query();
   const { page, pageSize, q } = paginationSchema.parse(sp);
   const status = sp.status;
 
   const where: Prisma.JournalEntryWhereInput = {
+    ...areaScope(user),
     ...(q
       ? {
           OR: [
@@ -55,7 +58,7 @@ ledger.post("/", requireAuth, async (c) => {
 
   const entry = await createJournalEntry(
     {
-      dataAreaId: body.dataAreaId,
+      dataAreaId: areaForWrite(user, body.dataAreaId),
       postingDate: body.postingDate,
       currency: body.currency,
       exchangeRate: body.exchangeRate,
@@ -76,13 +79,14 @@ ledger.post("/", requireAuth, async (c) => {
 });
 
 ledger.get("/:id", requireAuth, requirePermission("ledger:read"), async (c) => {
+  const user = c.get("user");
   const id = c.req.param("id");
   idSchema.parse(id);
   const entry = await prisma.journalEntry.findUnique({
     where: { id },
     include: { lines: { include: { account: { select: { code: true, name: true } } } } },
   });
-  if (!entry) throw new AuthError("Not found", 404);
+  assertSameArea(user, entry);
   return ok(c, entry);
 });
 

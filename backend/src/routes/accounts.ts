@@ -5,21 +5,26 @@ import { accountSchema, paginationSchema } from "@backend/lib/validations";
 import { buildOrderBy } from "@backend/lib/format";
 import { logActivity } from "@backend/lib/activity";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { areaScope, areaForWrite } from "@backend/lib/scope";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 export const accounts = new Hono();
 
 accounts.get("/", requireAuth, requirePermission("account:read"), async (c) => {
+  const user = c.get("user");
   const { page, pageSize, q, sort, order } = paginationSchema.parse(c.req.query());
 
-  const where: Prisma.AccountWhereInput = q
-    ? {
-        OR: [
-          { code: { contains: q, mode: "insensitive" } },
-          { name: { contains: q, mode: "insensitive" } },
-        ],
-      }
-    : {};
+  const where: Prisma.AccountWhereInput = {
+    ...areaScope(user),
+    ...(q
+      ? {
+          OR: [
+            { code: { contains: q, mode: "insensitive" } },
+            { name: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
 
   const [items, total] = await Promise.all([
     prisma.account.findMany({
@@ -36,7 +41,9 @@ accounts.get("/", requireAuth, requirePermission("account:read"), async (c) => {
 accounts.post("/", requireAuth, requirePermission("account:write"), async (c) => {
   const user = c.get("user");
   const body = accountSchema.parse(await c.req.json());
-  const account = await prisma.account.create({ data: body });
+  const account = await prisma.account.create({
+    data: { ...body, dataAreaId: areaForWrite(user, body.dataAreaId), createdById: user.id },
+  });
   await logActivity({ userId: user.id, action: "CREATE", target: `Account:${account.id}` });
   return created(c, account);
 });

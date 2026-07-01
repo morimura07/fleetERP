@@ -18,13 +18,15 @@ export interface AuthUser {
   name: string;
   role: Role;
   driverId: string | null;
+  /** Legal entity the user belongs to; drives multi-company data isolation. */
+  dataAreaId: string;
 }
 
 const secret = () => new TextEncoder().encode(process.env.JWT_SECRET ?? "dev-secret-change-me");
 const EXPIRES = process.env.JWT_EXPIRES ?? "1d";
 
 export async function signToken(user: AuthUser): Promise<string> {
-  return new SignJWT({ email: user.email, role: user.role, driverId: user.driverId, name: user.name })
+  return new SignJWT({ email: user.email, role: user.role, driverId: user.driverId, name: user.name, dataAreaId: user.dataAreaId })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
@@ -40,6 +42,7 @@ export async function verifyToken(token: string): Promise<AuthUser> {
     name: payload.name as string,
     role: payload.role as Role,
     driverId: (payload.driverId as string | null) ?? null,
+    dataAreaId: (payload.dataAreaId as string) ?? "HQ01",
   };
 }
 
@@ -52,7 +55,7 @@ export async function authenticate(email: string, password: string): Promise<Aut
   if (!user || !user.isActive) throw new AuthError("Invalid credentials", 401);
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) throw new AuthError("Invalid credentials", 401);
-  return { id: user.id, email: user.email, name: user.name, role: user.role, driverId: user.driver?.id ?? null };
+  return { id: user.id, email: user.email, name: user.name, role: user.role, driverId: user.driver?.id ?? null, dataAreaId: user.dataAreaId };
 }
 
 declare module "hono" {

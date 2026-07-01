@@ -6,6 +6,7 @@ import { buildOrderBy } from "@backend/lib/format";
 import { logActivity } from "@backend/lib/activity";
 import { notifyDriver } from "@backend/lib/notifications";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { updateWithVersion, requireVersion } from "@backend/lib/concurrency";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 export const jobs = new Hono();
@@ -46,7 +47,7 @@ jobs.get("/", requireAuth, requirePermission("job:read"), async (c) => {
 jobs.post("/", requireAuth, requirePermission("job:write"), async (c) => {
   const user = c.get("user");
   const body = jobSchema.parse(await c.req.json());
-  const job = await prisma.deliveryJob.create({ data: body });
+  const job = await prisma.deliveryJob.create({ data: { ...body, createdById: user.id } });
   await logActivity({ userId: user.id, action: "CREATE", target: `DeliveryJob:${job.id}` });
   return created(c, job);
 });
@@ -67,13 +68,17 @@ jobs.get("/:id", requireAuth, requirePermission("job:read"), async (c) => {
 jobs.patch("/:id", requireAuth, requirePermission("job:write"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
-  const body = jobSchema.partial().parse(await c.req.json());
+  const raw = await c.req.json();
+  const version = requireVersion(raw);
+  const body = jobSchema.partial().parse(raw);
 
   const before = await prisma.deliveryJob.findUniqueOrThrow({
     where: { id },
     include: { dispatch: { select: { driverId: true } } },
   });
-  const job = await prisma.deliveryJob.update({ where: { id }, data: body });
+  const job = await updateWithVersion<{ id: string; jobCode: string }>(
+    prisma.deliveryJob, id, version, user.id, body,
+  );
 
   // Notify the assigned driver on status changes.
   if (body.status && body.status !== before.status && before.dispatch?.driverId) {

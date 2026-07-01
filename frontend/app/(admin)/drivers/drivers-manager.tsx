@@ -19,7 +19,7 @@ import { formatDate } from "@frontend/lib/utils";
 import type { DriverStatus, ContractType } from "@frontend/lib/enums";
 
 interface Driver {
-  id: string; name: string; email: string; phone: string; address: string;
+  id: string; version: number; name: string; email: string; phone: string; address: string;
   contractType: ContractType; joinedAt: string; status: DriverStatus;
 }
 
@@ -61,7 +61,8 @@ export function DriversManager() {
   async function onSubmit(data: DriverInput) {
     try {
       const path = editing ? `/api/drivers/${editing.id}` : "/api/drivers";
-      await apiFetch(path, { method: editing ? "PATCH" : "POST", body: JSON.stringify(data) });
+      const payload = editing ? { ...data, version: editing.version } : data;
+      await apiFetch(path, { method: editing ? "PATCH" : "POST", body: JSON.stringify(payload) });
       toast({ title: "Saved", variant: "success" });
       setOpen(false);
       setRefreshKey((k) => k + 1);

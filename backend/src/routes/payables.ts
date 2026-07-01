@@ -7,16 +7,19 @@ import { logActivity } from "@backend/lib/activity";
 import { can } from "@backend/lib/rbac";
 import { AuthError } from "@backend/lib/errors";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { areaScope } from "@backend/lib/scope";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 export const payables = new Hono();
 
 payables.get("/", requireAuth, requirePermission("payable:read"), async (c) => {
+  const user = c.get("user");
   const sp = c.req.query();
   const { page, pageSize, q } = paginationSchema.parse(sp);
   const status = sp.status;
 
   const where: Prisma.VendorInvoiceWhereInput = {
+    ...areaScope(user),
     ...(q
       ? {
           OR: [

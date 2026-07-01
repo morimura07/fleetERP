@@ -4,6 +4,7 @@ import { prisma } from "@backend/lib/prisma";
 import { orderSchema, paginationSchema } from "@backend/lib/validations";
 import { logActivity } from "@backend/lib/activity";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { areaScope, areaForWrite } from "@backend/lib/scope";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 /**
@@ -14,11 +15,13 @@ import { ok, created, pageMeta } from "@backend/lib/http";
 export const orders = new Hono();
 
 orders.get("/", requireAuth, requirePermission("order:read"), async (c) => {
+  const user = c.get("user");
   const sp = c.req.query();
   const { page, pageSize, q } = paginationSchema.parse(sp);
   const status = sp.status;
 
   const where: Prisma.OrderWhereInput = {
+    ...areaScope(user),
     ...(q
       ? {
           OR: [
@@ -48,7 +51,7 @@ orders.post("/", requireAuth, requirePermission("order:write"), async (c) => {
   const user = c.get("user");
   const body = orderSchema.parse(await c.req.json());
   const orderCode = `ORD-${Date.now().toString().slice(-8)}`;
-  const order = await prisma.order.create({ data: { ...body, orderCode, createdById: user.id } });
+  const order = await prisma.order.create({ data: { ...body, dataAreaId: areaForWrite(user, body.dataAreaId), orderCode, createdById: user.id } });
   await logActivity({ userId: user.id, action: "CREATE", target: `Order:${order.id}` });
   return created(c, order);
 });
