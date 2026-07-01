@@ -18,7 +18,7 @@ import { JOB_STATUS_LABEL, JOB_STATUS_VARIANT } from "@frontend/lib/labels";
 import { formatDate, formatYen } from "@frontend/lib/utils";
 import type { JobStatus } from "@frontend/lib/enums";
 
-interface Job extends JobInput { id: string; client?: { companyName: string }; }
+interface Job extends JobInput { id: string; version: number; client?: { companyName: string }; }
 
 export function JobsManager({ clients }: { clients: { id: string; companyName: string }[] }) {
   const { toast } = useToast();
@@ -52,7 +52,8 @@ export function JobsManager({ clients }: { clients: { id: string; companyName: s
   async function onSubmit(data: JobInput) {
     try {
       const path = editing ? `/api/jobs/${editing.id}` : "/api/jobs";
-      await apiFetch(path, { method: editing ? "PATCH" : "POST", body: JSON.stringify(data) });
+      const payload = editing ? { ...data, version: editing.version } : data;
+      await apiFetch(path, { method: editing ? "PATCH" : "POST", body: JSON.stringify(payload) });
       toast({ title: "Saved", variant: "success" });
       setOpen(false); setRefreshKey((k) => k + 1);
     } catch (e) {

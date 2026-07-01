@@ -10,6 +10,7 @@ import { logActivity } from "@backend/lib/activity";
 import { notifyDriver } from "@backend/lib/notifications";
 import { AuthError } from "@backend/lib/errors";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { updateWithVersion, requireVersion } from "@backend/lib/concurrency";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 export const dispatch = new Hono();
@@ -81,14 +82,16 @@ dispatch.get("/available", requireAuth, requirePermission("dispatch:write"), asy
 dispatch.patch("/:id", requireAuth, requirePermission("dispatch:write"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
-  const body = dispatchSchema.parse(await c.req.json());
+  const raw = await c.req.json();
+  const version = requireVersion(raw);
+  const body = dispatchSchema.parse(raw);
 
   const conflict = await checkDispatchConflict({ ...body, excludeDispatchId: id });
   if (conflict.hasConflict) {
     throw new AuthError("There is a scheduling conflict in this time window", 409, conflict);
   }
 
-  const updated = await prisma.dispatch.update({ where: { id }, data: body });
+  const updated = await updateWithVersion(prisma.dispatch, id, version, user.id, body);
   await logActivity({ userId: user.id, action: "UPDATE", target: `Dispatch:${id}`, detail: body });
   return ok(c, updated);
 });

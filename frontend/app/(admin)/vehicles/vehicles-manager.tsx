@@ -19,7 +19,7 @@ import type { VehicleStatus } from "@frontend/lib/enums";
 import { z } from "zod";
 
 interface Vehicle {
-  id: string; vehicleNumber: string; plateNumber: string; maker: string; model: string;
+  id: string; version: number; vehicleNumber: string; plateNumber: string; maker: string; model: string;
   insuranceExpiry: string; inspectionExpiry: string; status: VehicleStatus;
 }
 interface Maintenance { id: string; maintenanceType: string; date: string; cost: number; note: string | null; }
@@ -63,7 +63,8 @@ export function VehiclesManager() {
   async function onSubmit(data: VehicleInput) {
     try {
       const path = editing ? `/api/vehicles/${editing.id}` : "/api/vehicles";
-      await apiFetch(path, { method: editing ? "PATCH" : "POST", body: JSON.stringify(data) });
+      const payload = editing ? { ...data, version: editing.version } : data;
+      await apiFetch(path, { method: editing ? "PATCH" : "POST", body: JSON.stringify(payload) });
       toast({ title: "Saved", variant: "success" });
       setOpen(false); setRefreshKey((k) => k + 1);
     } catch (e) {

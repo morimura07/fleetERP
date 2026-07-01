@@ -7,16 +7,19 @@ import { logActivity } from "@backend/lib/activity";
 import { can } from "@backend/lib/rbac";
 import { AuthError } from "@backend/lib/errors";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { areaScope, areaForWrite } from "@backend/lib/scope";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 export const bank = new Hono();
 
 bank.get("/", requireAuth, requirePermission("bank:read"), async (c) => {
+  const user = c.get("user");
   const sp = c.req.query();
   const { page, pageSize, q } = paginationSchema.parse(sp);
   const type = sp.type;
 
   const where: Prisma.BankAccountWhereInput = {
+    ...areaScope(user),
     ...(q
       ? {
           OR: [
@@ -40,7 +43,7 @@ bank.post("/", requireAuth, requirePermission("bank:write"), async (c) => {
   const body = bankAccountSchema.parse(await c.req.json());
   const account = await prisma.bankAccount.create({
     data: {
-      dataAreaId: body.dataAreaId,
+      dataAreaId: areaForWrite(user, body.dataAreaId),
       code: body.code,
       name: body.name,
       type: body.type,
@@ -59,11 +62,13 @@ bank.post("/", requireAuth, requirePermission("bank:write"), async (c) => {
 
 // ---- money transfers / driver disbursements ----
 bank.get("/transfers", requireAuth, requirePermission("bank:read"), async (c) => {
+  const user = c.get("user");
   const sp = c.req.query();
   const { page, pageSize, q } = paginationSchema.parse(sp);
   const status = sp.status;
 
   const where: Prisma.MoneyTransferWhereInput = {
+    ...areaScope(user),
     ...(q
       ? {
           OR: [
@@ -100,7 +105,7 @@ bank.post("/transfers", requireAuth, async (c) => {
 
   const transfer = await prisma.moneyTransfer.create({
     data: {
-      dataAreaId: body.dataAreaId,
+      dataAreaId: areaForWrite(user, body.dataAreaId),
       reference: body.reference,
       bankAccountId: body.bankAccountId,
       driverId: body.driverId ?? null,

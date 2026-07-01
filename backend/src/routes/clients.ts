@@ -4,6 +4,7 @@ import { prisma } from "@backend/lib/prisma";
 import { clientSchema, paginationSchema } from "@backend/lib/validations";
 import { buildOrderBy } from "@backend/lib/format";
 import { logActivity } from "@backend/lib/activity";
+import { updateWithVersion, requireVersion } from "@backend/lib/concurrency";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
@@ -37,7 +38,7 @@ clients.get("/", requireAuth, requirePermission("client:read"), async (c) => {
 clients.post("/", requireAuth, requirePermission("client:write"), async (c) => {
   const user = c.get("user");
   const body = clientSchema.parse(await c.req.json());
-  const client = await prisma.client.create({ data: body });
+  const client = await prisma.client.create({ data: { ...body, createdById: user.id } });
   await logActivity({ userId: user.id, action: "CREATE", target: `Client:${client.id}` });
   return created(c, client);
 });
@@ -51,8 +52,10 @@ clients.get("/:id", requireAuth, requirePermission("client:read"), async (c) => 
 clients.patch("/:id", requireAuth, requirePermission("client:write"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
-  const body = clientSchema.partial().parse(await c.req.json());
-  const client = await prisma.client.update({ where: { id }, data: body });
+  const raw = await c.req.json();
+  const version = requireVersion(raw);
+  const body = clientSchema.partial().parse(raw);
+  const client = await updateWithVersion(prisma.client, id, version, user.id, body);
   await logActivity({ userId: user.id, action: "UPDATE", target: `Client:${id}`, detail: body });
   return ok(c, client);
 });

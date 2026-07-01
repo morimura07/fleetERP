@@ -227,6 +227,7 @@ model User {
   email             String    @unique
   passwordHash      String
   role              Role      @default(STAFF)
+  dataAreaId        String    @default("HQ01") // legal entity the user belongs to (multi-company isolation, PRD §6.2)
   isActive          Boolean   @default(true)
   emailVerified     DateTime?
   image             String?
@@ -249,6 +250,7 @@ model User {
   budgets          Budget[]          @relation("BudgetCreatedBy")
 
   @@index([role])
+  @@index([dataAreaId])
   @@map("users")
 }
 
@@ -276,6 +278,9 @@ model Driver {
   trips        Trip[]
   transfers    MoneyTransfer[]
   documents    DriverDocument[]
+  version      Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById  String? // audit: creator user id
+  updatedById  String? // audit: last-modifier user id
 
   @@index([status])
   @@map("drivers")
@@ -283,15 +288,18 @@ model Driver {
 
 // 稼働設定 (per weekday working hours)
 model DriverAvailability {
-  id        String   @id @default(cuid())
-  driverId  String
-  driver    Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  weekday   Int // 0 = Sunday .. 6 = Saturday
-  startTime String // "HH:mm"
-  endTime   String // "HH:mm"
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  driverId    String
+  driver      Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  weekday     Int // 0 = Sunday .. 6 = Saturday
+  startTime   String // "HH:mm"
+  endTime     String // "HH:mm"
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  version     Int      @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String? // audit: creator user id
+  updatedById String? // audit: last-modifier user id
 
   @@unique([driverId, weekday])
   @@map("driver_availabilities")
@@ -299,12 +307,15 @@ model DriverAvailability {
 
 // 休日管理
 model Holiday {
-  id        String   @id @default(cuid())
-  driverId  String
-  driver    Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  date      DateTime @db.Date
-  reason    String?
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  driverId    String
+  driver      Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  reason      String?
+  createdAt   DateTime @default(now())
+  version     Int      @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String? // audit: creator user id
+  updatedById String? // audit: last-modifier user id
 
   @@unique([driverId, date])
   @@index([date])
@@ -336,6 +347,9 @@ model Vehicle {
   dispatches   Dispatch[]
   trips        Trip[]
   position     VehiclePosition?
+  version      Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById  String? // audit: creator user id
+  updatedById  String? // audit: last-modifier user id
 
   @@index([status])
   @@map("vehicles")
@@ -350,6 +364,9 @@ model VehicleMaintenance {
   cost            Int // 円
   note            String?
   createdAt       DateTime @default(now())
+  version         Int      @default(0) // optimistic concurrency (PRD §7.1)
+  createdById     String? // audit: creator user id
+  updatedById     String? // audit: last-modifier user id
 
   @@index([vehicleId])
   @@map("vehicle_maintenances")
@@ -367,8 +384,11 @@ model Client {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  jobs   DeliveryJob[]
-  orders Order[]
+  jobs        DeliveryJob[]
+  orders      Order[]
+  version     Int           @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String? // audit: creator user id
+  updatedById String? // audit: last-modifier user id
 
   @@index([companyName])
   @@map("clients")
@@ -393,6 +413,9 @@ model DeliveryJob {
 
   dispatch    Dispatch?
   dailyReport DailyReport?
+  version     Int          @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String? // audit: creator user id
+  updatedById String? // audit: last-modifier user id
 
   @@index([status])
   @@index([deliveryDate])
@@ -417,6 +440,8 @@ model Dispatch {
   createdBy      User?          @relation("DispatchCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
+  version        Int            @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById    String? // audit: last-modifier user id
 
   @@index([driverId, scheduledStart])
   @@index([vehicleId, scheduledStart])
@@ -513,7 +538,10 @@ model Account {
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
-  lines JournalLine[]
+  lines       JournalLine[]
+  version     Int           @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String? // audit: creator user id
+  updatedById String? // audit: last-modifier user id
 
   @@unique([dataAreaId, code])
   @@index([type])
@@ -556,6 +584,8 @@ model JournalEntry {
   customerInvoicePosting CustomerInvoice? @relation("CustomerInvoicePosting")
   customerReceipt        CustomerReceipt? @relation("CustomerReceiptEntry")
   moneyTransfer          MoneyTransfer?   @relation("MoneyTransferEntry")
+  version                Int              @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById            String? // audit: last-modifier user id
 
   @@unique([dataAreaId, voucherNumber])
   @@index([status])
@@ -613,7 +643,9 @@ model Order {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  trip Trip?
+  trip        Trip?
+  version     Int     @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById String? // audit: last-modifier user id
 
   @@index([status])
   @@index([clientId])
@@ -654,7 +686,9 @@ model Trip {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  expenses TripExpense[]
+  expenses    TripExpense[]
+  version     Int           @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById String? // audit: last-modifier user id
 
   @@index([driverId, scheduledStart])
   @@index([vehicleId, scheduledStart])
@@ -701,7 +735,10 @@ model Vendor {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  invoices VendorInvoice[]
+  invoices    VendorInvoice[]
+  version     Int             @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String? // audit: creator user id
+  updatedById String? // audit: last-modifier user id
 
   @@unique([dataAreaId, code])
   @@index([group])
@@ -737,7 +774,9 @@ model VendorInvoice {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  payments VendorPayment[]
+  payments    VendorPayment[]
+  version     Int             @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById String? // audit: last-modifier user id
 
   @@unique([vendorId, invoiceNumber])
   @@index([status])
@@ -782,7 +821,10 @@ model Customer {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  invoices CustomerInvoice[]
+  invoices    CustomerInvoice[]
+  version     Int               @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String? // audit: creator user id
+  updatedById String? // audit: last-modifier user id
 
   @@unique([dataAreaId, code])
   @@index([name])
@@ -817,7 +859,9 @@ model CustomerInvoice {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  receipts CustomerReceipt[]
+  receipts    CustomerReceipt[]
+  version     Int               @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById String? // audit: last-modifier user id
 
   @@unique([dataAreaId, invoiceNumber])
   @@index([status])
@@ -882,7 +926,10 @@ model BankAccount {
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
 
-  transfers MoneyTransfer[]
+  transfers   MoneyTransfer[]
+  version     Int             @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String? // audit: creator user id
+  updatedById String? // audit: last-modifier user id
 
   @@unique([dataAreaId, code])
   @@index([type])
@@ -916,6 +963,8 @@ model MoneyTransfer {
   createdBy   User?    @relation("MoneyTransferCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  version     Int      @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById String? // audit: last-modifier user id
 
   @@index([bankAccountId])
   @@index([driverId])
@@ -938,7 +987,9 @@ model Budget {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  lines BudgetLine[]
+  lines       BudgetLine[]
+  version     Int          @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById String? // audit: last-modifier user id
 
   @@unique([dataAreaId, fiscalYear, name])
   @@index([fiscalYear])
@@ -987,16 +1038,19 @@ model ConsolidationMap {
 // A compliance document for a driver, with its own expiry. Drives the
 // border-impound risk warnings on the compliance dashboard (PRD §2.2, §8.3).
 model DriverDocument {
-  id        String        @id @default(cuid())
-  driverId  String
-  driver    Driver        @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  type      DriverDocType
-  number    String? // document / certificate number
-  issuedAt  DateTime?     @db.Date
-  expiresAt DateTime      @db.Date
-  note      String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id          String        @id @default(cuid())
+  driverId    String
+  driver      Driver        @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  type        DriverDocType
+  number      String? // document / certificate number
+  issuedAt    DateTime?     @db.Date
+  expiresAt   DateTime      @db.Date
+  note        String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  version     Int           @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String? // audit: creator user id
+  updatedById String? // audit: last-modifier user id
 
   @@unique([driverId, type])
   @@index([expiresAt])
@@ -1008,16 +1062,19 @@ model DriverDocument {
 // A named checkpoint on the corridors (Chalinze, Malaba, Namanga …) with
 // coordinates. Master data for route planning and the border-turnaround tracker.
 model GpsWaypoint {
-  id        String   @id @default(cuid())
-  code      String   @unique // CHALINZE, MALABA …
-  name      String
-  kind      String   @default("CHECKPOINT") // CHECKPOINT / BORDER / WEIGHBRIDGE / DEPOT
-  lat       Decimal  @db.Decimal(9, 6)
-  lng       Decimal  @db.Decimal(9, 6)
-  country   String? // ISO country of the point
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  code        String   @unique // CHALINZE, MALABA …
+  name        String
+  kind        String   @default("CHECKPOINT") // CHECKPOINT / BORDER / WEIGHBRIDGE / DEPOT
+  lat         Decimal  @db.Decimal(9, 6)
+  lng         Decimal  @db.Decimal(9, 6)
+  country     String? // ISO country of the point
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  version     Int      @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String? // audit: creator user id
+  updatedById String? // audit: last-modifier user id
 
   @@index([kind])
   @@map("gps_waypoints")

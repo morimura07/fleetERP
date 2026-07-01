@@ -14,7 +14,7 @@ import { useToast } from "@frontend/components/ui/toast";
 import { clientSchema, type ClientInput } from "@frontend/lib/validations";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 
-interface Client extends ClientInput { id: string; }
+interface Client extends ClientInput { id: string; version: number; }
 
 const columns: Column<Client>[] = [
   { key: "companyName", header: "Company" },
@@ -37,7 +37,7 @@ export function ClientsManager() {
   async function onSubmit(data: ClientInput) {
     try {
       if (editing) {
-        await apiFetch(`/api/clients/${editing.id}`, { method: "PATCH", body: JSON.stringify(data) });
+        await apiFetch(`/api/clients/${editing.id}`, { method: "PATCH", body: JSON.stringify({ ...data, version: editing.version }) });
       } else {
         await apiFetch("/api/clients", { method: "POST", body: JSON.stringify(data) });
       }

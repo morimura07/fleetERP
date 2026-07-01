@@ -16,16 +16,20 @@ import { notifyDriver } from "@backend/lib/notifications";
 import { AuthError } from "@backend/lib/errors";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
 import { can } from "@backend/lib/rbac";
+import { updateWithVersion, requireVersion } from "@backend/lib/concurrency";
+import { areaScope, areaForWrite } from "@backend/lib/scope";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 export const trips = new Hono();
 
 trips.get("/", requireAuth, requirePermission("trip:read"), async (c) => {
+  const user = c.get("user");
   const sp = c.req.query();
   const { page, pageSize, q } = paginationSchema.parse(sp);
   const status = sp.status;
 
   const where: Prisma.TripWhereInput = {
+    ...areaScope(user),
     ...(q ? { tripCode: { contains: q, mode: "insensitive" } } : {}),
     ...(status && status in TripStatus ? { status: status as TripStatus } : {}),
   };
@@ -68,7 +72,7 @@ trips.post("/", requireAuth, requirePermission("trip:write"), async (c) => {
 
   const tripCode = `TRP-${Date.now().toString().slice(-8)}`;
   const trip = await prisma.$transaction(async (tx) => {
-    const t = await tx.trip.create({ data: { ...body, tripCode, createdById: user.id } });
+    const t = await tx.trip.create({ data: { ...body, dataAreaId: areaForWrite(user, body.dataAreaId), tripCode, createdById: user.id } });
     await tx.order.update({ where: { id: body.orderId }, data: { status: "IN_TRANSIT" } });
     return t;
   });
@@ -116,8 +120,10 @@ trips.patch("/:id", requireAuth, requirePermission("trip:write"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   idSchema.parse(id);
-  const body = tripBaseSchema.partial().parse(await c.req.json());
-  const trip = await prisma.trip.update({ where: { id }, data: body });
+  const raw = await c.req.json();
+  const version = requireVersion(raw);
+  const body = tripBaseSchema.partial().parse(raw);
+  const trip = await updateWithVersion(prisma.trip, id, version, user.id, body);
   await logActivity({ userId: user.id, action: "UPDATE", target: `Trip:${id}` });
   return ok(c, trip);
 });

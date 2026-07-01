@@ -5,14 +5,19 @@ import { budgetSchema, paginationSchema } from "@backend/lib/validations";
 import { lineStatus } from "@backend/services/budget";
 import { logActivity } from "@backend/lib/activity";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { areaScope, areaForWrite } from "@backend/lib/scope";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 export const budgets = new Hono();
 
 budgets.get("/", requireAuth, requirePermission("budget:read"), async (c) => {
+  const user = c.get("user");
   const { page, pageSize, q } = paginationSchema.parse(c.req.query());
 
-  const where: Prisma.BudgetWhereInput = q ? { name: { contains: q, mode: "insensitive" } } : {};
+  const where: Prisma.BudgetWhereInput = {
+    ...areaScope(user),
+    ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
+  };
 
   const [rows, total] = await Promise.all([
     prisma.budget.findMany({
@@ -35,7 +40,7 @@ budgets.post("/", requireAuth, requirePermission("budget:write"), async (c) => {
 
   const budget = await prisma.budget.create({
     data: {
-      dataAreaId: body.dataAreaId,
+      dataAreaId: areaForWrite(user, body.dataAreaId),
       name: body.name,
       fiscalYear: body.fiscalYear,
       control: body.control,

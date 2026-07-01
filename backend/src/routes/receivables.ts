@@ -12,16 +12,19 @@ import { logActivity } from "@backend/lib/activity";
 import { can } from "@backend/lib/rbac";
 import { AuthError } from "@backend/lib/errors";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { areaScope } from "@backend/lib/scope";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 export const receivables = new Hono();
 
 receivables.get("/", requireAuth, requirePermission("receivable:read"), async (c) => {
+  const user = c.get("user");
   const sp = c.req.query();
   const { page, pageSize, q } = paginationSchema.parse(sp);
   const status = sp.status;
 
   const where: Prisma.CustomerInvoiceWhereInput = {
+    ...areaScope(user),
     ...(q
       ? {
           OR: [
