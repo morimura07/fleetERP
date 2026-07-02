@@ -52,6 +52,8 @@ export type Permission =
   | "bank:disburse" // post driver disbursements to the ledger
   | "budget:read" // budgets & budget control (M3)
   | "budget:write"
+  | "inventory:read" // stock items & movements (M14)
+  | "inventory:write"
   | "fx:read" // exchange rates (M8 multi-currency)
   | "fx:write"
   | "consolidation:read" // subsidiary→parent mapping & rollup (M5)
@@ -109,6 +111,8 @@ const ALL: Permission[] = [
   "bank:disburse",
   "budget:read",
   "budget:write",
+  "inventory:read",
+  "inventory:write",
   "fx:read",
   "fx:write",
   "consolidation:read",
@@ -150,6 +154,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "collection:read",
     "bank:read",
     "budget:read",
+    "inventory:read",
+    "inventory:write",
     "fx:read",
     "compliance:read",
     "waypoint:read",
@@ -191,6 +197,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "bank:disburse",
     "budget:read",
     "budget:write",
+    "inventory:read",
     "fx:read",
     "fx:write",
     "consolidation:read",
@@ -228,6 +235,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "collection:read",
     "bank:read",
     "budget:read",
+    "inventory:read",
     "fx:read",
     "consolidation:read",
     "compliance:read",
@@ -267,6 +275,7 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/collections", permission: "collection:read" },
   { prefix: "/bank", permission: "bank:read" },
   { prefix: "/budgets", permission: "budget:read" },
+  { prefix: "/inventory", permission: "inventory:read" },
   { prefix: "/fx", permission: "fx:read" },
   { prefix: "/consolidation", permission: "consolidation:read" },
   { prefix: "/compliance", permission: "compliance:read" },

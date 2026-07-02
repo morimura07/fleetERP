@@ -53,6 +53,8 @@ export type Permission =
   | "bank:disburse"
   | "budget:read"
   | "budget:write"
+  | "inventory:read"
+  | "inventory:write"
   | "fx:read"
   | "fx:write"
   | "consolidation:read"
@@ -86,6 +88,7 @@ const ALL: Permission[] = [
   "collection:read",
   "bank:read", "bank:write", "bank:disburse",
   "budget:read", "budget:write",
+  "inventory:read", "inventory:write",
   "fx:read", "fx:write",
   "consolidation:read", "consolidation:run",
   "compliance:read",
@@ -109,7 +112,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "order:read", "order:write",
     "trip:read", "trip:write",
     "vendor:read", "payable:read", "customer:read", "receivable:read",
-    "collection:read", "bank:read", "budget:read", "fx:read",
+    "collection:read", "bank:read", "budget:read", "inventory:read", "inventory:write", "fx:read",
     "compliance:read", "waypoint:read", "waypoint:write", "tracking:read",
     "export:run",
   ],
@@ -127,6 +130,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "tax:read", "tax:write", "collection:read",
     "bank:read", "bank:write", "bank:disburse",
     "budget:read", "budget:write",
+    "inventory:read",
     "fx:read", "fx:write",
     "consolidation:read", "consolidation:run",
     "compliance:read", "waypoint:read", "tracking:read",
@@ -139,7 +143,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "report:read", "payment:read", "account:read", "ledger:read",
     "order:read", "trip:read", "vendor:read", "payable:read",
     "customer:read", "receivable:read", "tax:read", "collection:read",
-    "bank:read", "budget:read", "fx:read", "consolidation:read",
+    "bank:read", "budget:read", "inventory:read", "fx:read", "consolidation:read",
     "compliance:read", "waypoint:read", "tracking:read",
   ],
 };
@@ -183,6 +187,7 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/collections", permission: "collection:read" },
   { prefix: "/bank", permission: "bank:read" },
   { prefix: "/budgets", permission: "budget:read" },
+  { prefix: "/inventory", permission: "inventory:read" },
   { prefix: "/fx", permission: "fx:read" },
   { prefix: "/consolidation", permission: "consolidation:read" },
   { prefix: "/compliance", permission: "compliance:read" },

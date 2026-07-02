@@ -464,3 +464,29 @@ export type ConsolidationMapInput = z.infer<typeof consolidationMapSchema>;
 export type DriverDocumentInput = z.infer<typeof driverDocumentSchema>;
 export type WaypointInput = z.infer<typeof waypointSchema>;
 export type TripReconInput = z.infer<typeof tripReconSchema>;
+
+// ── Inventory (M14) ──
+export const stockItemSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  code: z.string().min(1, "Code is required").max(40),
+  name: z.string().min(1, "Name is required").max(150),
+  category: z.enum(["SPARE_PART", "FUEL", "TYRE", "LUBRICANT", "CONSUMABLE", "OTHER"]).default("SPARE_PART"),
+  unit: z.enum(["PIECE", "LITRE", "KG", "SET", "METRE", "BOX"]).default("PIECE"),
+  glCode: z.string().min(1).max(20).default("1300"),
+  expenseCode: z.string().min(1).max(20).default("5100"),
+  reorderLevel: z.coerce.number().min(0).default(0),
+  currency: z.string().length(3).default("USD"),
+  isActive: z.boolean().default(true),
+});
+
+export const stockMovementSchema = z.object({
+  stockItemId: z.string().min(1, "Item is required"),
+  type: z.enum(["RECEIPT", "ISSUE"]),
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+  unitCost: z.coerce.number().min(0).optional(), // required for RECEIPT
+  reference: z.string().max(80).optional().or(z.literal("")),
+  memo: z.string().max(300).optional().or(z.literal("")),
+});
+
+export type StockItemInput = z.infer<typeof stockItemSchema>;
+export type StockMovementInput = z.infer<typeof stockMovementSchema>;

@@ -68,3 +68,6 @@ export type DriverDocType =
   | "OTHER";
 export type ReconStatus = "UNRECONCILED" | "MATCHED" | "DISCREPANCY";
 export type PositionSource = "STUB" | "GPS" | "MANUAL";
+export type StockCategory = "SPARE_PART" | "FUEL" | "TYRE" | "LUBRICANT" | "CONSUMABLE" | "OTHER";
+export type StockUnit = "PIECE" | "LITRE" | "KG" | "SET" | "METRE" | "BOX";
+export type StockMovementType = "RECEIPT" | "ISSUE" | "ADJUSTMENT";
