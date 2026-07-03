@@ -62,6 +62,9 @@ export type Permission =
   | "payroll:read" // employees & pay runs (M9)
   | "payroll:write"
   | "payroll:approve" // approve & post pay runs
+  | "expense:read" // expense claims / cash sheets (M23)
+  | "expense:write"
+  | "expense:approve" // approve & post claims
   | "fx:read" // exchange rates (M8 multi-currency)
   | "fx:write"
   | "consolidation:read" // subsidiary→parent mapping & rollup (M5)
@@ -129,6 +132,9 @@ const ALL: Permission[] = [
   "payroll:read",
   "payroll:write",
   "payroll:approve",
+  "expense:read",
+  "expense:write",
+  "expense:approve",
   "fx:read",
   "fx:write",
   "consolidation:read",
@@ -176,6 +182,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "warehouse:write",
     "procurement:read",
     "procurement:write",
+    "expense:read",
+    "expense:write",
     "fx:read",
     "compliance:read",
     "waypoint:read",
@@ -224,6 +232,9 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "payroll:read",
     "payroll:write",
     "payroll:approve",
+    "expense:read",
+    "expense:write",
+    "expense:approve",
     "fx:read",
     "fx:write",
     "consolidation:read",
@@ -265,6 +276,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "warehouse:read",
     "procurement:read",
     "payroll:read",
+    "expense:read",
     "fx:read",
     "consolidation:read",
     "compliance:read",
@@ -308,6 +320,7 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/warehouses", permission: "warehouse:read" },
   { prefix: "/procurement", permission: "procurement:read" },
   { prefix: "/payroll", permission: "payroll:read" },
+  { prefix: "/expenses", permission: "expense:read" },
   { prefix: "/fx", permission: "fx:read" },
   { prefix: "/consolidation", permission: "consolidation:read" },
   { prefix: "/compliance", permission: "compliance:read" },

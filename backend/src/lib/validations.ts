@@ -568,3 +568,24 @@ export const stockTransferSchema = z.object({
 
 export type WarehouseInput = z.infer<typeof warehouseSchema>;
 export type StockTransferInput = z.infer<typeof stockTransferSchema>;
+
+// ── Expense management (M23) ──
+export const expenseLineSchema = z.object({
+  expenseCode: z.string().min(1, "Expense account is required").max(20),
+  description: z.string().min(1, "Description is required").max(200),
+  amount: z.coerce.number().positive("Amount must be positive"),
+  incurredAt: z.coerce.date(),
+  receiptUrl: z.string().max(300).optional().nullable(),
+});
+
+export const expenseClaimSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  driverId: z.string().optional().nullable(),
+  title: z.string().min(1, "Title is required").max(150),
+  currency: z.string().length(3).default("USD"),
+  advanceId: z.string().optional().nullable(),
+  lines: z.array(expenseLineSchema).min(1, "At least one line is required"),
+});
+
+export type ExpenseClaimInput = z.infer<typeof expenseClaimSchema>;
+export type ExpenseLineInput = z.infer<typeof expenseLineSchema>;

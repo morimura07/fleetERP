@@ -27,6 +27,7 @@ import type {
   MatchStatus,
   EmployeeStatus,
   PayRunStatus,
+  ExpenseClaimStatus,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -348,4 +349,20 @@ export const PAYRUN_STATUS_VARIANT: Record<PayRunStatus, BadgeVariant> = {
   DRAFT: "secondary",
   APPROVED: "info",
   POSTED: "success",
+};
+
+export const EXPENSE_STATUS_LABEL: Record<ExpenseClaimStatus, string> = {
+  DRAFT: "Draft",
+  SUBMITTED: "Submitted",
+  APPROVED: "Approved",
+  POSTED: "Posted",
+  REJECTED: "Rejected",
+};
+
+export const EXPENSE_STATUS_VARIANT: Record<ExpenseClaimStatus, BadgeVariant> = {
+  DRAFT: "secondary",
+  SUBMITTED: "info",
+  APPROVED: "warning",
+  POSTED: "success",
+  REJECTED: "destructive",
 };

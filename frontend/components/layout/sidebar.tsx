@@ -8,7 +8,7 @@ import {
   ReceiptText, HandCoins, Store, Contact,
   Percent, AlarmClock,
   Landmark, PiggyBank, Combine, Coins,
-  ShieldCheck, MapPin, Boxes, ShoppingCart, BadgeDollarSign, Warehouse,
+  ShieldCheck, MapPin, Boxes, ShoppingCart, BadgeDollarSign, Warehouse, Receipt,
 } from "lucide-react";
 import { cn } from "@frontend/lib/utils";
 import { can, type Permission, type Role } from "@frontend/lib/rbac";
@@ -47,6 +47,7 @@ const GROUPS: NavGroup[] = [
       { href: "/consolidation", label: "Consolidation", icon: Combine, perm: "consolidation:read" },
       { href: "/payments", label: "Payments", icon: Wallet, perm: "payment:read" },
       { href: "/payroll", label: "Payroll", icon: BadgeDollarSign, perm: "payroll:read" },
+      { href: "/expenses", label: "Expenses", icon: Receipt, perm: "expense:read" },
     ],
   },
   {

@@ -75,3 +75,4 @@ export type PurchaseOrderStatus = "DRAFT" | "APPROVED" | "PARTIAL" | "RECEIVED" 
 export type MatchStatus = "UNMATCHED" | "MATCHED" | "VARIANCE";
 export type EmployeeStatus = "ACTIVE" | "ON_LEAVE" | "TERMINATED";
 export type PayRunStatus = "DRAFT" | "APPROVED" | "POSTED";
+export type ExpenseClaimStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "POSTED" | "REJECTED";

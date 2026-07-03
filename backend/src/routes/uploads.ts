@@ -3,7 +3,8 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { AuthError } from "@backend/lib/errors";
-import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { requireAuth } from "@backend/lib/auth";
+import { can } from "@backend/lib/rbac";
 import { ok } from "@backend/lib/http";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
@@ -13,8 +14,16 @@ export const uploadDir = () => process.env.UPLOAD_DIR ?? path.join(process.cwd()
 
 export const uploads = new Hono();
 
-/** Proof-of-delivery image upload. Returns a public URL under /uploads. */
-uploads.post("/", requireAuth, requirePermission("report:write"), async (c) => {
+/**
+ * Image upload (proof-of-delivery reports and expense-claim receipts).
+ * Returns a public URL under /uploads. Any user who can file a report or an
+ * expense claim may upload.
+ */
+uploads.post("/", requireAuth, async (c) => {
+  const user = c.get("user");
+  if (!can(user.role, "report:write") && !can(user.role, "expense:write")) {
+    throw new AuthError("You do not have permission to upload", 403);
+  }
   const form = await c.req.formData();
   const file = form.get("file");
   if (!(file instanceof File)) throw new AuthError("No file provided", 400);

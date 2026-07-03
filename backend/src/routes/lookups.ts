@@ -79,6 +79,26 @@ lookups.get("/warehouse-form", requireAuth, requirePermission("warehouse:read"),
   return ok(c, { items, warehouses });
 });
 
+/** Drivers + unreconciled advances for the expense-claim form. */
+lookups.get("/expense-form", requireAuth, requirePermission("expense:read"), async (c) => {
+  const user = c.get("user");
+  const [drivers, advances] = await Promise.all([
+    prisma.driver.findMany({
+      where: { status: "ACTIVE" },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    // Settled disbursements not yet reconciled by a claim.
+    prisma.moneyTransfer.findMany({
+      where: { ...areaScope(user), status: "SUCCESS", expenseClaim: null },
+      select: { id: true, reference: true, amount: true, type: true, driver: { select: { name: true } } },
+      orderBy: { transferredAt: "desc" },
+      take: 100,
+    }),
+  ]);
+  return ok(c, { drivers, advances });
+});
+
 /** Active customers (with currency) for the receivables form. */
 lookups.get("/customers", requireAuth, requirePermission("receivable:read"), async (c) => {
   const customers = await prisma.customer.findMany({

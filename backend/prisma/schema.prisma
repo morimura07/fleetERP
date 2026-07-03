@@ -275,6 +275,15 @@ enum PayRunStatus {
   POSTED // journal entry posted to the ledger
 }
 
+// Expense management (M23) — trip cash-sheet / expense claim lifecycle.
+enum ExpenseClaimStatus {
+  DRAFT // being filled in
+  SUBMITTED // sent for review
+  APPROVED // reviewed, ready to post
+  POSTED // journal entry posted; advance reconciled
+  REJECTED
+}
+
 // ───────────────────────── Auth / User ─────────────────────────
 
 model User {
@@ -326,18 +335,19 @@ model Driver {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  availability DriverAvailability[]
-  holidays     Holiday[]
-  dispatches   Dispatch[]
-  dailyReports DailyReport[]
-  payments     Payment[]
-  trips        Trip[]
-  transfers    MoneyTransfer[]
-  documents    DriverDocument[]
-  employee     Employee?
-  version      Int                  @default(0) // optimistic concurrency (PRD §7.1)
-  createdById  String? // audit: creator user id
-  updatedById  String? // audit: last-modifier user id
+  availability  DriverAvailability[]
+  holidays      Holiday[]
+  dispatches    Dispatch[]
+  dailyReports  DailyReport[]
+  payments      Payment[]
+  trips         Trip[]
+  transfers     MoneyTransfer[]
+  documents     DriverDocument[]
+  employee      Employee?
+  expenseClaims ExpenseClaim[]
+  version       Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById   String? // audit: creator user id
+  updatedById   String? // audit: last-modifier user id
 
   @@index([status])
   @@map("drivers")
@@ -643,6 +653,7 @@ model JournalEntry {
   moneyTransfer          MoneyTransfer?   @relation("MoneyTransferEntry")
   stockMovement          StockMovement?   @relation("StockMovementPosting")
   payRun                 PayRun?          @relation("PayRunPosting")
+  expenseClaim           ExpenseClaim?    @relation("ExpenseClaimPosting")
   version                Int              @default(0) // optimistic concurrency (PRD §7.1)
   updatedById            String? // audit: last-modifier user id
 
@@ -1019,6 +1030,9 @@ model MoneyTransfer {
   // Ledger link: the disbursement journal entry, created when status → SUCCESS.
   entryId String?       @unique
   entry   JournalEntry? @relation("MoneyTransferEntry", fields: [entryId], references: [id], onDelete: SetNull)
+
+  // Expense reconciliation (M23): the claim that settled this advance, if any.
+  expenseClaim ExpenseClaim? @relation("ClaimAdvance")
 
   createdById String?
   createdBy   User?    @relation("MoneyTransferCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -1429,4 +1443,58 @@ model Payslip {
   @@unique([payRunId, employeeId])
   @@index([employeeId])
   @@map("payslips")
+}
+
+// ───────────────────────── Expense Management (M23) ─────────────────────────
+
+model ExpenseClaim {
+  id          String             @id @default(cuid())
+  dataAreaId  String             @default("HQ01")
+  claimNumber String
+  driverId    String?
+  driver      Driver?            @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  title       String // e.g. "Trip TRP-00012 cash sheet"
+  currency    String             @default("USD")
+  status      ExpenseClaimStatus @default(DRAFT)
+  total       Decimal            @default(0) @db.Decimal(18, 2) // Σ line amounts
+
+  // Advance reconciliation (M23) — the driver disbursement this claim settles.
+  advanceId     String?        @unique
+  advance       MoneyTransfer? @relation("ClaimAdvance", fields: [advanceId], references: [id], onDelete: SetNull)
+  advanceAmount Decimal        @default(0) @db.Decimal(18, 2) // snapshot of the advance at reconcile
+  reconciled    Decimal        @default(0) @db.Decimal(18, 2) // total − advanceAmount (+ = owed to driver, − = driver returns)
+
+  // Ledger link
+  postingEntryId String?       @unique
+  postingEntry   JournalEntry? @relation("ExpenseClaimPosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
+
+  approvedById String?
+  approvedAt   DateTime?
+
+  lines     ExpenseLine[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  version     Int     @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String?
+  updatedById String?
+
+  @@unique([dataAreaId, claimNumber])
+  @@index([status])
+  @@index([driverId])
+  @@map("expense_claims")
+}
+
+model ExpenseLine {
+  id             String       @id @default(cuid())
+  expenseClaimId String
+  expenseClaim   ExpenseClaim @relation(fields: [expenseClaimId], references: [id], onDelete: Cascade)
+  expenseCode    String // COA expense account this line hits (5000/5030/…)
+  description    String
+  amount         Decimal      @db.Decimal(18, 2)
+  incurredAt     DateTime     @db.Date
+  receiptUrl     String? // uploaded proof-of-spend image (/uploads/…)
+
+  @@index([expenseClaimId])
+  @@map("expense_lines")
 }
