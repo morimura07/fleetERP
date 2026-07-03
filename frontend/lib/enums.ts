@@ -71,3 +71,5 @@ export type PositionSource = "STUB" | "GPS" | "MANUAL";
 export type StockCategory = "SPARE_PART" | "FUEL" | "TYRE" | "LUBRICANT" | "CONSUMABLE" | "OTHER";
 export type StockUnit = "PIECE" | "LITRE" | "KG" | "SET" | "METRE" | "BOX";
 export type StockMovementType = "RECEIPT" | "ISSUE" | "ADJUSTMENT";
+export type PurchaseOrderStatus = "DRAFT" | "APPROVED" | "PARTIAL" | "RECEIVED" | "CLOSED" | "CANCELLED";
+export type MatchStatus = "UNMATCHED" | "MATCHED" | "VARIANCE";

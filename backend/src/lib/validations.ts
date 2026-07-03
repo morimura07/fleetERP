@@ -490,3 +490,35 @@ export const stockMovementSchema = z.object({
 
 export type StockItemInput = z.infer<typeof stockItemSchema>;
 export type StockMovementInput = z.infer<typeof stockMovementSchema>;
+
+// ── Procurement (M15) ──
+export const poLineSchema = z.object({
+  stockItemId: z.string().optional().nullable(),
+  description: z.string().min(1, "Description is required").max(200),
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+  unitPrice: z.coerce.number().min(0, "Price must be ≥ 0"),
+  expenseCode: z.string().min(1).max(20).default("5100"),
+});
+
+export const purchaseOrderSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  vendorId: z.string().min(1, "Vendor is required"),
+  currency: z.string().length(3).default("USD"),
+  orderDate: z.coerce.date(),
+  expectedAt: z.coerce.date().optional().nullable(),
+  memo: z.string().max(300).optional().or(z.literal("")),
+  lines: z.array(poLineSchema).min(1, "At least one line is required"),
+});
+
+export const goodsReceiptSchema = z.object({
+  receivedAt: z.coerce.date().optional(),
+  note: z.string().max(300).optional().or(z.literal("")),
+  lines: z
+    .array(z.object({ purchaseOrderLineId: z.string().min(1), quantity: z.coerce.number().positive() }))
+    .min(1, "At least one receipt line is required"),
+});
+
+export const matchSchema = z.object({ vendorInvoiceId: z.string().min(1, "Vendor invoice is required") });
+
+export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>;
+export type GoodsReceiptInput = z.infer<typeof goodsReceiptSchema>;

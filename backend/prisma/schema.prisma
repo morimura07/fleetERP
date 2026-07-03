@@ -244,6 +244,22 @@ enum StockMovementType {
   ADJUSTMENT // stock-take correction (+/−)
 }
 
+// Procurement (M15)
+enum PurchaseOrderStatus {
+  DRAFT
+  APPROVED
+  PARTIAL // some lines received
+  RECEIVED // all lines fully received
+  CLOSED // matched & billed
+  CANCELLED
+}
+
+enum MatchStatus {
+  UNMATCHED // no vendor invoice matched yet
+  MATCHED // PO ↔ receipt ↔ invoice all agree
+  VARIANCE // quantity/price mismatch beyond tolerance
+}
+
 // ───────────────────────── Auth / User ─────────────────────────
 
 model User {
@@ -761,10 +777,11 @@ model Vendor {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  invoices    VendorInvoice[]
-  version     Int             @default(0) // optimistic concurrency (PRD §7.1)
-  createdById String? // audit: creator user id
-  updatedById String? // audit: last-modifier user id
+  invoices       VendorInvoice[]
+  purchaseOrders PurchaseOrder[]
+  version        Int             @default(0) // optimistic concurrency (PRD §7.1)
+  createdById    String? // audit: creator user id
+  updatedById    String? // audit: last-modifier user id
 
   @@unique([dataAreaId, code])
   @@index([group])
@@ -800,9 +817,10 @@ model VendorInvoice {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  payments    VendorPayment[]
-  version     Int             @default(0) // optimistic concurrency (PRD §7.1)
-  updatedById String? // audit: last-modifier user id
+  payments       VendorPayment[]
+  purchaseOrders PurchaseOrder[] @relation("PoVendorInvoice")
+  version        Int             @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById    String? // audit: last-modifier user id
 
   @@unique([vendorId, invoiceNumber])
   @@index([status])
@@ -1144,7 +1162,8 @@ model StockItem {
   updatedAt      DateTime      @updatedAt
 
   movements   StockMovement[]
-  version     Int             @default(0) // optimistic concurrency (PRD §7.1)
+  poLines     PurchaseOrderLine[]
+  version     Int                 @default(0) // optimistic concurrency (PRD §7.1)
   createdById String? // audit
   updatedById String? // audit
 
@@ -1177,4 +1196,93 @@ model StockMovement {
   @@index([stockItemId])
   @@index([type])
   @@map("stock_movements")
+}
+
+// ───────────────────────── Procurement (M15) ─────────────────────────
+
+model PurchaseOrder {
+  id          String              @id @default(cuid())
+  dataAreaId  String              @default("HQ01")
+  poNumber    String // internal, e.g. PO-000123
+  vendorId    String
+  vendor      Vendor              @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  status      PurchaseOrderStatus @default(DRAFT)
+  matchStatus MatchStatus         @default(UNMATCHED)
+  currency    String              @default("USD")
+  orderDate   DateTime            @db.Date
+  expectedAt  DateTime?           @db.Date
+  subtotal    Decimal             @default(0) @db.Decimal(18, 2) // Σ line totals
+  memo        String?
+
+  // 3-way match: the vendor bill this PO was matched against.
+  vendorInvoiceId String?
+  vendorInvoice   VendorInvoice? @relation("PoVendorInvoice", fields: [vendorInvoiceId], references: [id], onDelete: SetNull)
+
+  approvedById String?
+  approvedAt   DateTime?
+
+  lines    PurchaseOrderLine[]
+  receipts GoodsReceipt[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  version     Int      @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String?
+  updatedById String?
+
+  @@unique([dataAreaId, poNumber])
+  @@index([vendorId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  stockItemId     String?
+  stockItem       StockItem?    @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
+  description     String
+  quantity        Decimal       @db.Decimal(18, 3) // ordered
+  qtyReceived     Decimal       @default(0) @db.Decimal(18, 3)
+  unitPrice       Decimal       @db.Decimal(18, 4)
+  lineTotal       Decimal       @db.Decimal(18, 2) // quantity × unitPrice
+  expenseCode     String        @default("5100") // non-stock lines charge here
+
+  @@index([purchaseOrderId])
+  @@index([stockItemId])
+  @@map("purchase_order_lines")
+}
+
+model GoodsReceipt {
+  id              String        @id @default(cuid())
+  dataAreaId      String        @default("HQ01")
+  receiptNumber   String
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  receivedAt      DateTime      @db.Date
+  note            String?
+
+  lines GoodsReceiptLine[]
+
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  @@unique([dataAreaId, receiptNumber])
+  @@index([purchaseOrderId])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptLine {
+  id                  String       @id @default(cuid())
+  goodsReceiptId      String
+  goodsReceipt        GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  purchaseOrderLineId String
+  quantity            Decimal      @db.Decimal(18, 3) // received on this receipt
+
+  // Inventory link — the stock movement this receipt line created (if a stock item).
+  stockMovementId String?
+
+  @@index([goodsReceiptId])
+  @@map("goods_receipt_lines")
 }

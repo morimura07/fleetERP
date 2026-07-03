@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { prisma } from "@backend/lib/prisma";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { areaScope } from "@backend/lib/scope";
 import { ok } from "@backend/lib/http";
 
 /**
@@ -40,6 +41,24 @@ lookups.get("/vendors", requireAuth, requirePermission("payable:read"), async (c
     orderBy: { code: "asc" },
   });
   return ok(c, vendors);
+});
+
+/** Vendors + stock items for the purchase-order form (procurement authority). */
+lookups.get("/procurement-form", requireAuth, requirePermission("procurement:read"), async (c) => {
+  const user = c.get("user");
+  const [vendors, items] = await Promise.all([
+    prisma.vendor.findMany({
+      where: { ...areaScope(user), isActive: true },
+      select: { id: true, code: true, legalName: true, currency: true },
+      orderBy: { code: "asc" },
+    }),
+    prisma.stockItem.findMany({
+      where: { ...areaScope(user), isActive: true },
+      select: { id: true, code: true, name: true, unit: true, expenseCode: true },
+      orderBy: { code: "asc" },
+    }),
+  ]);
+  return ok(c, { vendors, items });
 });
 
 /** Active customers (with currency) for the receivables form. */
