@@ -219,6 +219,31 @@ enum PositionSource {
   MANUAL
 }
 
+// Inventory (M14)
+enum StockCategory {
+  SPARE_PART
+  FUEL
+  TYRE
+  LUBRICANT
+  CONSUMABLE
+  OTHER
+}
+
+enum StockUnit {
+  PIECE
+  LITRE
+  KG
+  SET
+  METRE
+  BOX
+}
+
+enum StockMovementType {
+  RECEIPT // stock in (purchase / return)
+  ISSUE // stock out (consumed on a vehicle/trip)
+  ADJUSTMENT // stock-take correction (+/−)
+}
+
 // ───────────────────────── Auth / User ─────────────────────────
 
 model User {
@@ -584,6 +609,7 @@ model JournalEntry {
   customerInvoicePosting CustomerInvoice? @relation("CustomerInvoicePosting")
   customerReceipt        CustomerReceipt? @relation("CustomerReceiptEntry")
   moneyTransfer          MoneyTransfer?   @relation("MoneyTransferEntry")
+  stockMovement          StockMovement?   @relation("StockMovementPosting")
   version                Int              @default(0) // optimistic concurrency (PRD §7.1)
   updatedById            String? // audit: last-modifier user id
 
@@ -1096,4 +1122,59 @@ model VehiclePosition {
   updatedAt    DateTime       @updatedAt
 
   @@map("vehicle_positions")
+}
+
+// ───────────────────────── Inventory (M14) ─────────────────────────
+
+model StockItem {
+  id             String        @id @default(cuid())
+  dataAreaId     String        @default("HQ01")
+  code           String // internal SKU, e.g. SP-BRAKE-PAD
+  name           String
+  category       StockCategory @default(SPARE_PART)
+  unit           StockUnit     @default(PIECE)
+  glCode         String        @default("1300") // inventory asset account
+  expenseCode    String        @default("5100") // account charged when issued (maintenance/fuel)
+  quantityOnHand Decimal       @default(0) @db.Decimal(18, 3)
+  avgCost        Decimal       @default(0) @db.Decimal(18, 4) // moving-average unit cost (base ccy)
+  reorderLevel   Decimal       @default(0) @db.Decimal(18, 3)
+  currency       String        @default("USD")
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  movements   StockMovement[]
+  version     Int             @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String? // audit
+  updatedById String? // audit
+
+  @@unique([dataAreaId, code])
+  @@index([category])
+  @@map("stock_items")
+}
+
+model StockMovement {
+  id           String            @id @default(cuid())
+  dataAreaId   String            @default("HQ01")
+  stockItemId  String
+  stockItem    StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  type         StockMovementType
+  quantity     Decimal           @db.Decimal(18, 3) // always positive; type gives direction
+  unitCost     Decimal           @db.Decimal(18, 4) // cost per unit for this movement
+  totalCost    Decimal           @db.Decimal(18, 2) // quantity × unitCost
+  qtyAfter     Decimal           @db.Decimal(18, 3) // on-hand snapshot after this movement
+  avgCostAfter Decimal           @db.Decimal(18, 4) // moving-average snapshot after this movement
+  reference    String? // PO number, vehicle/trip ref, stock-take id
+  memo         String?
+
+  // Ledger link — the journal entry this movement posted (if any).
+  postingEntryId String?       @unique
+  postingEntry   JournalEntry? @relation("StockMovementPosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  @@index([stockItemId])
+  @@index([type])
+  @@map("stock_movements")
 }

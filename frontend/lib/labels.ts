@@ -21,6 +21,8 @@ import type {
   BudgetControl,
   DriverDocType,
   ReconStatus,
+  StockCategory,
+  StockUnit,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -270,4 +272,22 @@ export const FUEL_STATUS_VARIANT: Record<string, BadgeVariant> = {
   MEETS_TARGET: "success",
   BELOW_EXPECTED: "destructive",
   NO_DATA: "secondary",
+};
+
+export const STOCK_CATEGORY_LABEL: Record<StockCategory, string> = {
+  SPARE_PART: "Spare Part",
+  FUEL: "Fuel",
+  TYRE: "Tyre",
+  LUBRICANT: "Lubricant",
+  CONSUMABLE: "Consumable",
+  OTHER: "Other",
+};
+
+export const STOCK_UNIT_LABEL: Record<StockUnit, string> = {
+  PIECE: "pc",
+  LITRE: "L",
+  KG: "kg",
+  SET: "set",
+  METRE: "m",
+  BOX: "box",
 };

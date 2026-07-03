@@ -8,7 +8,7 @@ import {
   ReceiptText, HandCoins, Store, Contact,
   Percent, AlarmClock,
   Landmark, PiggyBank, Combine, Coins,
-  ShieldCheck, MapPin,
+  ShieldCheck, MapPin, Boxes,
 } from "lucide-react";
 import { cn } from "@frontend/lib/utils";
 import { can, type Permission, type Role } from "@frontend/lib/rbac";
@@ -54,6 +54,7 @@ const GROUPS: NavGroup[] = [
       { href: "/drivers", label: "Drivers", icon: Users, perm: "driver:read" },
       { href: "/vehicles", label: "Vehicles", icon: Truck, perm: "vehicle:read" },
       { href: "/clients", label: "Clients", icon: Building2, perm: "client:read" },
+      { href: "/inventory", label: "Inventory", icon: Boxes, perm: "inventory:read" },
       { href: "/compliance", label: "Compliance", icon: ShieldCheck, perm: "compliance:read" },
       { href: "/waypoints", label: "GPS Waypoints", icon: MapPin, perm: "waypoint:read" },
       { href: "/reports", label: "Daily Reports", icon: FileText, perm: "report:read" },
