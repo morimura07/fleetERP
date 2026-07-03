@@ -73,3 +73,5 @@ export type StockUnit = "PIECE" | "LITRE" | "KG" | "SET" | "METRE" | "BOX";
 export type StockMovementType = "RECEIPT" | "ISSUE" | "ADJUSTMENT";
 export type PurchaseOrderStatus = "DRAFT" | "APPROVED" | "PARTIAL" | "RECEIVED" | "CLOSED" | "CANCELLED";
 export type MatchStatus = "UNMATCHED" | "MATCHED" | "VARIANCE";
+export type EmployeeStatus = "ACTIVE" | "ON_LEAVE" | "TERMINATED";
+export type PayRunStatus = "DRAFT" | "APPROVED" | "POSTED";

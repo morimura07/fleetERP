@@ -260,6 +260,19 @@ enum MatchStatus {
   VARIANCE // quantity/price mismatch beyond tolerance
 }
 
+// Payroll (M9)
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+enum PayRunStatus {
+  DRAFT // computed, not approved
+  APPROVED // reviewed, ready to post
+  POSTED // journal entry posted to the ledger
+}
+
 // ───────────────────────── Auth / User ─────────────────────────
 
 model User {
@@ -319,6 +332,7 @@ model Driver {
   trips        Trip[]
   transfers    MoneyTransfer[]
   documents    DriverDocument[]
+  employee     Employee?
   version      Int                  @default(0) // optimistic concurrency (PRD §7.1)
   createdById  String? // audit: creator user id
   updatedById  String? // audit: last-modifier user id
@@ -626,6 +640,7 @@ model JournalEntry {
   customerReceipt        CustomerReceipt? @relation("CustomerReceiptEntry")
   moneyTransfer          MoneyTransfer?   @relation("MoneyTransferEntry")
   stockMovement          StockMovement?   @relation("StockMovementPosting")
+  payRun                 PayRun?          @relation("PayRunPosting")
   version                Int              @default(0) // optimistic concurrency (PRD §7.1)
   updatedById            String? // audit: last-modifier user id
 
@@ -1285,4 +1300,87 @@ model GoodsReceiptLine {
 
   @@index([goodsReceiptId])
   @@map("goods_receipt_lines")
+}
+
+// ───────────────────────── Payroll (M9) ─────────────────────────
+
+model Employee {
+  id          String         @id @default(cuid())
+  dataAreaId  String         @default("HQ01")
+  code        String // internal, e.g. EMP-000001
+  name        String
+  nationalId  String? // NIDA / national ID
+  tin         String? // tax PIN/TIN
+  country     String         @default("TZ") // ISO country → statutory scheme (TZ, KE …)
+  grossSalary Decimal        @db.Decimal(18, 2) // monthly gross (base ccy)
+  currency    String         @default("USD")
+  status      EmployeeStatus @default(ACTIVE)
+  bankAccount String?
+  hiredAt     DateTime       @db.Date
+  // Optional link to a Driver record (a driver may also be an employee).
+  driverId    String?        @unique
+  driver      Driver?        @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  payslips  Payslip[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  version     Int     @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String?
+  updatedById String?
+
+  @@unique([dataAreaId, code])
+  @@index([status])
+  @@map("employees")
+}
+
+model PayRun {
+  id         String       @id @default(cuid())
+  dataAreaId String       @default("HQ01")
+  year       Int
+  month      Int // 1-12
+  status     PayRunStatus @default(DRAFT)
+  currency   String       @default("USD")
+  grossTotal Decimal      @default(0) @db.Decimal(18, 2)
+  payeTotal  Decimal      @default(0) @db.Decimal(18, 2)
+  nssfTotal  Decimal      @default(0) @db.Decimal(18, 2)
+  shifTotal  Decimal      @default(0) @db.Decimal(18, 2)
+  netTotal   Decimal      @default(0) @db.Decimal(18, 2)
+  memo       String?
+
+  // Ledger link — the journal entry this run posted.
+  postingEntryId String?       @unique
+  postingEntry   JournalEntry? @relation("PayRunPosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
+
+  approvedById String?
+  approvedAt   DateTime?
+
+  payslips  Payslip[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  version     Int     @default(0)
+  createdById String?
+  updatedById String?
+
+  @@unique([dataAreaId, year, month])
+  @@index([status])
+  @@map("pay_runs")
+}
+
+model Payslip {
+  id         String   @id @default(cuid())
+  payRunId   String
+  payRun     PayRun   @relation(fields: [payRunId], references: [id], onDelete: Cascade)
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  gross      Decimal  @db.Decimal(18, 2)
+  paye       Decimal  @db.Decimal(18, 2) // income tax
+  nssf       Decimal  @db.Decimal(18, 2) // pension
+  shif       Decimal  @db.Decimal(18, 2) // health
+  net        Decimal  @db.Decimal(18, 2) // gross − paye − nssf − shif
+
+  @@unique([payRunId, employeeId])
+  @@index([employeeId])
+  @@map("payslips")
 }

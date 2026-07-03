@@ -512,3 +512,20 @@ export const purchaseOrderSchema = z.object({
 
 export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>;
 export type PoLineInput = z.infer<typeof poLineSchema>;
+
+// ── Payroll (M9) ──
+export const employeeSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  code: z.string().min(1, "Code is required").max(40),
+  name: z.string().min(1, "Name is required").max(150),
+  nationalId: z.string().max(40).optional().or(z.literal("")),
+  tin: z.string().max(40).optional().or(z.literal("")),
+  country: z.string().length(2).default("TZ"),
+  grossSalary: z.coerce.number().positive("Gross salary must be positive"),
+  currency: z.string().length(3).default("USD"),
+  status: z.enum(["ACTIVE", "ON_LEAVE", "TERMINATED"]).default("ACTIVE"),
+  bankAccount: z.string().max(60).optional().or(z.literal("")),
+  hiredAt: z.coerce.date(),
+});
+
+export type EmployeeInput = z.infer<typeof employeeSchema>;

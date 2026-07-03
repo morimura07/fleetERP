@@ -39,6 +39,7 @@ import { lookups } from "@backend/routes/lookups";
 import { driver } from "@backend/routes/driver";
 import { inventory } from "@backend/routes/inventory";
 import { procurement } from "@backend/routes/procurement";
+import { payroll } from "@backend/routes/payroll";
 
 /**
  * FleetERP standalone API (Hono). Deploys independently from the web app and
@@ -106,6 +107,7 @@ app.route("/api/lookups", lookups);
 app.route("/api/driver", driver);
 app.route("/api/inventory", inventory);
 app.route("/api/procurement", procurement);
+app.route("/api/payroll", payroll);
 
 app.onError(onError);
 app.notFound((c) => c.json({ error: "Not found" }, 404));

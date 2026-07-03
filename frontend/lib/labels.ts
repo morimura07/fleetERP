@@ -25,6 +25,8 @@ import type {
   StockUnit,
   PurchaseOrderStatus,
   MatchStatus,
+  EmployeeStatus,
+  PayRunStatus,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -322,4 +324,28 @@ export const MATCH_STATUS_VARIANT: Record<MatchStatus, BadgeVariant> = {
   UNMATCHED: "secondary",
   MATCHED: "success",
   VARIANCE: "destructive",
+};
+
+export const EMPLOYEE_STATUS_LABEL: Record<EmployeeStatus, string> = {
+  ACTIVE: "Active",
+  ON_LEAVE: "On Leave",
+  TERMINATED: "Terminated",
+};
+
+export const EMPLOYEE_STATUS_VARIANT: Record<EmployeeStatus, BadgeVariant> = {
+  ACTIVE: "success",
+  ON_LEAVE: "warning",
+  TERMINATED: "secondary",
+};
+
+export const PAYRUN_STATUS_LABEL: Record<PayRunStatus, string> = {
+  DRAFT: "Draft",
+  APPROVED: "Approved",
+  POSTED: "Posted",
+};
+
+export const PAYRUN_STATUS_VARIANT: Record<PayRunStatus, BadgeVariant> = {
+  DRAFT: "secondary",
+  APPROVED: "info",
+  POSTED: "success",
 };
