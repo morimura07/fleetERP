@@ -242,6 +242,8 @@ enum StockMovementType {
   RECEIPT // stock in (purchase / return)
   ISSUE // stock out (consumed on a vehicle/trip)
   ADJUSTMENT // stock-take correction (+/−)
+  TRANSFER_OUT // moved out of a warehouse (M18)
+  TRANSFER_IN // moved into a warehouse (M18)
 }
 
 // Procurement (M15)
@@ -1178,6 +1180,7 @@ model StockItem {
 
   movements   StockMovement[]
   poLines     PurchaseOrderLine[]
+  balances    StockBalance[]
   version     Int                 @default(0) // optimistic concurrency (PRD §7.1)
   createdById String? // audit
   updatedById String? // audit
@@ -1201,6 +1204,10 @@ model StockMovement {
   reference    String? // PO number, vehicle/trip ref, stock-take id
   memo         String?
 
+  // Warehouse this movement affected (M18). Null = legacy/default location.
+  warehouseId String?
+  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+
   // Ledger link — the journal entry this movement posted (if any).
   postingEntryId String?       @unique
   postingEntry   JournalEntry? @relation("StockMovementPosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
@@ -1210,7 +1217,46 @@ model StockMovement {
 
   @@index([stockItemId])
   @@index([type])
+  @@index([warehouseId])
   @@map("stock_movements")
+}
+
+// ───────────────────────── Warehouse (M18) ─────────────────────────
+
+model Warehouse {
+  id         String  @id @default(cuid())
+  dataAreaId String  @default("HQ01")
+  code       String // e.g. WH-DAR, WH-MSA
+  name       String
+  location   String? // city / address
+  isDefault  Boolean @default(false) // the MAIN warehouse receipts default to
+  isActive   Boolean @default(true)
+
+  balances  StockBalance[]
+  movements StockMovement[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  version     Int     @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String?
+  updatedById String?
+
+  @@unique([dataAreaId, code])
+  @@map("warehouses")
+}
+
+model StockBalance {
+  id          String    @id @default(cuid())
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  quantity    Decimal   @default(0) @db.Decimal(18, 3) // on-hand at this location
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([stockItemId, warehouseId])
+  @@index([warehouseId])
+  @@map("stock_balances")
 }
 
 // ───────────────────────── Procurement (M15) ─────────────────────────

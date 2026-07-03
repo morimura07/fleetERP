@@ -61,6 +61,24 @@ lookups.get("/procurement-form", requireAuth, requirePermission("procurement:rea
   return ok(c, { vendors, items });
 });
 
+/** Stock items + warehouses for the transfer form (warehouse authority). */
+lookups.get("/warehouse-form", requireAuth, requirePermission("warehouse:read"), async (c) => {
+  const user = c.get("user");
+  const [items, warehouses] = await Promise.all([
+    prisma.stockItem.findMany({
+      where: { ...areaScope(user), isActive: true },
+      select: { id: true, code: true, name: true, unit: true },
+      orderBy: { code: "asc" },
+    }),
+    prisma.warehouse.findMany({
+      where: { ...areaScope(user), isActive: true },
+      select: { id: true, code: true, name: true },
+      orderBy: { code: "asc" },
+    }),
+  ]);
+  return ok(c, { items, warehouses });
+});
+
 /** Active customers (with currency) for the receivables form. */
 lookups.get("/customers", requireAuth, requirePermission("receivable:read"), async (c) => {
   const customers = await prisma.customer.findMany({

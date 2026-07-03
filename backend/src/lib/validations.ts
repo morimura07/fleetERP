@@ -484,6 +484,7 @@ export const stockMovementSchema = z.object({
   type: z.enum(["RECEIPT", "ISSUE"]),
   quantity: z.coerce.number().positive("Quantity must be positive"),
   unitCost: z.coerce.number().min(0).optional(), // required for RECEIPT
+  warehouseId: z.string().optional().nullable(), // location (M18); default if omitted
   reference: z.string().max(80).optional().or(z.literal("")),
   memo: z.string().max(300).optional().or(z.literal("")),
 });
@@ -545,3 +546,25 @@ export const payRunSchema = z.object({
 
 export type EmployeeInput = z.infer<typeof employeeSchema>;
 export type PayRunInput = z.infer<typeof payRunSchema>;
+
+// ── Warehouse (M18) ──
+export const warehouseSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  code: z.string().min(1, "Code is required").max(40),
+  name: z.string().min(1, "Name is required").max(150),
+  location: z.string().max(150).optional().or(z.literal("")),
+  isDefault: z.boolean().default(false),
+  isActive: z.boolean().default(true),
+});
+
+export const stockTransferSchema = z.object({
+  stockItemId: z.string().min(1, "Item is required"),
+  fromWarehouseId: z.string().min(1, "Source warehouse is required"),
+  toWarehouseId: z.string().min(1, "Destination warehouse is required"),
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+  reference: z.string().max(80).optional().or(z.literal("")),
+  memo: z.string().max(300).optional().or(z.literal("")),
+});
+
+export type WarehouseInput = z.infer<typeof warehouseSchema>;
+export type StockTransferInput = z.infer<typeof stockTransferSchema>;

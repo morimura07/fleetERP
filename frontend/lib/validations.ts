@@ -484,6 +484,7 @@ export const stockMovementSchema = z.object({
   type: z.enum(["RECEIPT", "ISSUE"]),
   quantity: z.coerce.number().positive("Quantity must be positive"),
   unitCost: z.coerce.number().min(0).optional(),
+  warehouseId: z.string().optional().nullable(),
   reference: z.string().max(80).optional().or(z.literal("")),
   memo: z.string().max(300).optional().or(z.literal("")),
 });
@@ -529,3 +530,15 @@ export const employeeSchema = z.object({
 });
 
 export type EmployeeInput = z.infer<typeof employeeSchema>;
+
+// ── Warehouse (M18) ──
+export const warehouseSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  code: z.string().min(1, "Code is required").max(40),
+  name: z.string().min(1, "Name is required").max(150),
+  location: z.string().max(150).optional().or(z.literal("")),
+  isDefault: z.boolean().default(false),
+  isActive: z.boolean().default(true),
+});
+
+export type WarehouseInput = z.infer<typeof warehouseSchema>;

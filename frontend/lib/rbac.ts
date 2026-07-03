@@ -55,6 +55,8 @@ export type Permission =
   | "budget:write"
   | "inventory:read"
   | "inventory:write"
+  | "warehouse:read"
+  | "warehouse:write"
   | "procurement:read"
   | "procurement:write"
   | "procurement:approve"
@@ -95,6 +97,7 @@ const ALL: Permission[] = [
   "bank:read", "bank:write", "bank:disburse",
   "budget:read", "budget:write",
   "inventory:read", "inventory:write",
+  "warehouse:read", "warehouse:write",
   "procurement:read", "procurement:write", "procurement:approve",
   "payroll:read", "payroll:write", "payroll:approve",
   "fx:read", "fx:write",
@@ -120,7 +123,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "order:read", "order:write",
     "trip:read", "trip:write",
     "vendor:read", "payable:read", "customer:read", "receivable:read",
-    "collection:read", "bank:read", "budget:read", "inventory:read", "inventory:write", "procurement:read", "procurement:write", "fx:read",
+    "collection:read", "bank:read", "budget:read", "inventory:read", "inventory:write", "warehouse:read", "warehouse:write", "procurement:read", "procurement:write", "fx:read",
     "compliance:read", "waypoint:read", "waypoint:write", "tracking:read",
     "export:run",
   ],
@@ -138,7 +141,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "tax:read", "tax:write", "collection:read",
     "bank:read", "bank:write", "bank:disburse",
     "budget:read", "budget:write",
-    "inventory:read", "procurement:read", "procurement:approve",
+    "inventory:read", "warehouse:read", "procurement:read", "procurement:approve",
     "payroll:read", "payroll:write", "payroll:approve",
     "fx:read", "fx:write",
     "consolidation:read", "consolidation:run",
@@ -152,7 +155,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "report:read", "payment:read", "account:read", "ledger:read",
     "order:read", "trip:read", "vendor:read", "payable:read",
     "customer:read", "receivable:read", "tax:read", "collection:read",
-    "bank:read", "budget:read", "inventory:read", "procurement:read", "payroll:read", "fx:read", "consolidation:read",
+    "bank:read", "budget:read", "inventory:read", "warehouse:read", "procurement:read", "payroll:read", "fx:read", "consolidation:read",
     "compliance:read", "waypoint:read", "tracking:read",
   ],
 };
@@ -197,6 +200,7 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/bank", permission: "bank:read" },
   { prefix: "/budgets", permission: "budget:read" },
   { prefix: "/inventory", permission: "inventory:read" },
+  { prefix: "/warehouses", permission: "warehouse:read" },
   { prefix: "/procurement", permission: "procurement:read" },
   { prefix: "/payroll", permission: "payroll:read" },
   { prefix: "/fx", permission: "fx:read" },
