@@ -9,7 +9,7 @@ type Theme = "dark" | "green";
  * Persists to localStorage; the class is applied pre-paint in the root layout.
  */
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("green");
 
   useEffect(() => {
     setTheme(document.documentElement.classList.contains("green") ? "green" : "dark");
