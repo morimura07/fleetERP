@@ -23,6 +23,11 @@ import type {
   ReconStatus,
   StockCategory,
   StockUnit,
+  PurchaseOrderStatus,
+  MatchStatus,
+  EmployeeStatus,
+  PayRunStatus,
+  ExpenseClaimStatus,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -290,4 +295,74 @@ export const STOCK_UNIT_LABEL: Record<StockUnit, string> = {
   SET: "set",
   METRE: "m",
   BOX: "box",
+};
+
+export const PO_STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
+  DRAFT: "Draft",
+  APPROVED: "Approved",
+  PARTIAL: "Partially Received",
+  RECEIVED: "Received",
+  CLOSED: "Closed",
+  CANCELLED: "Cancelled",
+};
+
+export const PO_STATUS_VARIANT: Record<PurchaseOrderStatus, BadgeVariant> = {
+  DRAFT: "secondary",
+  APPROVED: "info",
+  PARTIAL: "warning",
+  RECEIVED: "success",
+  CLOSED: "default",
+  CANCELLED: "destructive",
+};
+
+export const MATCH_STATUS_LABEL: Record<MatchStatus, string> = {
+  UNMATCHED: "Unmatched",
+  MATCHED: "Matched",
+  VARIANCE: "Variance",
+};
+
+export const MATCH_STATUS_VARIANT: Record<MatchStatus, BadgeVariant> = {
+  UNMATCHED: "secondary",
+  MATCHED: "success",
+  VARIANCE: "destructive",
+};
+
+export const EMPLOYEE_STATUS_LABEL: Record<EmployeeStatus, string> = {
+  ACTIVE: "Active",
+  ON_LEAVE: "On Leave",
+  TERMINATED: "Terminated",
+};
+
+export const EMPLOYEE_STATUS_VARIANT: Record<EmployeeStatus, BadgeVariant> = {
+  ACTIVE: "success",
+  ON_LEAVE: "warning",
+  TERMINATED: "secondary",
+};
+
+export const PAYRUN_STATUS_LABEL: Record<PayRunStatus, string> = {
+  DRAFT: "Draft",
+  APPROVED: "Approved",
+  POSTED: "Posted",
+};
+
+export const PAYRUN_STATUS_VARIANT: Record<PayRunStatus, BadgeVariant> = {
+  DRAFT: "secondary",
+  APPROVED: "info",
+  POSTED: "success",
+};
+
+export const EXPENSE_STATUS_LABEL: Record<ExpenseClaimStatus, string> = {
+  DRAFT: "Draft",
+  SUBMITTED: "Submitted",
+  APPROVED: "Approved",
+  POSTED: "Posted",
+  REJECTED: "Rejected",
+};
+
+export const EXPENSE_STATUS_VARIANT: Record<ExpenseClaimStatus, BadgeVariant> = {
+  DRAFT: "secondary",
+  SUBMITTED: "info",
+  APPROVED: "warning",
+  POSTED: "success",
+  REJECTED: "destructive",
 };

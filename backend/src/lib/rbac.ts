@@ -54,6 +54,17 @@ export type Permission =
   | "budget:write"
   | "inventory:read" // stock items & movements (M14)
   | "inventory:write"
+  | "warehouse:read" // warehouses & stock balances (M18)
+  | "warehouse:write"
+  | "procurement:read" // purchase orders & goods receipt (M15)
+  | "procurement:write"
+  | "procurement:approve" // approve POs & 3-way match
+  | "payroll:read" // employees & pay runs (M9)
+  | "payroll:write"
+  | "payroll:approve" // approve & post pay runs
+  | "expense:read" // expense claims / cash sheets (M23)
+  | "expense:write"
+  | "expense:approve" // approve & post claims
   | "fx:read" // exchange rates (M8 multi-currency)
   | "fx:write"
   | "consolidation:read" // subsidiary→parent mapping & rollup (M5)
@@ -113,6 +124,17 @@ const ALL: Permission[] = [
   "budget:write",
   "inventory:read",
   "inventory:write",
+  "warehouse:read",
+  "warehouse:write",
+  "procurement:read",
+  "procurement:write",
+  "procurement:approve",
+  "payroll:read",
+  "payroll:write",
+  "payroll:approve",
+  "expense:read",
+  "expense:write",
+  "expense:approve",
   "fx:read",
   "fx:write",
   "consolidation:read",
@@ -156,6 +178,12 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "budget:read",
     "inventory:read",
     "inventory:write",
+    "warehouse:read",
+    "warehouse:write",
+    "procurement:read",
+    "procurement:write",
+    "expense:read",
+    "expense:write",
     "fx:read",
     "compliance:read",
     "waypoint:read",
@@ -198,6 +226,15 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "budget:read",
     "budget:write",
     "inventory:read",
+    "warehouse:read",
+    "procurement:read",
+    "procurement:approve",
+    "payroll:read",
+    "payroll:write",
+    "payroll:approve",
+    "expense:read",
+    "expense:write",
+    "expense:approve",
     "fx:read",
     "fx:write",
     "consolidation:read",
@@ -236,6 +273,10 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "bank:read",
     "budget:read",
     "inventory:read",
+    "warehouse:read",
+    "procurement:read",
+    "payroll:read",
+    "expense:read",
     "fx:read",
     "consolidation:read",
     "compliance:read",
@@ -276,6 +317,10 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/bank", permission: "bank:read" },
   { prefix: "/budgets", permission: "budget:read" },
   { prefix: "/inventory", permission: "inventory:read" },
+  { prefix: "/warehouses", permission: "warehouse:read" },
+  { prefix: "/procurement", permission: "procurement:read" },
+  { prefix: "/payroll", permission: "payroll:read" },
+  { prefix: "/expenses", permission: "expense:read" },
   { prefix: "/fx", permission: "fx:read" },
   { prefix: "/consolidation", permission: "consolidation:read" },
   { prefix: "/compliance", permission: "compliance:read" },

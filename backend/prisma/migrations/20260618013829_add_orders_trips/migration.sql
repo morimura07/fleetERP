@@ -110,10 +110,9 @@ CREATE INDEX "trip_expenses_tripId_idx" ON "trip_expenses"("tripId");
 ALTER TABLE "orders" ADD CONSTRAINT "orders_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clients"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "orders" ADD CONSTRAINT "orders_invoiceEntryId_fkey" FOREIGN KEY ("invoiceEntryId") REFERENCES "journal_entries"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "orders" ADD CONSTRAINT "orders_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+-- NOTE: the orders.invoiceEntryId → journal_entries FK is added in the later
+-- 20260618100000_add_accounting_ledger migration (which creates journal_entries).
 
 -- AddForeignKey
 ALTER TABLE "trips" ADD CONSTRAINT "trips_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -130,5 +129,5 @@ ALTER TABLE "trips" ADD CONSTRAINT "trips_createdById_fkey" FOREIGN KEY ("create
 -- AddForeignKey
 ALTER TABLE "trip_expenses" ADD CONSTRAINT "trip_expenses_tripId_fkey" FOREIGN KEY ("tripId") REFERENCES "trips"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- AddForeignKey
-ALTER TABLE "trip_expenses" ADD CONSTRAINT "trip_expenses_entryId_fkey" FOREIGN KEY ("entryId") REFERENCES "journal_entries"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+-- NOTE: the trip_expenses.entryId → journal_entries FK is added in the later
+-- 20260618100000_add_accounting_ledger migration (which creates journal_entries).

@@ -129,6 +129,7 @@ inventory.post("/:id/movements", requireAuth, requirePermission("inventory:write
       unitCost: body.unitCost,
       reference: body.reference || null,
       memo: body.memo || null,
+      warehouseId: body.warehouseId || null,
       createdById: user.id,
     });
     await logActivity({ userId: user.id, action: "RECEIVE", target: `StockItem:${id}`, detail: { movementId: mv.id } });
@@ -141,6 +142,7 @@ inventory.post("/:id/movements", requireAuth, requirePermission("inventory:write
     quantity: body.quantity,
     reference: body.reference || null,
     memo: body.memo || null,
+    warehouseId: body.warehouseId || null,
     createdById: user.id,
   });
   await logActivity({ userId: user.id, action: "ISSUE", target: `StockItem:${id}`, detail: { movementId: mv.id } });

@@ -484,9 +484,108 @@ export const stockMovementSchema = z.object({
   type: z.enum(["RECEIPT", "ISSUE"]),
   quantity: z.coerce.number().positive("Quantity must be positive"),
   unitCost: z.coerce.number().min(0).optional(), // required for RECEIPT
+  warehouseId: z.string().optional().nullable(), // location (M18); default if omitted
   reference: z.string().max(80).optional().or(z.literal("")),
   memo: z.string().max(300).optional().or(z.literal("")),
 });
 
 export type StockItemInput = z.infer<typeof stockItemSchema>;
 export type StockMovementInput = z.infer<typeof stockMovementSchema>;
+
+// ── Procurement (M15) ──
+export const poLineSchema = z.object({
+  stockItemId: z.string().optional().nullable(),
+  description: z.string().min(1, "Description is required").max(200),
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+  unitPrice: z.coerce.number().min(0, "Price must be ≥ 0"),
+  expenseCode: z.string().min(1).max(20).default("5100"),
+});
+
+export const purchaseOrderSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  vendorId: z.string().min(1, "Vendor is required"),
+  currency: z.string().length(3).default("USD"),
+  orderDate: z.coerce.date(),
+  expectedAt: z.coerce.date().optional().nullable(),
+  memo: z.string().max(300).optional().or(z.literal("")),
+  lines: z.array(poLineSchema).min(1, "At least one line is required"),
+});
+
+export const goodsReceiptSchema = z.object({
+  receivedAt: z.coerce.date().optional(),
+  note: z.string().max(300).optional().or(z.literal("")),
+  lines: z
+    .array(z.object({ purchaseOrderLineId: z.string().min(1), quantity: z.coerce.number().positive() }))
+    .min(1, "At least one receipt line is required"),
+});
+
+export const matchSchema = z.object({ vendorInvoiceId: z.string().min(1, "Vendor invoice is required") });
+
+export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>;
+export type GoodsReceiptInput = z.infer<typeof goodsReceiptSchema>;
+
+// ── Payroll (M9) ──
+export const employeeSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  code: z.string().min(1, "Code is required").max(40),
+  name: z.string().min(1, "Name is required").max(150),
+  nationalId: z.string().max(40).optional().or(z.literal("")),
+  tin: z.string().max(40).optional().or(z.literal("")),
+  country: z.string().length(2).default("TZ"),
+  grossSalary: z.coerce.number().positive("Gross salary must be positive"),
+  currency: z.string().length(3).default("USD"),
+  status: z.enum(["ACTIVE", "ON_LEAVE", "TERMINATED"]).default("ACTIVE"),
+  bankAccount: z.string().max(60).optional().or(z.literal("")),
+  hiredAt: z.coerce.date(),
+});
+
+export const payRunSchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  month: z.coerce.number().int().min(1).max(12),
+});
+
+export type EmployeeInput = z.infer<typeof employeeSchema>;
+export type PayRunInput = z.infer<typeof payRunSchema>;
+
+// ── Warehouse (M18) ──
+export const warehouseSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  code: z.string().min(1, "Code is required").max(40),
+  name: z.string().min(1, "Name is required").max(150),
+  location: z.string().max(150).optional().or(z.literal("")),
+  isDefault: z.boolean().default(false),
+  isActive: z.boolean().default(true),
+});
+
+export const stockTransferSchema = z.object({
+  stockItemId: z.string().min(1, "Item is required"),
+  fromWarehouseId: z.string().min(1, "Source warehouse is required"),
+  toWarehouseId: z.string().min(1, "Destination warehouse is required"),
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+  reference: z.string().max(80).optional().or(z.literal("")),
+  memo: z.string().max(300).optional().or(z.literal("")),
+});
+
+export type WarehouseInput = z.infer<typeof warehouseSchema>;
+export type StockTransferInput = z.infer<typeof stockTransferSchema>;
+
+// ── Expense management (M23) ──
+export const expenseLineSchema = z.object({
+  expenseCode: z.string().min(1, "Expense account is required").max(20),
+  description: z.string().min(1, "Description is required").max(200),
+  amount: z.coerce.number().positive("Amount must be positive"),
+  incurredAt: z.coerce.date(),
+  receiptUrl: z.string().max(300).optional().nullable(),
+});
+
+export const expenseClaimSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  driverId: z.string().optional().nullable(),
+  title: z.string().min(1, "Title is required").max(150),
+  currency: z.string().length(3).default("USD"),
+  advanceId: z.string().optional().nullable(),
+  lines: z.array(expenseLineSchema).min(1, "At least one line is required"),
+});
+
+export type ExpenseClaimInput = z.infer<typeof expenseClaimSchema>;
+export type ExpenseLineInput = z.infer<typeof expenseLineSchema>;

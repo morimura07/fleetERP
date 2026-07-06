@@ -89,3 +89,17 @@ ALTER TABLE "journal_lines" ADD CONSTRAINT "journal_lines_entryId_fkey" FOREIGN 
 
 -- AddForeignKey
 ALTER TABLE "journal_lines" ADD CONSTRAINT "journal_lines_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "accounts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Deferred from 20260618013829_add_orders_trips: these reference journal_entries,
+-- which only exists as of this migration, so the FKs are added here.
+-- Guarded with IF NOT EXISTS so DBs that were force-synced with `db push`
+-- (where the constraint may already exist) still apply cleanly.
+DO $$ BEGIN
+  ALTER TABLE "orders" ADD CONSTRAINT "orders_invoiceEntryId_fkey" FOREIGN KEY ("invoiceEntryId") REFERENCES "journal_entries"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "trip_expenses" ADD CONSTRAINT "trip_expenses_entryId_fkey" FOREIGN KEY ("entryId") REFERENCES "journal_entries"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

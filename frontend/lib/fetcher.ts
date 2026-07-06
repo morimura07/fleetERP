@@ -18,19 +18,25 @@ export class ApiError extends Error {
  */
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
+export interface ApiFetchOptions extends RequestInit {
+  /** Return the full { data, meta } envelope instead of just `data` (for paginated lists). */
+  returnRaw?: boolean;
+}
+
 export async function apiFetch<T = unknown>(
   url: string,
-  options?: RequestInit,
+  options?: ApiFetchOptions,
 ): Promise<T> {
+  const { returnRaw, ...init } = options ?? {};
   const token = getToken();
   const res = await fetch(`${API_BASE}${url}`, {
-    ...options,
+    ...init,
     headers: {
-      ...(options?.body && !(options.body instanceof FormData)
+      ...(init.body && !(init.body instanceof FormData)
         ? { "Content-Type": "application/json" }
         : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
+      ...init.headers,
     },
   });
   // A 401 means the token is missing/expired — clear it so the guard redirects.
@@ -40,5 +46,6 @@ export async function apiFetch<T = unknown>(
   if (!res.ok) {
     throw new ApiError(payload?.error ?? "Request failed", res.status, payload?.details);
   }
-  return (payload?.data ?? payload) as T;
+  // returnRaw keeps { data, meta } for paginated lists; otherwise unwrap `data`.
+  return (returnRaw ? payload : payload?.data ?? payload) as T;
 }

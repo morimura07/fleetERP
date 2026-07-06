@@ -242,6 +242,46 @@ enum StockMovementType {
   RECEIPT // stock in (purchase / return)
   ISSUE // stock out (consumed on a vehicle/trip)
   ADJUSTMENT // stock-take correction (+/−)
+  TRANSFER_OUT // moved out of a warehouse (M18)
+  TRANSFER_IN // moved into a warehouse (M18)
+}
+
+// Procurement (M15)
+enum PurchaseOrderStatus {
+  DRAFT
+  APPROVED
+  PARTIAL // some lines received
+  RECEIVED // all lines fully received
+  CLOSED // matched & billed
+  CANCELLED
+}
+
+enum MatchStatus {
+  UNMATCHED // no vendor invoice matched yet
+  MATCHED // PO ↔ receipt ↔ invoice all agree
+  VARIANCE // quantity/price mismatch beyond tolerance
+}
+
+// Payroll (M9)
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+enum PayRunStatus {
+  DRAFT // computed, not approved
+  APPROVED // reviewed, ready to post
+  POSTED // journal entry posted to the ledger
+}
+
+// Expense management (M23) — trip cash-sheet / expense claim lifecycle.
+enum ExpenseClaimStatus {
+  DRAFT // being filled in
+  SUBMITTED // sent for review
+  APPROVED // reviewed, ready to post
+  POSTED // journal entry posted; advance reconciled
+  REJECTED
 }
 
 // ───────────────────────── Auth / User ─────────────────────────
@@ -295,17 +335,19 @@ model Driver {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  availability DriverAvailability[]
-  holidays     Holiday[]
-  dispatches   Dispatch[]
-  dailyReports DailyReport[]
-  payments     Payment[]
-  trips        Trip[]
-  transfers    MoneyTransfer[]
-  documents    DriverDocument[]
-  version      Int                  @default(0) // optimistic concurrency (PRD §7.1)
-  createdById  String? // audit: creator user id
-  updatedById  String? // audit: last-modifier user id
+  availability  DriverAvailability[]
+  holidays      Holiday[]
+  dispatches    Dispatch[]
+  dailyReports  DailyReport[]
+  payments      Payment[]
+  trips         Trip[]
+  transfers     MoneyTransfer[]
+  documents     DriverDocument[]
+  employee      Employee?
+  expenseClaims ExpenseClaim[]
+  version       Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById   String? // audit: creator user id
+  updatedById   String? // audit: last-modifier user id
 
   @@index([status])
   @@map("drivers")
@@ -610,6 +652,8 @@ model JournalEntry {
   customerReceipt        CustomerReceipt? @relation("CustomerReceiptEntry")
   moneyTransfer          MoneyTransfer?   @relation("MoneyTransferEntry")
   stockMovement          StockMovement?   @relation("StockMovementPosting")
+  payRun                 PayRun?          @relation("PayRunPosting")
+  expenseClaim           ExpenseClaim?    @relation("ExpenseClaimPosting")
   version                Int              @default(0) // optimistic concurrency (PRD §7.1)
   updatedById            String? // audit: last-modifier user id
 
@@ -761,10 +805,11 @@ model Vendor {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  invoices    VendorInvoice[]
-  version     Int             @default(0) // optimistic concurrency (PRD §7.1)
-  createdById String? // audit: creator user id
-  updatedById String? // audit: last-modifier user id
+  invoices       VendorInvoice[]
+  purchaseOrders PurchaseOrder[]
+  version        Int             @default(0) // optimistic concurrency (PRD §7.1)
+  createdById    String? // audit: creator user id
+  updatedById    String? // audit: last-modifier user id
 
   @@unique([dataAreaId, code])
   @@index([group])
@@ -800,9 +845,10 @@ model VendorInvoice {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  payments    VendorPayment[]
-  version     Int             @default(0) // optimistic concurrency (PRD §7.1)
-  updatedById String? // audit: last-modifier user id
+  payments       VendorPayment[]
+  purchaseOrders PurchaseOrder[] @relation("PoVendorInvoice")
+  version        Int             @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById    String? // audit: last-modifier user id
 
   @@unique([vendorId, invoiceNumber])
   @@index([status])
@@ -985,6 +1031,9 @@ model MoneyTransfer {
   entryId String?       @unique
   entry   JournalEntry? @relation("MoneyTransferEntry", fields: [entryId], references: [id], onDelete: SetNull)
 
+  // Expense reconciliation (M23): the claim that settled this advance, if any.
+  expenseClaim ExpenseClaim? @relation("ClaimAdvance")
+
   createdById String?
   createdBy   User?    @relation("MoneyTransferCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
@@ -1144,7 +1193,9 @@ model StockItem {
   updatedAt      DateTime      @updatedAt
 
   movements   StockMovement[]
-  version     Int             @default(0) // optimistic concurrency (PRD §7.1)
+  poLines     PurchaseOrderLine[]
+  balances    StockBalance[]
+  version     Int                 @default(0) // optimistic concurrency (PRD §7.1)
   createdById String? // audit
   updatedById String? // audit
 
@@ -1167,6 +1218,10 @@ model StockMovement {
   reference    String? // PO number, vehicle/trip ref, stock-take id
   memo         String?
 
+  // Warehouse this movement affected (M18). Null = legacy/default location.
+  warehouseId String?
+  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+
   // Ledger link — the journal entry this movement posted (if any).
   postingEntryId String?       @unique
   postingEntry   JournalEntry? @relation("StockMovementPosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
@@ -1176,5 +1231,270 @@ model StockMovement {
 
   @@index([stockItemId])
   @@index([type])
+  @@index([warehouseId])
   @@map("stock_movements")
+}
+
+// ───────────────────────── Warehouse (M18) ─────────────────────────
+
+model Warehouse {
+  id         String  @id @default(cuid())
+  dataAreaId String  @default("HQ01")
+  code       String // e.g. WH-DAR, WH-MSA
+  name       String
+  location   String? // city / address
+  isDefault  Boolean @default(false) // the MAIN warehouse receipts default to
+  isActive   Boolean @default(true)
+
+  balances  StockBalance[]
+  movements StockMovement[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  version     Int     @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String?
+  updatedById String?
+
+  @@unique([dataAreaId, code])
+  @@map("warehouses")
+}
+
+model StockBalance {
+  id          String    @id @default(cuid())
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  quantity    Decimal   @default(0) @db.Decimal(18, 3) // on-hand at this location
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([stockItemId, warehouseId])
+  @@index([warehouseId])
+  @@map("stock_balances")
+}
+
+// ───────────────────────── Procurement (M15) ─────────────────────────
+
+model PurchaseOrder {
+  id          String              @id @default(cuid())
+  dataAreaId  String              @default("HQ01")
+  poNumber    String // internal, e.g. PO-000123
+  vendorId    String
+  vendor      Vendor              @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  status      PurchaseOrderStatus @default(DRAFT)
+  matchStatus MatchStatus         @default(UNMATCHED)
+  currency    String              @default("USD")
+  orderDate   DateTime            @db.Date
+  expectedAt  DateTime?           @db.Date
+  subtotal    Decimal             @default(0) @db.Decimal(18, 2) // Σ line totals
+  memo        String?
+
+  // 3-way match: the vendor bill this PO was matched against.
+  vendorInvoiceId String?
+  vendorInvoice   VendorInvoice? @relation("PoVendorInvoice", fields: [vendorInvoiceId], references: [id], onDelete: SetNull)
+
+  approvedById String?
+  approvedAt   DateTime?
+
+  lines    PurchaseOrderLine[]
+  receipts GoodsReceipt[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  version     Int      @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String?
+  updatedById String?
+
+  @@unique([dataAreaId, poNumber])
+  @@index([vendorId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  stockItemId     String?
+  stockItem       StockItem?    @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
+  description     String
+  quantity        Decimal       @db.Decimal(18, 3) // ordered
+  qtyReceived     Decimal       @default(0) @db.Decimal(18, 3)
+  unitPrice       Decimal       @db.Decimal(18, 4)
+  lineTotal       Decimal       @db.Decimal(18, 2) // quantity × unitPrice
+  expenseCode     String        @default("5100") // non-stock lines charge here
+
+  @@index([purchaseOrderId])
+  @@index([stockItemId])
+  @@map("purchase_order_lines")
+}
+
+model GoodsReceipt {
+  id              String        @id @default(cuid())
+  dataAreaId      String        @default("HQ01")
+  receiptNumber   String
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  receivedAt      DateTime      @db.Date
+  note            String?
+
+  lines GoodsReceiptLine[]
+
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  @@unique([dataAreaId, receiptNumber])
+  @@index([purchaseOrderId])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptLine {
+  id                  String       @id @default(cuid())
+  goodsReceiptId      String
+  goodsReceipt        GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  purchaseOrderLineId String
+  quantity            Decimal      @db.Decimal(18, 3) // received on this receipt
+
+  // Inventory link — the stock movement this receipt line created (if a stock item).
+  stockMovementId String?
+
+  @@index([goodsReceiptId])
+  @@map("goods_receipt_lines")
+}
+
+// ───────────────────────── Payroll (M9) ─────────────────────────
+
+model Employee {
+  id          String         @id @default(cuid())
+  dataAreaId  String         @default("HQ01")
+  code        String // internal, e.g. EMP-000001
+  name        String
+  nationalId  String? // NIDA / national ID
+  tin         String? // tax PIN/TIN
+  country     String         @default("TZ") // ISO country → statutory scheme (TZ, KE …)
+  grossSalary Decimal        @db.Decimal(18, 2) // monthly gross (base ccy)
+  currency    String         @default("USD")
+  status      EmployeeStatus @default(ACTIVE)
+  bankAccount String?
+  hiredAt     DateTime       @db.Date
+  // Optional link to a Driver record (a driver may also be an employee).
+  driverId    String?        @unique
+  driver      Driver?        @relation(fields: [driverId], references: [id], onDelete: SetNull)
+
+  payslips  Payslip[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  version     Int     @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String?
+  updatedById String?
+
+  @@unique([dataAreaId, code])
+  @@index([status])
+  @@map("employees")
+}
+
+model PayRun {
+  id         String       @id @default(cuid())
+  dataAreaId String       @default("HQ01")
+  year       Int
+  month      Int // 1-12
+  status     PayRunStatus @default(DRAFT)
+  currency   String       @default("USD")
+  grossTotal Decimal      @default(0) @db.Decimal(18, 2)
+  payeTotal  Decimal      @default(0) @db.Decimal(18, 2)
+  nssfTotal  Decimal      @default(0) @db.Decimal(18, 2)
+  shifTotal  Decimal      @default(0) @db.Decimal(18, 2)
+  netTotal   Decimal      @default(0) @db.Decimal(18, 2)
+  memo       String?
+
+  // Ledger link — the journal entry this run posted.
+  postingEntryId String?       @unique
+  postingEntry   JournalEntry? @relation("PayRunPosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
+
+  approvedById String?
+  approvedAt   DateTime?
+
+  payslips  Payslip[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  version     Int     @default(0)
+  createdById String?
+  updatedById String?
+
+  @@unique([dataAreaId, year, month])
+  @@index([status])
+  @@map("pay_runs")
+}
+
+model Payslip {
+  id         String   @id @default(cuid())
+  payRunId   String
+  payRun     PayRun   @relation(fields: [payRunId], references: [id], onDelete: Cascade)
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  gross      Decimal  @db.Decimal(18, 2)
+  paye       Decimal  @db.Decimal(18, 2) // income tax
+  nssf       Decimal  @db.Decimal(18, 2) // pension
+  shif       Decimal  @db.Decimal(18, 2) // health
+  net        Decimal  @db.Decimal(18, 2) // gross − paye − nssf − shif
+
+  @@unique([payRunId, employeeId])
+  @@index([employeeId])
+  @@map("payslips")
+}
+
+// ───────────────────────── Expense Management (M23) ─────────────────────────
+
+model ExpenseClaim {
+  id          String             @id @default(cuid())
+  dataAreaId  String             @default("HQ01")
+  claimNumber String
+  driverId    String?
+  driver      Driver?            @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  title       String // e.g. "Trip TRP-00012 cash sheet"
+  currency    String             @default("USD")
+  status      ExpenseClaimStatus @default(DRAFT)
+  total       Decimal            @default(0) @db.Decimal(18, 2) // Σ line amounts
+
+  // Advance reconciliation (M23) — the driver disbursement this claim settles.
+  advanceId     String?        @unique
+  advance       MoneyTransfer? @relation("ClaimAdvance", fields: [advanceId], references: [id], onDelete: SetNull)
+  advanceAmount Decimal        @default(0) @db.Decimal(18, 2) // snapshot of the advance at reconcile
+  reconciled    Decimal        @default(0) @db.Decimal(18, 2) // total − advanceAmount (+ = owed to driver, − = driver returns)
+
+  // Ledger link
+  postingEntryId String?       @unique
+  postingEntry   JournalEntry? @relation("ExpenseClaimPosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
+
+  approvedById String?
+  approvedAt   DateTime?
+
+  lines     ExpenseLine[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  version     Int     @default(0) // optimistic concurrency (PRD §7.1)
+  createdById String?
+  updatedById String?
+
+  @@unique([dataAreaId, claimNumber])
+  @@index([status])
+  @@index([driverId])
+  @@map("expense_claims")
+}
+
+model ExpenseLine {
+  id             String       @id @default(cuid())
+  expenseClaimId String
+  expenseClaim   ExpenseClaim @relation(fields: [expenseClaimId], references: [id], onDelete: Cascade)
+  expenseCode    String // COA expense account this line hits (5000/5030/…)
+  description    String
+  amount         Decimal      @db.Decimal(18, 2)
+  incurredAt     DateTime     @db.Date
+  receiptUrl     String? // uploaded proof-of-spend image (/uploads/…)
+
+  @@index([expenseClaimId])
+  @@map("expense_lines")
 }

@@ -42,10 +42,16 @@ export function DataTable<T extends { id: string }>({
     if (q) params.set("q", q);
     for (const [k, v] of Object.entries(filters ?? {})) if (v) params.set(k, v);
     try {
-      const res = await fetch(`${endpoint}?${params}`);
-      const json = await res.json();
-      setRows(json.data ?? []);
-      if (json.meta) setMeta(json.meta);
+      // apiFetch hits the backend origin with the bearer token and returns the
+      // `data` payload directly (it also carries `meta` on the raw response).
+      const body = await apiFetch<{ data?: T[]; meta?: Meta }>(
+        `${endpoint}?${params}`,
+        { returnRaw: true },
+      );
+      setRows(body.data ?? []);
+      if (body.meta) setMeta(body.meta);
+    } catch {
+      setRows([]);
     } finally {
       setLoading(false);
     }

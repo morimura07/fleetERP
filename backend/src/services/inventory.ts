@@ -66,7 +66,46 @@ interface MovementInput {
   unitCost?: Prisma.Decimal.Value; // required for RECEIPT / ADJUSTMENT; ignored for ISSUE
   reference?: string | null;
   memo?: string | null;
+  warehouseId?: string | null; // location for this movement (M18); null = default
   createdById?: string | null;
+}
+
+/**
+ * Resolve the warehouse for a movement: the given one, else the entity's default
+ * warehouse. Returns null if the entity has no warehouses configured (single-
+ * location mode — balances are simply not tracked per location).
+ */
+async function resolveWarehouseId(
+  tx: Prisma.TransactionClient,
+  dataAreaId: string,
+  warehouseId?: string | null,
+): Promise<string | null> {
+  if (warehouseId) return warehouseId;
+  const def = await tx.warehouse.findFirst({
+    where: { dataAreaId, isDefault: true, isActive: true },
+    select: { id: true },
+  });
+  return def?.id ?? null;
+}
+
+/** Adjust a per-warehouse balance by delta (may be negative). Upserts the row. */
+async function adjustBalance(
+  tx: Prisma.TransactionClient,
+  stockItemId: string,
+  warehouseId: string,
+  delta: Prisma.Decimal,
+): Promise<Prisma.Decimal> {
+  const existing = await tx.stockBalance.findUnique({
+    where: { stockItemId_warehouseId: { stockItemId, warehouseId } },
+  });
+  const next = (existing ? D(existing.quantity) : new Prisma.Decimal(0)).plus(delta);
+  if (next.isNegative()) throw new AuthError("Not enough stock at this warehouse", 422);
+  await tx.stockBalance.upsert({
+    where: { stockItemId_warehouseId: { stockItemId, warehouseId } },
+    create: { stockItemId, warehouseId, quantity: next.toFixed(3) },
+    update: { quantity: next.toFixed(3) },
+  });
+  return next;
 }
 
 /** Receive stock: raise on-hand, recompute average, post Dr Inventory / Cr Accrued. */
@@ -102,6 +141,11 @@ export async function receiveStock(input: MovementInput) {
       where: { id: item.id },
       data: { quantityOnHand: next.qty.toFixed(3), avgCost: next.avgCost.toFixed(4), updatedById: input.createdById ?? null },
     });
+
+    // Raise the per-warehouse balance (if this entity uses warehouses).
+    const whId = await resolveWarehouseId(tx, item.dataAreaId, input.warehouseId);
+    if (whId) await adjustBalance(tx, item.id, whId, D(input.quantity));
+
     return tx.stockMovement.create({
       data: {
         dataAreaId: item.dataAreaId,
@@ -114,6 +158,7 @@ export async function receiveStock(input: MovementInput) {
         avgCostAfter: next.avgCost.toFixed(4),
         reference: input.reference ?? null,
         memo: input.memo ?? null,
+        warehouseId: whId,
         postingEntryId: entry.id,
         createdById: input.createdById ?? null,
       },
@@ -155,6 +200,11 @@ export async function issueStock(input: MovementInput) {
       where: { id: item.id },
       data: { quantityOnHand: next.qty.toFixed(3), updatedById: input.createdById ?? null },
     });
+
+    // Lower the per-warehouse balance (if this entity uses warehouses).
+    const whId = await resolveWarehouseId(tx, item.dataAreaId, input.warehouseId);
+    if (whId) await adjustBalance(tx, item.id, whId, D(input.quantity).negated());
+
     return tx.stockMovement.create({
       data: {
         dataAreaId: item.dataAreaId,
@@ -167,6 +217,7 @@ export async function issueStock(input: MovementInput) {
         avgCostAfter: item.avgCost.toString(),
         reference: input.reference ?? null,
         memo: input.memo ?? null,
+        warehouseId: whId,
         postingEntryId: entry.id,
         createdById: input.createdById ?? null,
       },
@@ -177,4 +228,65 @@ export async function issueStock(input: MovementInput) {
 /** Total inventory value of an item (qty × avgCost). */
 export function itemValue(item: { quantityOnHand: Prisma.Decimal.Value; avgCost: Prisma.Decimal.Value }): Prisma.Decimal {
   return D(item.quantityOnHand).times(item.avgCost);
+}
+
+export interface TransferInput {
+  stockItemId: string;
+  fromWarehouseId: string;
+  toWarehouseId: string;
+  quantity: Prisma.Decimal.Value;
+  reference?: string | null;
+  memo?: string | null;
+  createdById?: string | null;
+}
+
+/**
+ * Move stock between two warehouses (M18). Same legal entity, same average cost —
+ * no P&L and no ledger posting (the item's total on-hand and value are unchanged;
+ * only the location split moves). Writes a TRANSFER_OUT + TRANSFER_IN movement
+ * pair and re-balances both locations atomically.
+ */
+export async function transferStock(input: TransferInput) {
+  const qty = D(input.quantity);
+  if (!qty.greaterThan(0)) throw new AuthError("Transfer quantity must be positive", 422);
+  if (input.fromWarehouseId === input.toWarehouseId) {
+    throw new AuthError("Source and destination warehouses must differ", 422);
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const item = await tx.stockItem.findUnique({ where: { id: input.stockItemId } });
+    if (!item) throw new AuthError("Stock item not found", 404);
+
+    const [from, to] = await Promise.all([
+      tx.warehouse.findUnique({ where: { id: input.fromWarehouseId } }),
+      tx.warehouse.findUnique({ where: { id: input.toWarehouseId } }),
+    ]);
+    if (!from || !to) throw new AuthError("Warehouse not found", 404);
+    if (from.dataAreaId !== item.dataAreaId || to.dataAreaId !== item.dataAreaId) {
+      throw new AuthError("Warehouses must be in the item's entity", 422);
+    }
+
+    // Move the balances (adjustBalance throws 422 if the source is short).
+    const outQty = await adjustBalance(tx, item.id, from.id, qty.negated());
+    const inQty = await adjustBalance(tx, item.id, to.id, qty);
+
+    const avg = item.avgCost;
+    const value = qty.times(avg);
+    const common = {
+      dataAreaId: item.dataAreaId,
+      stockItemId: item.id,
+      quantity: qty.toFixed(3),
+      unitCost: avg.toString(),
+      totalCost: value.toFixed(2),
+      avgCostAfter: avg.toString(),
+      reference: input.reference ?? null,
+      memo: input.memo ?? null,
+      createdById: input.createdById ?? null,
+    };
+    const [outMv, inMv] = await Promise.all([
+      tx.stockMovement.create({ data: { ...common, type: "TRANSFER_OUT", warehouseId: from.id, qtyAfter: outQty.toFixed(3) } }),
+      tx.stockMovement.create({ data: { ...common, type: "TRANSFER_IN", warehouseId: to.id, qtyAfter: inQty.toFixed(3) } }),
+    ]);
+    return { out: outMv, in: inMv, fromBalance: outQty.toFixed(3), toBalance: inQty.toFixed(3) };
+  });
 }

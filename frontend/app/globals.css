@@ -61,6 +61,33 @@
     --ring: 243 80% 66%;
     --radius: 0.875rem;
   }
+
+  /* Green / white theme — clean, light, emerald-accented (client request). */
+  .green {
+    --background: 150 30% 98%; /* near-white with a green tint */
+    --foreground: 155 30% 12%; /* deep green-charcoal text */
+    --card: 0 0% 100%;
+    --card-foreground: 155 30% 12%;
+    --elevated: 150 33% 96%; /* nested / hover surface */
+    --popover: 0 0% 100%;
+    --popover-foreground: 155 30% 12%;
+    --primary: 152 60% 36%; /* emerald green */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 150 24% 94%;
+    --secondary-foreground: 155 30% 14%;
+    --muted: 150 20% 95%;
+    --muted-foreground: 155 12% 40%;
+    --accent: 152 45% 92%;
+    --accent-foreground: 152 60% 26%;
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 60% 36%;
+    --warning: 38 92% 45%;
+    --border: 150 20% 88%;
+    --input: 150 20% 88%;
+    --ring: 152 60% 36%;
+    --radius: 0.875rem;
+  }
 }
 
 @layer base {
@@ -82,6 +109,17 @@
     background:
       radial-gradient(60% 50% at 15% 0%, hsl(243 80% 60% / 0.06), transparent 70%),
       radial-gradient(50% 45% at 100% 0%, hsl(265 80% 60% / 0.05), transparent 70%);
+  }
+  /* Green theme — a soft emerald wash top-left. */
+  .green body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(60% 50% at 15% 0%, hsl(152 60% 45% / 0.07), transparent 70%),
+      radial-gradient(50% 45% at 100% 0%, hsl(140 60% 45% / 0.05), transparent 70%);
   }
   /* Keep app content above the ambient glow. */
   body > * {
@@ -105,9 +143,16 @@
       inset 0 1px 0 0 hsl(0 0% 100% / 0.04),
       0 1px 2px 0 hsl(0 0% 0% / 0.3);
   }
-  /* Indigo gradient text for emphasis numbers/labels. */
+  /* Indigo gradient text for emphasis numbers/labels (dark theme). */
   .text-gradient {
     background: linear-gradient(90deg, hsl(243 85% 75%), hsl(265 85% 78%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  /* Green theme keeps emphasis text on-palette. */
+  .green .text-gradient {
+    background: linear-gradient(90deg, hsl(152 60% 34%), hsl(140 60% 40%));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;

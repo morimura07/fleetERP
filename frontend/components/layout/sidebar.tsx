@@ -8,7 +8,7 @@ import {
   ReceiptText, HandCoins, Store, Contact,
   Percent, AlarmClock,
   Landmark, PiggyBank, Combine, Coins,
-  ShieldCheck, MapPin, Boxes,
+  ShieldCheck, MapPin, Boxes, ShoppingCart, BadgeDollarSign, Warehouse, Receipt,
 } from "lucide-react";
 import { cn } from "@frontend/lib/utils";
 import { can, type Permission, type Role } from "@frontend/lib/rbac";
@@ -46,6 +46,8 @@ const GROUPS: NavGroup[] = [
       { href: "/fx", label: "Exchange Rates", icon: Coins, perm: "fx:read" },
       { href: "/consolidation", label: "Consolidation", icon: Combine, perm: "consolidation:read" },
       { href: "/payments", label: "Payments", icon: Wallet, perm: "payment:read" },
+      { href: "/payroll", label: "Payroll", icon: BadgeDollarSign, perm: "payroll:read" },
+      { href: "/expenses", label: "Expenses", icon: Receipt, perm: "expense:read" },
     ],
   },
   {
@@ -55,6 +57,8 @@ const GROUPS: NavGroup[] = [
       { href: "/vehicles", label: "Vehicles", icon: Truck, perm: "vehicle:read" },
       { href: "/clients", label: "Clients", icon: Building2, perm: "client:read" },
       { href: "/inventory", label: "Inventory", icon: Boxes, perm: "inventory:read" },
+      { href: "/warehouses", label: "Warehouses", icon: Warehouse, perm: "warehouse:read" },
+      { href: "/procurement", label: "Procurement", icon: ShoppingCart, perm: "procurement:read" },
       { href: "/compliance", label: "Compliance", icon: ShieldCheck, perm: "compliance:read" },
       { href: "/waypoints", label: "GPS Waypoints", icon: MapPin, perm: "waypoint:read" },
       { href: "/reports", label: "Daily Reports", icon: FileText, perm: "report:read" },
