@@ -1,11 +1,12 @@
 "use client";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signIn } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loginSchema } from "@frontend/lib/validations";
+import { clearToken } from "@frontend/lib/auth-token";
 import { z } from "zod";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
@@ -18,6 +19,16 @@ function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+
+  // Arrived here because the backend token expired: fully clear the stale
+  // NextAuth session + client token so we don't loop back into a 401'ing page.
+  useEffect(() => {
+    if (params.get("reason") === "expired") {
+      clearToken();
+      signOut({ redirect: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const {
     register,
     handleSubmit,
@@ -43,6 +54,11 @@ function LoginForm() {
           <CardDescription>Sign in to the logistics ERP</CardDescription>
         </CardHeader>
         <CardContent>
+          {params.get("reason") === "expired" && (
+            <p className="mb-4 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+              Your session expired — please sign in again.
+            </p>
+          )}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

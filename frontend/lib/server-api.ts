@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 
 /**
@@ -19,6 +20,10 @@ export class ServerApiError extends Error {
 export async function serverApi<T = unknown>(path: string, init?: RequestInit): Promise<T> {
   const session = await auth();
   const token = session?.accessToken;
+
+  // No token at all → the session is missing/incomplete; send to login.
+  if (!token) redirect("/login?reason=session");
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
@@ -28,6 +33,10 @@ export async function serverApi<T = unknown>(path: string, init?: RequestInit): 
     // Server-rendered list pages should always reflect current data.
     cache: "no-store",
   });
+
+  // Expired/invalid token → don't crash the page; bounce to login to re-auth.
+  if (res.status === 401) redirect("/login?reason=expired");
+
   const isJson = res.headers.get("content-type")?.includes("application/json");
   const payload = isJson ? await res.json() : null;
   if (!res.ok) {

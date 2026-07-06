@@ -25,7 +25,10 @@ export default auth((req) => {
     }
 
     // Signed in but on a public auth page → send to home.
-    if (isPublic) {
+    // EXCEPTION: an expired backend token bounced us here (?reason=expired).
+    // The NextAuth cookie still looks valid, so don't ricochet back to a page
+    // that will 401 again — let /login render so the user can re-authenticate.
+    if (isPublic && nextUrl.searchParams.get("reason") !== "expired") {
       return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
 
