@@ -599,3 +599,35 @@ export const companySchema = z.object({
   isActive: z.boolean().default(true),
 });
 export type CompanyInput = z.infer<typeof companySchema>;
+
+// ── Fixed Assets (M20) ──
+export const fixedAssetSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  code: z.string().min(1, "Asset tag is required").max(40),
+  name: z.string().min(1, "Name is required").max(150),
+  category: z.enum(["VEHICLE", "EQUIPMENT", "FURNITURE", "BUILDING", "IT", "OTHER"]).default("EQUIPMENT"),
+  acquisitionCost: z.coerce.number().positive("Acquisition cost must be positive"),
+  residualValue: z.coerce.number().min(0, "Residual value cannot be negative").default(0),
+  usefulLifeMonths: z.coerce.number().int().positive("Useful life must be a positive number of months"),
+  acquisitionDate: z.coerce.date(),
+  inServiceDate: z.coerce.date(),
+  assetAccountCode: z.string().max(20).default("1500"),
+  accumDepCode: z.string().max(20).default("1510"),
+  expenseCode: z.string().max(20).default("5200"),
+}).refine((a) => a.residualValue < a.acquisitionCost, {
+  message: "Residual value must be less than acquisition cost",
+  path: ["residualValue"],
+});
+
+export const depreciationRunSchema = z.object({
+  period: z.string().regex(/^\d{4}-\d{2}$/, "Period must be YYYY-MM"),
+});
+
+export const assetDisposalSchema = z.object({
+  proceeds: z.coerce.number().min(0, "Proceeds cannot be negative"),
+  disposalDate: z.coerce.date(),
+});
+
+export type FixedAssetInput = z.infer<typeof fixedAssetSchema>;
+export type DepreciationRunInput = z.infer<typeof depreciationRunSchema>;
+export type AssetDisposalInput = z.infer<typeof assetDisposalSchema>;

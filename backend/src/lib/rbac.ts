@@ -65,6 +65,9 @@ export type Permission =
   | "expense:read" // expense claims / cash sheets (M23)
   | "expense:write"
   | "expense:approve" // approve & post claims
+  | "asset:read" // fixed asset register (M20)
+  | "asset:write"
+  | "asset:approve" // run depreciation & dispose assets
   | "fx:read" // exchange rates (M8 multi-currency)
   | "fx:write"
   | "consolidation:read" // subsidiary→parent mapping & rollup (M5)
@@ -136,6 +139,9 @@ const ALL: Permission[] = [
   "expense:read",
   "expense:write",
   "expense:approve",
+  "asset:read",
+  "asset:write",
+  "asset:approve",
   "fx:read",
   "fx:write",
   "consolidation:read",
@@ -237,6 +243,9 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "expense:read",
     "expense:write",
     "expense:approve",
+    "asset:read",
+    "asset:write",
+    "asset:approve",
     "fx:read",
     "fx:write",
     "consolidation:read",

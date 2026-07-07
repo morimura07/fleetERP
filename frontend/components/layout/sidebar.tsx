@@ -9,6 +9,7 @@ import {
   Percent, AlarmClock,
   Landmark, PiggyBank, Combine, Coins,
   ShieldCheck, MapPin, Boxes, ShoppingCart, BadgeDollarSign, Warehouse, Receipt,
+  Building,
 } from "lucide-react";
 import { cn } from "@frontend/lib/utils";
 import { can, type Permission, type Role } from "@frontend/lib/rbac";
@@ -48,6 +49,7 @@ const GROUPS: NavGroup[] = [
       { href: "/payments", label: "Payments", icon: Wallet, perm: "payment:read" },
       { href: "/payroll", label: "Payroll", icon: BadgeDollarSign, perm: "payroll:read" },
       { href: "/expenses", label: "Expenses", icon: Receipt, perm: "expense:read" },
+      { href: "/assets", label: "Fixed Assets", icon: Building, perm: "asset:read" },
     ],
   },
   {

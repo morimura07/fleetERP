@@ -42,6 +42,7 @@ import { procurement } from "@backend/routes/procurement";
 import { payroll } from "@backend/routes/payroll";
 import { warehouses } from "@backend/routes/warehouses";
 import { expenses } from "@backend/routes/expenses";
+import { assets } from "@backend/routes/assets";
 import { companies } from "@backend/routes/companies";
 
 /**
@@ -113,6 +114,7 @@ app.route("/api/procurement", procurement);
 app.route("/api/payroll", payroll);
 app.route("/api/warehouses", warehouses);
 app.route("/api/expenses", expenses);
+app.route("/api/assets", assets);
 app.route("/api/companies", companies);
 
 app.onError(onError);

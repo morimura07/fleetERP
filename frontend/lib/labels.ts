@@ -28,6 +28,8 @@ import type {
   EmployeeStatus,
   PayRunStatus,
   ExpenseClaimStatus,
+  AssetCategory,
+  AssetStatus,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -365,4 +367,25 @@ export const EXPENSE_STATUS_VARIANT: Record<ExpenseClaimStatus, BadgeVariant> = 
   APPROVED: "warning",
   POSTED: "success",
   REJECTED: "destructive",
+};
+
+export const ASSET_CATEGORY_LABEL: Record<AssetCategory, string> = {
+  VEHICLE: "Vehicle",
+  EQUIPMENT: "Equipment",
+  FURNITURE: "Furniture & Fixtures",
+  BUILDING: "Building",
+  IT: "IT & Computers",
+  OTHER: "Other",
+};
+
+export const ASSET_STATUS_LABEL: Record<AssetStatus, string> = {
+  ACTIVE: "Active",
+  FULLY_DEPRECIATED: "Fully depreciated",
+  DISPOSED: "Disposed",
+};
+
+export const ASSET_STATUS_VARIANT: Record<AssetStatus, BadgeVariant> = {
+  ACTIVE: "success",
+  FULLY_DEPRECIATED: "info",
+  DISPOSED: "secondary",
 };

@@ -284,6 +284,22 @@ enum ExpenseClaimStatus {
   REJECTED
 }
 
+// Fixed Assets (M20)
+enum AssetCategory {
+  VEHICLE
+  EQUIPMENT
+  FURNITURE
+  BUILDING
+  IT
+  OTHER
+}
+
+enum AssetStatus {
+  ACTIVE // in service, depreciating
+  FULLY_DEPRECIATED // book value at residual
+  DISPOSED // sold / written off
+}
+
 // ───────────────────────── Multi-company (M34) ─────────────────────────
 
 // A legal entity / tenant. Its `code` is the `dataAreaId` used to partition every
@@ -684,18 +700,20 @@ model JournalEntry {
   lines JournalLine[]
 
   // Reverse links from freight settlements (a posting may settle an order or expense).
-  orderInvoice           Order?           @relation("OrderInvoice")
-  tripExpense            TripExpense?     @relation("TripExpenseEntry")
+  orderInvoice           Order?             @relation("OrderInvoice")
+  tripExpense            TripExpense?       @relation("TripExpenseEntry")
   // AP / AR settlement links.
-  vendorInvoicePosting   VendorInvoice?   @relation("VendorInvoicePosting")
-  vendorPayment          VendorPayment?   @relation("VendorPaymentEntry")
-  customerInvoicePosting CustomerInvoice? @relation("CustomerInvoicePosting")
-  customerReceipt        CustomerReceipt? @relation("CustomerReceiptEntry")
-  moneyTransfer          MoneyTransfer?   @relation("MoneyTransferEntry")
-  stockMovement          StockMovement?   @relation("StockMovementPosting")
-  payRun                 PayRun?          @relation("PayRunPosting")
-  expenseClaim           ExpenseClaim?    @relation("ExpenseClaimPosting")
-  version                Int              @default(0) // optimistic concurrency (PRD §7.1)
+  vendorInvoicePosting   VendorInvoice?     @relation("VendorInvoicePosting")
+  vendorPayment          VendorPayment?     @relation("VendorPaymentEntry")
+  customerInvoicePosting CustomerInvoice?   @relation("CustomerInvoicePosting")
+  customerReceipt        CustomerReceipt?   @relation("CustomerReceiptEntry")
+  moneyTransfer          MoneyTransfer?     @relation("MoneyTransferEntry")
+  stockMovement          StockMovement?     @relation("StockMovementPosting")
+  payRun                 PayRun?            @relation("PayRunPosting")
+  expenseClaim           ExpenseClaim?      @relation("ExpenseClaimPosting")
+  depreciationEntry      DepreciationEntry? @relation("DepreciationPosting")
+  assetDisposal          FixedAsset?        @relation("AssetDisposalPosting")
+  version                Int                @default(0) // optimistic concurrency (PRD §7.1)
   updatedById            String? // audit: last-modifier user id
 
   @@unique([dataAreaId, voucherNumber])
@@ -1544,4 +1562,72 @@ model ExpenseLine {
 
   @@index([expenseClaimId])
   @@map("expense_lines")
+}
+
+// ── Fixed Assets (M20) ──────────────────────────────────────────────────────
+// Asset register with straight-line depreciation. Each depreciation run posts
+// Dr Depreciation Expense (5200) / Cr Accumulated Depreciation (1510). Disposal
+// removes the asset's cost + accumulated depreciation and books gain (4900) or
+// loss (6900) against proceeds. Multi-tenant via dataAreaId.
+model FixedAsset {
+  id         String        @id @default(cuid())
+  dataAreaId String        @default("HQ01")
+  code       String // human asset tag, unique within a company
+  name       String
+  category   AssetCategory @default(EQUIPMENT)
+  status     AssetStatus   @default(ACTIVE)
+
+  acquisitionCost  Decimal  @db.Decimal(18, 2)
+  residualValue    Decimal  @default(0) @db.Decimal(18, 2) // salvage value at end of life
+  usefulLifeMonths Int // straight-line depreciation period
+  acquisitionDate  DateTime @db.Date
+  inServiceDate    DateTime @db.Date // depreciation starts from here
+
+  accumulatedDepreciation Decimal @default(0) @db.Decimal(18, 2) // running total, kept in sync with entries
+  lastDepreciatedPeriod   String? // "YYYY-MM" of the most recent run; guards double-posting
+
+  // GL account codes this asset posts against (defaulted from category, overridable).
+  assetAccountCode String @default("1500")
+  accumDepCode     String @default("1510")
+  expenseCode      String @default("5200")
+
+  // Disposal outcome (set once when status → DISPOSED).
+  disposalDate     DateTime?     @db.Date
+  disposalProceeds Decimal?      @db.Decimal(18, 2)
+  disposalEntryId  String?       @unique
+  disposalEntry    JournalEntry? @relation("AssetDisposalPosting", fields: [disposalEntryId], references: [id], onDelete: SetNull)
+
+  entries DepreciationEntry[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, code])
+  @@index([dataAreaId])
+  @@index([dataAreaId, status])
+  @@map("fixed_assets")
+}
+
+model DepreciationEntry {
+  id           String     @id @default(cuid())
+  dataAreaId   String     @default("HQ01")
+  fixedAssetId String
+  fixedAsset   FixedAsset @relation(fields: [fixedAssetId], references: [id], onDelete: Cascade)
+
+  period         String // "YYYY-MM" the depreciation belongs to
+  amount         Decimal @db.Decimal(18, 2) // depreciation charged this period
+  bookValueAfter Decimal @db.Decimal(18, 2) // net book value after this charge
+
+  journalEntryId String?       @unique
+  journalEntry   JournalEntry? @relation("DepreciationPosting", fields: [journalEntryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([fixedAssetId, period]) // one depreciation charge per asset per month
+  @@index([dataAreaId])
+  @@index([fixedAssetId])
+  @@map("depreciation_entries")
 }
