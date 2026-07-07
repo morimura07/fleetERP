@@ -76,7 +76,8 @@ export type Permission =
   | "tracking:read"
   | "export:run"
   | "activity:read"
-  | "user:manage";
+  | "user:manage"
+  | "company:manage";
 
 const ALL: Permission[] = [
   "dashboard:view",
@@ -112,6 +113,7 @@ const ALL: Permission[] = [
   "export:run",
   "activity:read",
   "user:manage",
+  "company:manage",
 ];
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
@@ -216,4 +218,5 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/tracking", permission: "tracking:read" },
   { prefix: "/activity", permission: "activity:read" },
   { prefix: "/users", permission: "user:manage" },
+  { prefix: "/companies", permission: "company:manage" },
 ];

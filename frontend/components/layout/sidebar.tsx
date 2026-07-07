@@ -67,6 +67,7 @@ const GROUPS: NavGroup[] = [
   {
     label: "System",
     items: [
+      { href: "/companies", label: "Companies", icon: Building2, perm: "company:manage" },
       { href: "/activity", label: "Activity Log", icon: ScrollText, perm: "activity:read" },
       { href: "/users", label: "Users", icon: Settings, perm: "user:manage" },
     ],

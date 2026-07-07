@@ -15,22 +15,34 @@ export function isCrossEntity(user: AuthUser): boolean {
 }
 
 /**
- * A `where` fragment that scopes a partitioned model to the user's entity.
- * Returns `{}` for ADMIN (no restriction), `{ dataAreaId }` otherwise.
- * Spread it into any `where` clause:
- *   where: { ...areaScope(user), status: "POSTED" }
+ * The company switcher: an ADMIN may set an "active company" per request via the
+ * X-Data-Area header to focus the cross-entity view / choose where new records
+ * land. Non-admins can never override their own entity, so the header is ignored
+ * for them. `activeArea` is stamped onto the AuthUser by requireAuth.
  */
-export function areaScope(user: AuthUser): { dataAreaId?: string } {
-  return isCrossEntity(user) ? {} : { dataAreaId: user.dataAreaId };
+export function activeArea(user: AuthUser): string | undefined {
+  return isCrossEntity(user) ? user.activeArea : undefined;
 }
 
 /**
- * The dataAreaId a new record should be written with. Non-admins always create
- * in their own entity; admins may pass an explicit target (falling back to
- * their own). Prevents a scoped user from planting rows in another entity.
+ * A `where` fragment that scopes a partitioned model to the caller's entity.
+ * - Non-admin: always their own entity.
+ * - ADMIN with an active company selected: that company.
+ * - ADMIN with none selected: `{}` (all entities).
+ */
+export function areaScope(user: AuthUser): { dataAreaId?: string } {
+  if (!isCrossEntity(user)) return { dataAreaId: user.dataAreaId };
+  const a = activeArea(user);
+  return a ? { dataAreaId: a } : {};
+}
+
+/**
+ * The dataAreaId a new record should be written with.
+ * - Non-admin: always their own entity (a spoofed target is ignored).
+ * - ADMIN: the explicit target, else the active company, else their own.
  */
 export function areaForWrite(user: AuthUser, requested?: string): string {
-  if (isCrossEntity(user)) return requested ?? user.dataAreaId;
+  if (isCrossEntity(user)) return requested ?? activeArea(user) ?? user.dataAreaId;
   return user.dataAreaId;
 }
 
@@ -39,7 +51,10 @@ export function areaForWrite(user: AuthUser, requested?: string): string {
  * the user isn't cross-entity. Use after a findUnique on a partitioned model so
  * a scoped user can't read a sibling entity's row by guessing its id.
  */
-export function assertSameArea(user: AuthUser, row: { dataAreaId: string } | null): void {
+export function assertSameArea<T extends { dataAreaId: string }>(
+  user: AuthUser,
+  row: T | null,
+): asserts row is T {
   if (!row) throw new AuthError("Not found", 404);
   if (!isCrossEntity(user) && row.dataAreaId !== user.dataAreaId) {
     throw new AuthError("Not found", 404); // 404 (not 403) to avoid leaking existence

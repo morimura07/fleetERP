@@ -42,6 +42,7 @@ import { procurement } from "@backend/routes/procurement";
 import { payroll } from "@backend/routes/payroll";
 import { warehouses } from "@backend/routes/warehouses";
 import { expenses } from "@backend/routes/expenses";
+import { companies } from "@backend/routes/companies";
 
 /**
  * FleetERP standalone API (Hono). Deploys independently from the web app and
@@ -57,7 +58,7 @@ app.use(
   cors({
     origin: (process.env.CORS_ORIGIN ?? "http://localhost:3000").split(",").map((o) => o.trim()),
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Data-Area"],
   }),
 );
 
@@ -112,6 +113,7 @@ app.route("/api/procurement", procurement);
 app.route("/api/payroll", payroll);
 app.route("/api/warehouses", warehouses);
 app.route("/api/expenses", expenses);
+app.route("/api/companies", companies);
 
 app.onError(onError);
 app.notFound((c) => c.json({ error: "Not found" }, 404));

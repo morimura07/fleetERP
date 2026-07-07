@@ -8,6 +8,7 @@ import {
 import { ROLE_LABEL } from "@frontend/lib/labels";
 import { NotificationBell } from "@frontend/components/layout/notification-bell";
 import { ThemeToggle } from "@frontend/components/layout/theme-toggle";
+import { CompanySwitcher } from "@frontend/components/layout/company-switcher";
 import type { Role } from "@frontend/lib/enums";
 
 export function Topbar({ name, role }: { name: string; role: Role }) {
@@ -31,6 +32,7 @@ export function Topbar({ name, role }: { name: string; role: Role }) {
       </div>
 
       <div className="ml-auto flex items-center gap-2">
+        {role === "ADMIN" && <CompanySwitcher />}
         <ThemeToggle />
         <NotificationBell />
         <DropdownMenu>

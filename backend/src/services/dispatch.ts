@@ -53,7 +53,7 @@ export async function checkDispatchConflict(params: {
 }
 
 /** Drivers that are ACTIVE and free during the window (no overlapping dispatch). */
-export async function availableDrivers(start: Date, end: Date) {
+export async function availableDrivers(start: Date, end: Date, dataAreaId?: string) {
   const busy = await prisma.dispatch.findMany({
     where: {
       status: { not: "CANCELLED" },
@@ -65,13 +65,17 @@ export async function availableDrivers(start: Date, end: Date) {
   const busyIds = busy.map((d) => d.driverId);
 
   return prisma.driver.findMany({
-    where: { status: "ACTIVE", id: { notIn: busyIds.length ? busyIds : undefined } },
+    where: {
+      status: "ACTIVE",
+      id: { notIn: busyIds.length ? busyIds : undefined },
+      ...(dataAreaId ? { dataAreaId } : {}),
+    },
     orderBy: { name: "asc" },
   });
 }
 
 /** Vehicles that are AVAILABLE and free during the window. */
-export async function availableVehicles(start: Date, end: Date) {
+export async function availableVehicles(start: Date, end: Date, dataAreaId?: string) {
   const busy = await prisma.dispatch.findMany({
     where: {
       status: { not: "CANCELLED" },
@@ -86,6 +90,7 @@ export async function availableVehicles(start: Date, end: Date) {
     where: {
       status: "AVAILABLE",
       id: { notIn: busyIds.length ? busyIds : undefined },
+      ...(dataAreaId ? { dataAreaId } : {}),
     },
     orderBy: { vehicleNumber: "asc" },
   });

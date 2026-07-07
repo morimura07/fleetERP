@@ -53,6 +53,19 @@ const CHART_OF_ACCOUNTS: { code: string; name: string; type: AccountType }[] = [
 async function main() {
   console.log("Seeding FleetFlow...");
 
+  // ── Companies / legal entities (M34) ──
+  await prisma.company.upsert({
+    where: { code: "HQ01" },
+    update: {},
+    create: { code: "HQ01", name: "Head Office", baseCurrency: "USD", country: "TZ" },
+  });
+  await prisma.company.upsert({
+    where: { code: "KE01" },
+    update: {},
+    create: { code: "KE01", name: "Kenya Operations", baseCurrency: "USD", country: "KE" },
+  });
+  console.log("  Companies: HQ01, KE01");
+
   // ── Users (one per role) ──
   const [adminPw, dispatcherPw, financePw, staffPw, driverPw] = await Promise.all([
     hash("admin1234"), hash("dispatch1234"), hash("finance1234"), hash("staff1234"), hash("driver1234"),

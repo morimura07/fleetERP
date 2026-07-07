@@ -12,6 +12,7 @@ const userSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   role: z.enum(["ADMIN", "DISPATCHER", "FINANCE", "DRIVER", "STAFF"]),
+  dataAreaId: z.string().min(1).max(10).optional(), // company the user belongs to
 });
 
 export const users = new Hono();
@@ -29,7 +30,7 @@ users.get("/", requireAuth, requirePermission("user:manage"), async (c) => {
   const [items, total] = await Promise.all([
     prisma.user.findMany({
       where,
-      select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, dataAreaId: true, isActive: true, createdAt: true },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -47,9 +48,10 @@ users.post("/", requireAuth, requirePermission("user:manage"), async (c) => {
       name: body.name,
       email: body.email.toLowerCase(),
       role: body.role,
+      dataAreaId: body.dataAreaId ?? admin.dataAreaId, // assign company (default: admin's)
       passwordHash: await hashPassword(body.password),
     },
-    select: { id: true, name: true, email: true, role: true },
+    select: { id: true, name: true, email: true, role: true, dataAreaId: true },
   });
   await logActivity({ userId: admin.id, action: "CREATE", target: `User:${user.id}` });
   return created(c, user);

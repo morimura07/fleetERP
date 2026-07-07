@@ -284,6 +284,29 @@ enum ExpenseClaimStatus {
   REJECTED
 }
 
+// ───────────────────────── Multi-company (M34) ─────────────────────────
+
+// A legal entity / tenant. Its `code` is the `dataAreaId` used to partition every
+// business record; the code is validated against this registry on write. Kept as
+// a lightweight registry (no DB-level FK from every table) so partitioning stays a
+// simple, indexable string across the ~30 partitioned models.
+model Company {
+  id           String   @id @default(cuid())
+  code         String   @unique // = dataAreaId (e.g. HQ01, KE01)
+  name         String
+  baseCurrency String   @default("USD")
+  country      String   @default("TZ") // ISO country
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  version     Int     @default(0)
+  createdById String?
+  updatedById String?
+
+  @@map("companies")
+}
+
 // ───────────────────────── Auth / User ─────────────────────────
 
 model User {
@@ -323,6 +346,7 @@ model User {
 
 model Driver {
   id           String       @id @default(cuid())
+  dataAreaId   String       @default("HQ01") // legal entity (multi-company isolation)
   userId       String?      @unique
   user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   name         String
@@ -350,12 +374,14 @@ model Driver {
   updatedById   String? // audit: last-modifier user id
 
   @@index([status])
+  @@index([dataAreaId])
   @@map("drivers")
 }
 
 // 稼働設定 (per weekday working hours)
 model DriverAvailability {
   id          String   @id @default(cuid())
+  dataAreaId  String   @default("HQ01") // legal entity (multi-company isolation)
   driverId    String
   driver      Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
   weekday     Int // 0 = Sunday .. 6 = Saturday
@@ -369,12 +395,14 @@ model DriverAvailability {
   updatedById String? // audit: last-modifier user id
 
   @@unique([driverId, weekday])
+  @@index([dataAreaId])
   @@map("driver_availabilities")
 }
 
 // 休日管理
 model Holiday {
   id          String   @id @default(cuid())
+  dataAreaId  String   @default("HQ01") // legal entity (multi-company isolation)
   driverId    String
   driver      Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
   date        DateTime @db.Date
@@ -386,6 +414,7 @@ model Holiday {
 
   @@unique([driverId, date])
   @@index([date])
+  @@index([dataAreaId])
   @@map("holidays")
 }
 
@@ -393,6 +422,7 @@ model Holiday {
 
 model Vehicle {
   id               String        @id @default(cuid())
+  dataAreaId       String        @default("HQ01") // legal entity (multi-company isolation)
   vehicleNumber    String        @unique // 社内管理番号
   plateNumber      String        @unique // ナンバープレート
   maker            String
@@ -419,11 +449,13 @@ model Vehicle {
   updatedById  String? // audit: last-modifier user id
 
   @@index([status])
+  @@index([dataAreaId])
   @@map("vehicles")
 }
 
 model VehicleMaintenance {
   id              String   @id @default(cuid())
+  dataAreaId      String   @default("HQ01") // legal entity (multi-company isolation)
   vehicleId       String
   vehicle         Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   maintenanceType String // 整備種別 (オイル交換, 車検, タイヤ など)
@@ -436,6 +468,7 @@ model VehicleMaintenance {
   updatedById     String? // audit: last-modifier user id
 
   @@index([vehicleId])
+  @@index([dataAreaId])
   @@map("vehicle_maintenances")
 }
 
@@ -443,6 +476,7 @@ model VehicleMaintenance {
 
 model Client {
   id            String   @id @default(cuid())
+  dataAreaId    String   @default("HQ01") // legal entity (multi-company isolation)
   companyName   String
   contactPerson String
   phone         String
@@ -458,6 +492,7 @@ model Client {
   updatedById String? // audit: last-modifier user id
 
   @@index([companyName])
+  @@index([dataAreaId])
   @@map("clients")
 }
 
@@ -465,6 +500,7 @@ model Client {
 
 model DeliveryJob {
   id               String    @id @default(cuid())
+  dataAreaId       String    @default("HQ01") // legal entity (multi-company isolation)
   jobCode          String    @unique
   clientId         String
   client           Client    @relation(fields: [clientId], references: [id], onDelete: Restrict)
@@ -487,6 +523,7 @@ model DeliveryJob {
   @@index([status])
   @@index([deliveryDate])
   @@index([clientId])
+  @@index([dataAreaId])
   @@map("delivery_jobs")
 }
 
@@ -494,6 +531,7 @@ model DeliveryJob {
 
 model Dispatch {
   id             String         @id @default(cuid())
+  dataAreaId     String         @default("HQ01") // legal entity (multi-company isolation)
   jobId          String         @unique
   job            DeliveryJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
   driverId       String
@@ -512,6 +550,7 @@ model Dispatch {
 
   @@index([driverId, scheduledStart])
   @@index([vehicleId, scheduledStart])
+  @@index([dataAreaId])
   @@map("dispatches")
 }
 
@@ -519,6 +558,7 @@ model Dispatch {
 
 model DailyReport {
   id            String      @id @default(cuid())
+  dataAreaId    String      @default("HQ01") // legal entity (multi-company isolation)
   jobId         String      @unique
   job           DeliveryJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
   driverId      String
@@ -532,6 +572,7 @@ model DailyReport {
   updatedAt     DateTime    @updatedAt
 
   @@index([driverId])
+  @@index([dataAreaId])
   @@map("daily_reports")
 }
 
@@ -1114,6 +1155,7 @@ model ConsolidationMap {
 // border-impound risk warnings on the compliance dashboard (PRD §2.2, §8.3).
 model DriverDocument {
   id          String        @id @default(cuid())
+  dataAreaId  String        @default("HQ01") // legal entity (multi-company isolation)
   driverId    String
   driver      Driver        @relation(fields: [driverId], references: [id], onDelete: Cascade)
   type        DriverDocType
@@ -1129,6 +1171,7 @@ model DriverDocument {
 
   @@unique([driverId, type])
   @@index([expiresAt])
+  @@index([dataAreaId])
   @@map("driver_documents")
 }
 
@@ -1138,6 +1181,7 @@ model DriverDocument {
 // coordinates. Master data for route planning and the border-turnaround tracker.
 model GpsWaypoint {
   id          String   @id @default(cuid())
+  dataAreaId  String   @default("HQ01") // legal entity (multi-company isolation)
   code        String   @unique // CHALINZE, MALABA …
   name        String
   kind        String   @default("CHECKPOINT") // CHECKPOINT / BORDER / WEIGHBRIDGE / DEPOT
@@ -1152,6 +1196,7 @@ model GpsWaypoint {
   updatedById String? // audit: last-modifier user id
 
   @@index([kind])
+  @@index([dataAreaId])
   @@map("gps_waypoints")
 }
 
@@ -1159,6 +1204,7 @@ model GpsWaypoint {
 // feed. `source` stays STUB until a telematics provider is wired up (PRD §5).
 model VehiclePosition {
   id           String         @id @default(cuid())
+  dataAreaId   String         @default("HQ01") // legal entity (multi-company isolation)
   vehicleId    String         @unique
   vehicle      Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   lat          Decimal        @db.Decimal(9, 6)
@@ -1170,6 +1216,7 @@ model VehiclePosition {
   pingedAt     DateTime
   updatedAt    DateTime       @updatedAt
 
+  @@index([dataAreaId])
   @@map("vehicle_positions")
 }
 

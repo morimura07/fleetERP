@@ -563,3 +563,13 @@ export const expenseClaimSchema = z.object({
 
 export type ExpenseClaimInput = z.infer<typeof expenseClaimSchema>;
 export type ExpenseLineInput = z.infer<typeof expenseLineSchema>;
+
+// ── Company / legal entity (M34) ──
+export const companySchema = z.object({
+  code: z.string().min(1, "Code is required").max(10).regex(/^[A-Z0-9]+$/, "Code must be uppercase letters/digits"),
+  name: z.string().min(1, "Name is required").max(150),
+  baseCurrency: z.string().length(3).default("USD"),
+  country: z.string().length(2).default("TZ"),
+  isActive: z.boolean().default(true),
+});
+export type CompanyInput = z.infer<typeof companySchema>;
