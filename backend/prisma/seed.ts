@@ -53,6 +53,19 @@ const CHART_OF_ACCOUNTS: { code: string; name: string; type: AccountType }[] = [
 async function main() {
   console.log("Seeding FleetFlow...");
 
+  // ── Companies / legal entities (M34) ──
+  await prisma.company.upsert({
+    where: { code: "HQ01" },
+    update: {},
+    create: { code: "HQ01", name: "Head Office", baseCurrency: "USD", country: "TZ" },
+  });
+  await prisma.company.upsert({
+    where: { code: "KE01" },
+    update: {},
+    create: { code: "KE01", name: "Kenya Operations", baseCurrency: "USD", country: "KE" },
+  });
+  console.log("  Companies: HQ01, KE01");
+
   // ── Users (one per role) ──
   const [adminPw, dispatcherPw, financePw, staffPw, driverPw] = await Promise.all([
     hash("admin1234"), hash("dispatch1234"), hash("finance1234"), hash("staff1234"), hash("driver1234"),
@@ -275,7 +288,7 @@ async function main() {
   // ── Demo AP / AR (M1 / M2) — guarded so re-runs stay clean ──
   if ((await prisma.vendor.count()) === 0) {
     const { postVendorInvoice, payVendorInvoice, postCustomerInvoice, receiveCustomerInvoice } =
-      await import("../backend/services/ap-ar");
+      await import("@backend/services/ap-ar");
 
     // AP: vendor + posted, fully-paid bill
     const vendor = await prisma.vendor.create({
@@ -310,7 +323,7 @@ async function main() {
 
   // ── Demo Phase 2 — Core Finance (M3/M4/M5) — guarded for clean re-runs ──
   if ((await prisma.bankAccount.count()) === 0) {
-    const { settleTransfer } = await import("../backend/services/cash-bank");
+    const { settleTransfer } = await import("@backend/services/cash-bank");
 
     // M8 multi-currency: SPOT + AVERAGE rates for the regional currencies (→ USD).
     const today = new Date();

@@ -4,6 +4,7 @@ import { dailyReportSchema, paginationSchema } from "@backend/lib/validations";
 import { logActivity } from "@backend/lib/activity";
 import { notify } from "@backend/lib/notifications";
 import { can } from "@backend/lib/rbac";
+import { areaScope, areaForWrite } from "@backend/lib/scope";
 import { AuthError } from "@backend/lib/errors";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
 import { ok, created, pageMeta } from "@backend/lib/http";
@@ -15,8 +16,11 @@ reports.get("/", requireAuth, async (c) => {
   if (!can(user.role, "report:read")) throw new AuthError("You do not have permission", 403);
   const { page, pageSize } = paginationSchema.parse(c.req.query());
 
-  // Drivers see only their own reports.
-  const where = user.role === "DRIVER" ? { driverId: user.driverId ?? "__none__" } : {};
+  // Drivers see only their own reports; everyone else is scoped to their entity.
+  const where =
+    user.role === "DRIVER"
+      ? { driverId: user.driverId ?? "__none__" }
+      : areaScope(user);
 
   const [items, total] = await Promise.all([
     prisma.dailyReport.findMany({
@@ -47,7 +51,7 @@ reports.post("/", requireAuth, requirePermission("report:write"), async (c) => {
   }
 
   const report = await prisma.$transaction(async (tx) => {
-    const r = await tx.dailyReport.create({ data: { ...body, driverId: user.driverId! } });
+    const r = await tx.dailyReport.create({ data: { ...body, driverId: user.driverId!, dataAreaId: areaForWrite(user) } });
     await tx.deliveryJob.update({ where: { id: body.jobId }, data: { status: "COMPLETED" } });
     await tx.dispatch.update({ where: { id: d.id }, data: { status: "DONE" } });
     return r;

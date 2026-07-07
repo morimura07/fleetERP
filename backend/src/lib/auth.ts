@@ -20,6 +20,8 @@ export interface AuthUser {
   driverId: string | null;
   /** Legal entity the user belongs to; drives multi-company data isolation. */
   dataAreaId: string;
+  /** ADMIN-only per-request "active company" from the X-Data-Area header (company switcher). */
+  activeArea?: string;
 }
 
 const secret = () => new TextEncoder().encode(process.env.JWT_SECRET ?? "dev-secret-change-me");
@@ -70,7 +72,12 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
   const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
   if (!token) throw new AuthError("Authentication required", 401);
   try {
-    c.set("user", await verifyToken(token));
+    const user = await verifyToken(token);
+    // Company switcher: ADMIN may focus a specific company via X-Data-Area.
+    // Ignored for non-admins (they can never leave their own entity).
+    const active = c.req.header("x-data-area");
+    if (active && user.role === "ADMIN") user.activeArea = active;
+    c.set("user", user);
   } catch {
     throw new AuthError("Invalid or expired token", 401);
   }

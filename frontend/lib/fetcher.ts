@@ -1,5 +1,16 @@
 import { getToken, clearToken } from "./auth-token";
 
+/** ADMIN company switcher: the active company code, if one is selected. */
+export function getActiveCompany(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem("fleeterp.company");
+}
+export function setActiveCompany(code: string | null): void {
+  if (typeof window === "undefined") return;
+  if (code) window.localStorage.setItem("fleeterp.company", code);
+  else window.localStorage.removeItem("fleeterp.company");
+}
+
 /** Thin client-side JSON fetch wrapper with typed errors. */
 export class ApiError extends Error {
   constructor(
@@ -29,6 +40,7 @@ export async function apiFetch<T = unknown>(
 ): Promise<T> {
   const { returnRaw, ...init } = options ?? {};
   const token = getToken();
+  const company = getActiveCompany();
   const res = await fetch(`${API_BASE}${url}`, {
     ...init,
     headers: {
@@ -36,6 +48,7 @@ export async function apiFetch<T = unknown>(
         ? { "Content-Type": "application/json" }
         : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(company ? { "X-Data-Area": company } : {}),
       ...init.headers,
     },
   });

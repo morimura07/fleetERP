@@ -79,6 +79,16 @@ lookups.get("/warehouse-form", requireAuth, requirePermission("warehouse:read"),
   return ok(c, { items, warehouses });
 });
 
+/** Active companies for the user-assignment dropdown (admin). */
+lookups.get("/companies", requireAuth, requirePermission("user:manage"), async (c) => {
+  const rows = await prisma.company.findMany({
+    where: { isActive: true },
+    select: { code: true, name: true, baseCurrency: true },
+    orderBy: { code: "asc" },
+  });
+  return ok(c, rows);
+});
+
 /** Drivers + unreconciled advances for the expense-claim form. */
 lookups.get("/expense-form", requireAuth, requirePermission("expense:read"), async (c) => {
   const user = c.get("user");

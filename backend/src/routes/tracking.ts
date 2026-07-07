@@ -4,6 +4,7 @@ import { waypointSchema, paginationSchema } from "@backend/lib/validations";
 import { logActivity } from "@backend/lib/activity";
 import { Prisma } from "@prisma/client";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { areaScope, areaForWrite } from "@backend/lib/scope";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 /**
@@ -13,12 +14,14 @@ import { ok, created, pageMeta } from "@backend/lib/http";
 export const tracking = new Hono();
 
 tracking.get("/", requireAuth, requirePermission("tracking:read"), async (c) => {
+  const user = c.get("user");
   const positions = await prisma.vehiclePosition.findMany({
+    where: areaScope(user),
     include: { vehicle: { select: { plateNumber: true, model: true, status: true } } },
     orderBy: { pingedAt: "desc" },
   });
   const waypoints = await prisma.gpsWaypoint.findMany({
-    where: { isActive: true },
+    where: { ...areaScope(user), isActive: true },
     select: { code: true, name: true, kind: true, lat: true, lng: true },
     orderBy: { code: "asc" },
   });
@@ -29,11 +32,13 @@ tracking.get("/", requireAuth, requirePermission("tracking:read"), async (c) => 
 export const waypoints = new Hono();
 
 waypoints.get("/", requireAuth, requirePermission("waypoint:read"), async (c) => {
+  const user = c.get("user");
   const sp = c.req.query();
   const { page, pageSize, q } = paginationSchema.parse(sp);
   const kind = sp.kind;
 
   const where: Prisma.GpsWaypointWhereInput = {
+    ...areaScope(user),
     ...(q
       ? {
           OR: [
@@ -57,6 +62,7 @@ waypoints.post("/", requireAuth, requirePermission("waypoint:write"), async (c) 
   const body = waypointSchema.parse(await c.req.json());
   const wp = await prisma.gpsWaypoint.create({
     data: {
+      dataAreaId: areaForWrite(user),
       code: body.code,
       name: body.name,
       kind: body.kind,

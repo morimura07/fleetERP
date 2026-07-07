@@ -7,17 +7,20 @@ import { logActivity } from "@backend/lib/activity";
 import { notifyDriver } from "@backend/lib/notifications";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
 import { updateWithVersion, requireVersion } from "@backend/lib/concurrency";
+import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 export const jobs = new Hono();
 
 jobs.get("/", requireAuth, requirePermission("job:read"), async (c) => {
+  const user = c.get("user");
   const sp = c.req.query();
   const { page, pageSize, q, sort, order } = paginationSchema.parse(sp);
   const status = sp.status;
   const clientId = sp.clientId;
 
   const where: Prisma.DeliveryJobWhereInput = {
+    ...areaScope(user),
     ...(q
       ? {
           OR: [
@@ -47,14 +50,15 @@ jobs.get("/", requireAuth, requirePermission("job:read"), async (c) => {
 jobs.post("/", requireAuth, requirePermission("job:write"), async (c) => {
   const user = c.get("user");
   const body = jobSchema.parse(await c.req.json());
-  const job = await prisma.deliveryJob.create({ data: { ...body, createdById: user.id } });
+  const job = await prisma.deliveryJob.create({ data: { ...body, dataAreaId: areaForWrite(user), createdById: user.id } });
   await logActivity({ userId: user.id, action: "CREATE", target: `DeliveryJob:${job.id}` });
   return created(c, job);
 });
 
 jobs.get("/:id", requireAuth, requirePermission("job:read"), async (c) => {
+  const user = c.get("user");
   const id = c.req.param("id");
-  const job = await prisma.deliveryJob.findUniqueOrThrow({
+  const job = await prisma.deliveryJob.findUnique({
     where: { id },
     include: {
       client: true,
@@ -62,6 +66,7 @@ jobs.get("/:id", requireAuth, requirePermission("job:read"), async (c) => {
       dailyReport: true,
     },
   });
+  assertSameArea(user, job);
   return ok(c, job);
 });
 
@@ -72,17 +77,19 @@ jobs.patch("/:id", requireAuth, requirePermission("job:write"), async (c) => {
   const version = requireVersion(raw);
   const body = jobSchema.partial().parse(raw);
 
-  const before = await prisma.deliveryJob.findUniqueOrThrow({
+  const before = await prisma.deliveryJob.findUnique({
     where: { id },
     include: { dispatch: { select: { driverId: true } } },
   });
+  assertSameArea(user, before);
+  const prev = before!;
   const job = await updateWithVersion<{ id: string; jobCode: string }>(
     prisma.deliveryJob, id, version, user.id, body,
   );
 
   // Notify the assigned driver on status changes.
-  if (body.status && body.status !== before.status && before.dispatch?.driverId) {
-    await notifyDriver(before.dispatch.driverId, {
+  if (body.status && body.status !== prev.status && prev.dispatch?.driverId) {
+    await notifyDriver(prev.dispatch.driverId, {
       type: body.status === "COMPLETED" ? "COMPLETION" : "JOB_UPDATE",
       title: "Job updated",
       body: `Job ${job.jobCode} status changed to ${body.status}.`,
@@ -97,6 +104,8 @@ jobs.patch("/:id", requireAuth, requirePermission("job:write"), async (c) => {
 jobs.delete("/:id", requireAuth, requirePermission("job:write"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
+  const existing = await prisma.deliveryJob.findUnique({ where: { id }, select: { dataAreaId: true } });
+  assertSameArea(user, existing);
   await prisma.deliveryJob.delete({ where: { id } });
   await logActivity({ userId: user.id, action: "DELETE", target: `DeliveryJob:${id}` });
   return ok(c, { id });

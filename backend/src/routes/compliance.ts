@@ -1,16 +1,22 @@
 import { Hono } from "hono";
 import { complianceReport } from "@backend/services/compliance";
 import { vehicleFuelStats } from "@backend/services/fuel";
+import { isCrossEntity } from "@backend/lib/scope";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
 import { ok } from "@backend/lib/http";
 
 export const compliance = new Hono();
 
 compliance.get("/", requireAuth, requirePermission("compliance:read"), async (c) => {
+  const user = c.get("user");
   const sp = c.req.query();
   const warningDays = Number(sp.warningDays) || 14;
   const onlyAttention = sp.onlyAttention === "1";
-  const report = await complianceReport({ warningDays, onlyAttention });
+  const report = await complianceReport({
+    warningDays,
+    onlyAttention,
+    dataAreaId: isCrossEntity(user) ? undefined : user.dataAreaId,
+  });
   return ok(c, report);
 });
 
@@ -18,6 +24,7 @@ compliance.get("/", requireAuth, requirePermission("compliance:read"), async (c)
 export const fuel = new Hono();
 
 fuel.get("/", requireAuth, requirePermission("compliance:read"), async (c) => {
-  const stats = await vehicleFuelStats();
+  const user = c.get("user");
+  const stats = await vehicleFuelStats(isCrossEntity(user) ? undefined : user.dataAreaId);
   return ok(c, stats);
 });

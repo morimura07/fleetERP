@@ -63,8 +63,9 @@ export interface VehicleFuelStat extends FuelResult {
 }
 
 /** Per-vehicle fuel efficiency across completed trips with mileage + litres. */
-export async function vehicleFuelStats(): Promise<VehicleFuelStat[]> {
+export async function vehicleFuelStats(dataAreaId?: string): Promise<VehicleFuelStat[]> {
   const vehicles = await prisma.vehicle.findMany({
+    ...(dataAreaId ? { where: { dataAreaId } } : {}),
     select: {
       id: true, plateNumber: true, model: true, fuelTargetKmPerL: true,
       trips: {

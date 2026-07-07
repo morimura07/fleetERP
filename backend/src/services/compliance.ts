@@ -50,14 +50,16 @@ const iso = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : 
  * missing items (the actionable subset for the dashboard).
  */
 export async function complianceReport(
-  opts: { warningDays?: number; asOf?: Date; onlyAttention?: boolean } = {},
+  opts: { warningDays?: number; asOf?: Date; onlyAttention?: boolean; dataAreaId?: string } = {},
 ): Promise<ComplianceReport> {
   const asOf = opts.asOf ?? new Date();
   const warningDays = opts.warningDays ?? 14;
   const st = (d: Date | null | undefined) => docStatus(d, asOf, warningDays);
+  const area = opts.dataAreaId ? { dataAreaId: opts.dataAreaId } : {};
 
   const [vehicles, drivers] = await Promise.all([
     prisma.vehicle.findMany({
+      where: area,
       select: {
         id: true, plateNumber: true,
         insuranceExpiry: true, inspectionExpiry: true,
@@ -65,7 +67,7 @@ export async function complianceReport(
       },
     }),
     prisma.driver.findMany({
-      where: { status: { not: "INACTIVE" } },
+      where: { status: { not: "INACTIVE" }, ...area },
       select: { id: true, name: true, documents: { select: { type: true, number: true, expiresAt: true } } },
     }),
   ]);
