@@ -30,6 +30,8 @@ import type {
   ExpenseClaimStatus,
   AssetCategory,
   AssetStatus,
+  ServiceOrderStatus,
+  ServiceKind,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -388,4 +390,25 @@ export const ASSET_STATUS_VARIANT: Record<AssetStatus, BadgeVariant> = {
   ACTIVE: "success",
   FULLY_DEPRECIATED: "info",
   DISPOSED: "secondary",
+};
+
+export const SERVICE_STATUS_LABEL: Record<ServiceOrderStatus, string> = {
+  OPEN: "Open",
+  IN_PROGRESS: "In progress",
+  COMPLETED: "Completed",
+  POSTED: "Posted",
+  CANCELLED: "Cancelled",
+};
+
+export const SERVICE_STATUS_VARIANT: Record<ServiceOrderStatus, BadgeVariant> = {
+  OPEN: "secondary",
+  IN_PROGRESS: "info",
+  COMPLETED: "warning",
+  POSTED: "success",
+  CANCELLED: "destructive",
+};
+
+export const SERVICE_KIND_LABEL: Record<ServiceKind, string> = {
+  INTERNAL: "Own workshop",
+  EXTERNAL: "External garage",
 };

@@ -137,6 +137,36 @@ lookups.get("/trip-form", requireAuth, requirePermission("trip:read"), async (c)
   return ok(c, { orders, drivers, vehicles });
 });
 
+/** Vehicles, vendors, and in-stock parts for the service-order create form. */
+lookups.get("/service-form", requireAuth, requirePermission("service:read"), async (c) => {
+  const user = c.get("user");
+  const [vehicles, vendors, parts] = await Promise.all([
+    prisma.vehicle.findMany({
+      where: { ...areaScope(user) },
+      select: { id: true, plateNumber: true, model: true },
+      orderBy: { plateNumber: "asc" },
+    }),
+    prisma.vendor.findMany({
+      where: { ...areaScope(user) },
+      select: { id: true, code: true, legalName: true },
+      orderBy: { legalName: "asc" },
+    }),
+    prisma.stockItem.findMany({
+      where: { ...areaScope(user) },
+      select: { id: true, code: true, name: true, unit: true, quantityOnHand: true, avgCost: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+  return ok(c, {
+    vehicles,
+    vendors,
+    parts: parts.map((p) => ({
+      id: p.id, code: p.code, name: p.name, unit: p.unit,
+      quantityOnHand: p.quantityOnHand.toString(), avgCost: p.avgCost.toString(),
+    })),
+  });
+});
+
 /** Jobs still needing a dispatch, for the dispatch board. */
 lookups.get("/undispatched", requireAuth, requirePermission("dispatch:read"), async (c) => {
   const rows = await prisma.deliveryJob.findMany({

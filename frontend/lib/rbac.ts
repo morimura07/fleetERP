@@ -69,6 +69,9 @@ export type Permission =
   | "asset:read"
   | "asset:write"
   | "asset:approve"
+  | "service:read"
+  | "service:write"
+  | "service:approve"
   | "fx:read"
   | "fx:write"
   | "consolidation:read"
@@ -109,6 +112,7 @@ const ALL: Permission[] = [
   "payroll:read", "payroll:write", "payroll:approve",
   "expense:read", "expense:write", "expense:approve",
   "asset:read", "asset:write", "asset:approve",
+  "service:read", "service:write", "service:approve",
   "fx:read", "fx:write",
   "consolidation:read", "consolidation:run",
   "compliance:read",
@@ -133,7 +137,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "order:read", "order:write",
     "trip:read", "trip:write",
     "vendor:read", "payable:read", "customer:read", "receivable:read",
-    "collection:read", "bank:read", "budget:read", "inventory:read", "inventory:write", "warehouse:read", "warehouse:write", "procurement:read", "procurement:write", "expense:read", "expense:write", "fx:read",
+    "collection:read", "bank:read", "budget:read", "inventory:read", "inventory:write", "warehouse:read", "warehouse:write", "procurement:read", "procurement:write", "expense:read", "expense:write", "service:read", "service:write", "service:approve", "fx:read",
     "compliance:read", "waypoint:read", "waypoint:write", "tracking:read",
     "export:run",
   ],
@@ -155,6 +159,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "payroll:read", "payroll:write", "payroll:approve",
     "expense:read", "expense:write", "expense:approve",
     "asset:read", "asset:write", "asset:approve",
+    "service:read", "service:approve",
     "fx:read", "fx:write",
     "consolidation:read", "consolidation:run",
     "compliance:read", "waypoint:read", "tracking:read",
@@ -217,6 +222,7 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/payroll", permission: "payroll:read" },
   { prefix: "/expenses", permission: "expense:read" },
   { prefix: "/assets", permission: "asset:read" },
+  { prefix: "/service", permission: "service:read" },
   { prefix: "/fx", permission: "fx:read" },
   { prefix: "/consolidation", permission: "consolidation:read" },
   { prefix: "/compliance", permission: "compliance:read" },

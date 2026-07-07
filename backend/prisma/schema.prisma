@@ -300,6 +300,21 @@ enum AssetStatus {
   DISPOSED // sold / written off
 }
 
+// Service Management (M22) — workshop / vehicle service orders.
+enum ServiceOrderStatus {
+  OPEN // logged, not started
+  IN_PROGRESS // work underway (parts issued, labor added)
+  COMPLETED // work finished, ready to post costs
+  POSTED // labor cost posted to the ledger; order closed
+  CANCELLED
+}
+
+// Where the work is done — own workshop vs an external vendor garage.
+enum ServiceKind {
+  INTERNAL // own mechanics; labor is a memo cost (already in payroll)
+  EXTERNAL // outside garage; labor accrues to the ledger
+}
+
 // ───────────────────────── Multi-company (M34) ─────────────────────────
 
 // A legal entity / tenant. Its `code` is the `dataAreaId` used to partition every
@@ -456,13 +471,14 @@ model Vehicle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  maintenances VehicleMaintenance[]
-  dispatches   Dispatch[]
-  trips        Trip[]
-  position     VehiclePosition?
-  version      Int                  @default(0) // optimistic concurrency (PRD §7.1)
-  createdById  String? // audit: creator user id
-  updatedById  String? // audit: last-modifier user id
+  maintenances  VehicleMaintenance[]
+  serviceOrders ServiceOrder[]
+  dispatches    Dispatch[]
+  trips         Trip[]
+  position      VehiclePosition?
+  version       Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById   String? // audit: creator user id
+  updatedById   String? // audit: last-modifier user id
 
   @@index([status])
   @@index([dataAreaId])
@@ -713,6 +729,7 @@ model JournalEntry {
   expenseClaim           ExpenseClaim?      @relation("ExpenseClaimPosting")
   depreciationEntry      DepreciationEntry? @relation("DepreciationPosting")
   assetDisposal          FixedAsset?        @relation("AssetDisposalPosting")
+  serviceOrder           ServiceOrder?      @relation("ServiceOrderPosting")
   version                Int                @default(0) // optimistic concurrency (PRD §7.1)
   updatedById            String? // audit: last-modifier user id
 
@@ -866,6 +883,7 @@ model Vendor {
 
   invoices       VendorInvoice[]
   purchaseOrders PurchaseOrder[]
+  serviceOrders  ServiceOrder[]
   version        Int             @default(0) // optimistic concurrency (PRD §7.1)
   createdById    String? // audit: creator user id
   updatedById    String? // audit: last-modifier user id
@@ -1257,12 +1275,13 @@ model StockItem {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  movements   StockMovement[]
-  poLines     PurchaseOrderLine[]
-  balances    StockBalance[]
-  version     Int                 @default(0) // optimistic concurrency (PRD §7.1)
-  createdById String? // audit
-  updatedById String? // audit
+  movements    StockMovement[]
+  poLines      PurchaseOrderLine[]
+  balances     StockBalance[]
+  serviceParts ServicePart[]
+  version      Int                 @default(0) // optimistic concurrency (PRD §7.1)
+  createdById  String? // audit
+  updatedById  String? // audit
 
   @@unique([dataAreaId, code])
   @@index([category])
@@ -1630,4 +1649,100 @@ model DepreciationEntry {
   @@index([dataAreaId])
   @@index([fixedAssetId])
   @@map("depreciation_entries")
+}
+
+// ── Service Management (M22) ────────────────────────────────────────────────
+// Workshop service orders for the fleet. Parts are drawn from Inventory (each
+// ServicePart issues stock via the inventory service, which posts Dr Maintenance
+// (5100) / Cr Inventory (1300) and relieves the item). Labor is tracked per line;
+// external (vendor) labor accrues to the ledger when the order is posted
+// (Dr Maintenance 5100 / Cr Accrued 2300). Internal labor is a memo cost only,
+// since own mechanics are already paid through Payroll. Multi-tenant via dataAreaId.
+model ServiceOrder {
+  id          String             @id @default(cuid())
+  dataAreaId  String             @default("HQ01")
+  orderNumber String
+  vehicleId   String
+  vehicle     Vehicle            @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  kind        ServiceKind        @default(INTERNAL)
+  status      ServiceOrderStatus @default(OPEN)
+
+  // External garage (only when kind = EXTERNAL).
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  odometerKm Int? // reading at service time
+  fault      String // reported problem / service reason
+  currency   String @default("USD")
+
+  // Cost rollups, kept in sync as parts/labor are added.
+  partsCost Decimal @default(0) @db.Decimal(18, 2)
+  laborCost Decimal @default(0) @db.Decimal(18, 2)
+  totalCost Decimal @default(0) @db.Decimal(18, 2)
+
+  // The labor-accrual posting created when an EXTERNAL order is posted.
+  postingEntryId String?       @unique
+  postingEntry   JournalEntry? @relation("ServiceOrderPosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
+
+  openedAt    DateTime  @default(now())
+  completedAt DateTime?
+
+  parts ServicePart[]
+  labor ServiceLabor[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, orderNumber])
+  @@index([dataAreaId])
+  @@index([dataAreaId, status])
+  @@index([vehicleId])
+  @@map("service_orders")
+}
+
+// A part consumed on a service order. Issuing it relieves inventory and posts the
+// cost; the link to the resulting StockMovement records the trail.
+model ServicePart {
+  id             String       @id @default(cuid())
+  dataAreaId     String       @default("HQ01")
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  description String
+  quantity    Decimal   @db.Decimal(18, 3)
+  unitCost    Decimal   @db.Decimal(18, 2) // average cost at issue
+  totalCost   Decimal   @db.Decimal(18, 2)
+
+  // The inventory movement this part created (posts the GL relief).
+  stockMovementId String? @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([serviceOrderId])
+  @@index([dataAreaId])
+  @@map("service_parts")
+}
+
+// A labor line on a service order (own mechanic or external technician).
+model ServiceLabor {
+  id             String       @id @default(cuid())
+  dataAreaId     String       @default("HQ01")
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+
+  description String
+  hours       Decimal @db.Decimal(10, 2)
+  rate        Decimal @db.Decimal(18, 2) // per-hour rate
+  amount      Decimal @db.Decimal(18, 2) // hours × rate
+
+  createdAt DateTime @default(now())
+
+  @@index([serviceOrderId])
+  @@index([dataAreaId])
+  @@map("service_labor")
 }

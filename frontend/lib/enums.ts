@@ -78,3 +78,5 @@ export type PayRunStatus = "DRAFT" | "APPROVED" | "POSTED";
 export type ExpenseClaimStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "POSTED" | "REJECTED";
 export type AssetCategory = "VEHICLE" | "EQUIPMENT" | "FURNITURE" | "BUILDING" | "IT" | "OTHER";
 export type AssetStatus = "ACTIVE" | "FULLY_DEPRECIATED" | "DISPOSED";
+export type ServiceOrderStatus = "OPEN" | "IN_PROGRESS" | "COMPLETED" | "POSTED" | "CANCELLED";
+export type ServiceKind = "INTERNAL" | "EXTERNAL";

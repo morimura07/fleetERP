@@ -605,3 +605,32 @@ export const assetDisposalSchema = z.object({
 export type FixedAssetInput = z.infer<typeof fixedAssetSchema>;
 export type DepreciationRunInput = z.infer<typeof depreciationRunSchema>;
 export type AssetDisposalInput = z.infer<typeof assetDisposalSchema>;
+
+// ── Service Management (M22) ──
+export const serviceOrderSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  vehicleId: z.string().min(1, "Vehicle is required"),
+  kind: z.enum(["INTERNAL", "EXTERNAL"]).default("INTERNAL"),
+  vendorId: z.string().optional().nullable(),
+  odometerKm: z.coerce.number().int().min(0).optional().nullable(),
+  fault: z.string().min(1, "Describe the fault / service reason").max(500),
+  currency: z.string().length(3).default("USD"),
+}).refine((o) => o.kind !== "EXTERNAL" || !!o.vendorId, {
+  message: "An external garage requires a vendor",
+  path: ["vendorId"],
+});
+
+export const servicePartSchema = z.object({
+  stockItemId: z.string().min(1, "Part is required"),
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+});
+
+export const serviceLaborSchema = z.object({
+  description: z.string().min(1, "Description is required").max(200),
+  hours: z.coerce.number().positive("Hours must be positive"),
+  rate: z.coerce.number().min(0, "Rate cannot be negative"),
+});
+
+export type ServiceOrderInput = z.infer<typeof serviceOrderSchema>;
+export type ServicePartInput = z.infer<typeof servicePartSchema>;
+export type ServiceLaborInput = z.infer<typeof serviceLaborSchema>;
