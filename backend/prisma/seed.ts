@@ -288,7 +288,7 @@ async function main() {
   // ── Demo AP / AR (M1 / M2) — guarded so re-runs stay clean ──
   if ((await prisma.vendor.count()) === 0) {
     const { postVendorInvoice, payVendorInvoice, postCustomerInvoice, receiveCustomerInvoice } =
-      await import("../backend/services/ap-ar");
+      await import("@backend/services/ap-ar");
 
     // AP: vendor + posted, fully-paid bill
     const vendor = await prisma.vendor.create({
@@ -323,7 +323,7 @@ async function main() {
 
   // ── Demo Phase 2 — Core Finance (M3/M4/M5) — guarded for clean re-runs ──
   if ((await prisma.bankAccount.count()) === 0) {
-    const { settleTransfer } = await import("../backend/services/cash-bank");
+    const { settleTransfer } = await import("@backend/services/cash-bank");
 
     // M8 multi-currency: SPOT + AVERAGE rates for the regional currencies (→ USD).
     const today = new Date();
