@@ -315,6 +315,44 @@ enum ServiceKind {
   EXTERNAL // outside garage; labor accrues to the ledger
 }
 
+// ── Human Resources (M24) ──
+enum EmploymentType {
+  PERMANENT // open-ended contract
+  FIXED_TERM // fixed end date
+  PROBATION // probationary period
+  CONTRACTOR // service contract, not an employee
+}
+
+enum ContractStatus {
+  DRAFT // not yet in force
+  ACTIVE // currently in force (at most one per employee)
+  ENDED // superseded, expired, or terminated
+}
+
+enum LeaveType {
+  ANNUAL // paid annual leave (accrues a balance)
+  SICK // paid sick leave (accrues a balance)
+  UNPAID // leave without pay (no balance)
+  MATERNITY
+  COMPASSIONATE
+}
+
+enum LeaveStatus {
+  PENDING // submitted, awaiting approval
+  APPROVED // approved; balance deducted
+  REJECTED
+  CANCELLED // withdrawn before/after approval
+}
+
+enum EmployeeDocType {
+  CONTRACT
+  NATIONAL_ID
+  PASSPORT
+  WORK_PERMIT
+  CERTIFICATE
+  OTHER
+}
+
 // ───────────────────────── Multi-company (M34) ─────────────────────────
 
 // A legal entity / tenant. Its `code` is the `dataAreaId` used to partition every
@@ -1465,9 +1503,13 @@ model Employee {
   driverId    String?        @unique
   driver      Driver?        @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
-  payslips  Payslip[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  payslips      Payslip[]
+  contracts     EmploymentContract[]
+  leaveRequests LeaveRequest[]
+  leaveBalances LeaveBalance[]
+  documents     EmployeeDocument[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 
   version     Int     @default(0) // optimistic concurrency (PRD §7.1)
   createdById String?
@@ -1745,4 +1787,113 @@ model ServiceLabor {
   @@index([serviceOrderId])
   @@index([dataAreaId])
   @@map("service_labor")
+}
+
+// ── Human Resources (M24) ──────────────────────────────────────────────────
+// Layers contract history, leave management, and document-expiry tracking on top
+// of the Employee record (which Payroll M9 already uses). Multi-tenant via
+// dataAreaId. Activating a contract syncs the employee's current salary/status;
+// approving a paid leave request deducts from that year's LeaveBalance.
+model EmploymentContract {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type        EmploymentType @default(PERMANENT)
+  status      ContractStatus @default(DRAFT)
+  title       String // job title / position
+  grossSalary Decimal        @db.Decimal(18, 2) // monthly gross under this contract
+  currency    String         @default("USD")
+  startDate   DateTime       @db.Date
+  endDate     DateTime?      @db.Date // required for FIXED_TERM / PROBATION
+  note        String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId])
+  @@index([employeeId])
+  @@index([dataAreaId, status])
+  @@map("employment_contracts")
+}
+
+model LeaveRequest {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type      LeaveType   @default(ANNUAL)
+  status    LeaveStatus @default(PENDING)
+  startDate DateTime    @db.Date
+  endDate   DateTime    @db.Date
+  days      Int // working days requested (weekends excluded)
+  reason    String?
+
+  reviewedById String?
+  reviewedAt   DateTime?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId])
+  @@index([employeeId])
+  @@index([dataAreaId, status])
+  @@map("leave_requests")
+}
+
+// One row per employee / leave type / leave-year. `remaining` is derived
+// (entitled − taken) and enforced when a paid request is approved.
+model LeaveBalance {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type     LeaveType
+  year     Int // leave year, e.g. 2026
+  entitled Int       @default(0) // days granted for the year
+  taken    Int       @default(0) // days consumed by approved requests
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, type, year])
+  @@index([dataAreaId])
+  @@map("leave_balances")
+}
+
+model EmployeeDocument {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type      EmployeeDocType
+  number    String? // document / certificate number
+  issuedAt  DateTime?       @db.Date
+  expiresAt DateTime?       @db.Date // null = never expires (e.g. a certificate)
+  fileUrl   String? // uploaded scan (/uploads/…)
+  note      String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, type])
+  @@index([dataAreaId])
+  @@index([expiresAt])
+  @@map("employee_documents")
 }

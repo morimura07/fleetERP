@@ -44,6 +44,7 @@ import { warehouses } from "@backend/routes/warehouses";
 import { expenses } from "@backend/routes/expenses";
 import { assets } from "@backend/routes/assets";
 import { serviceOrders } from "@backend/routes/service-orders";
+import { hr } from "@backend/routes/hr";
 import { companies } from "@backend/routes/companies";
 
 /**
@@ -117,6 +118,7 @@ app.route("/api/warehouses", warehouses);
 app.route("/api/expenses", expenses);
 app.route("/api/assets", assets);
 app.route("/api/service-orders", serviceOrders);
+app.route("/api/hr", hr);
 app.route("/api/companies", companies);
 
 app.onError(onError);

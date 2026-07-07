@@ -72,6 +72,9 @@ export type Permission =
   | "service:read"
   | "service:write"
   | "service:approve"
+  | "hr:read"
+  | "hr:write"
+  | "hr:approve"
   | "fx:read"
   | "fx:write"
   | "consolidation:read"
@@ -113,6 +116,7 @@ const ALL: Permission[] = [
   "expense:read", "expense:write", "expense:approve",
   "asset:read", "asset:write", "asset:approve",
   "service:read", "service:write", "service:approve",
+  "hr:read", "hr:write", "hr:approve",
   "fx:read", "fx:write",
   "consolidation:read", "consolidation:run",
   "compliance:read",
@@ -160,6 +164,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "expense:read", "expense:write", "expense:approve",
     "asset:read", "asset:write", "asset:approve",
     "service:read", "service:approve",
+    "hr:read", "hr:write", "hr:approve",
     "fx:read", "fx:write",
     "consolidation:read", "consolidation:run",
     "compliance:read", "waypoint:read", "tracking:read",
@@ -223,6 +228,7 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/expenses", permission: "expense:read" },
   { prefix: "/assets", permission: "asset:read" },
   { prefix: "/service", permission: "service:read" },
+  { prefix: "/hr", permission: "hr:read" },
   { prefix: "/fx", permission: "fx:read" },
   { prefix: "/consolidation", permission: "consolidation:read" },
   { prefix: "/compliance", permission: "compliance:read" },

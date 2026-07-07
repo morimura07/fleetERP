@@ -32,6 +32,11 @@ import type {
   AssetStatus,
   ServiceOrderStatus,
   ServiceKind,
+  EmploymentType,
+  ContractStatus,
+  LeaveType,
+  LeaveStatus,
+  EmployeeDocType,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -411,4 +416,54 @@ export const SERVICE_STATUS_VARIANT: Record<ServiceOrderStatus, BadgeVariant> = 
 export const SERVICE_KIND_LABEL: Record<ServiceKind, string> = {
   INTERNAL: "Own workshop",
   EXTERNAL: "External garage",
+};
+
+export const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
+  PERMANENT: "Permanent",
+  FIXED_TERM: "Fixed term",
+  PROBATION: "Probation",
+  CONTRACTOR: "Contractor",
+};
+
+export const CONTRACT_STATUS_LABEL: Record<ContractStatus, string> = {
+  DRAFT: "Draft",
+  ACTIVE: "Active",
+  ENDED: "Ended",
+};
+
+export const CONTRACT_STATUS_VARIANT: Record<ContractStatus, BadgeVariant> = {
+  DRAFT: "secondary",
+  ACTIVE: "success",
+  ENDED: "secondary",
+};
+
+export const LEAVE_TYPE_LABEL: Record<LeaveType, string> = {
+  ANNUAL: "Annual",
+  SICK: "Sick",
+  UNPAID: "Unpaid",
+  MATERNITY: "Maternity",
+  COMPASSIONATE: "Compassionate",
+};
+
+export const LEAVE_STATUS_LABEL: Record<LeaveStatus, string> = {
+  PENDING: "Pending",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+  CANCELLED: "Cancelled",
+};
+
+export const LEAVE_STATUS_VARIANT: Record<LeaveStatus, BadgeVariant> = {
+  PENDING: "warning",
+  APPROVED: "success",
+  REJECTED: "destructive",
+  CANCELLED: "secondary",
+};
+
+export const EMPLOYEE_DOC_LABEL: Record<EmployeeDocType, string> = {
+  CONTRACT: "Contract",
+  NATIONAL_ID: "National ID",
+  PASSPORT: "Passport",
+  WORK_PERMIT: "Work permit",
+  CERTIFICATE: "Certificate",
+  OTHER: "Other",
 };

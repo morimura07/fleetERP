@@ -634,3 +634,45 @@ export const serviceLaborSchema = z.object({
 export type ServiceOrderInput = z.infer<typeof serviceOrderSchema>;
 export type ServicePartInput = z.infer<typeof servicePartSchema>;
 export type ServiceLaborInput = z.infer<typeof serviceLaborSchema>;
+
+// ── Human Resources (M24) ──
+export const contractSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  employeeId: z.string().min(1, "Employee is required"),
+  type: z.enum(["PERMANENT", "FIXED_TERM", "PROBATION", "CONTRACTOR"]).default("PERMANENT"),
+  title: z.string().min(1, "Job title is required").max(120),
+  grossSalary: z.coerce.number().positive("Gross salary must be positive"),
+  currency: z.string().length(3).default("USD"),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date().optional().nullable(),
+  note: z.string().max(500).optional().nullable(),
+});
+
+export const leaveRequestSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  employeeId: z.string().min(1, "Employee is required"),
+  type: z.enum(["ANNUAL", "SICK", "UNPAID", "MATERNITY", "COMPASSIONATE"]).default("ANNUAL"),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+  reason: z.string().max(300).optional().nullable(),
+});
+
+export const entitlementSchema = z.object({
+  type: z.enum(["ANNUAL", "SICK", "UNPAID", "MATERNITY", "COMPASSIONATE"]),
+  year: z.coerce.number().int().min(2000).max(2100),
+  entitled: z.coerce.number().int().min(0, "Entitlement cannot be negative"),
+});
+
+export const employeeDocSchema = z.object({
+  type: z.enum(["CONTRACT", "NATIONAL_ID", "PASSPORT", "WORK_PERMIT", "CERTIFICATE", "OTHER"]),
+  number: z.string().max(80).optional().nullable(),
+  issuedAt: z.coerce.date().optional().nullable(),
+  expiresAt: z.coerce.date().optional().nullable(),
+  fileUrl: z.string().max(300).optional().nullable(),
+  note: z.string().max(300).optional().nullable(),
+});
+
+export type ContractInput = z.infer<typeof contractSchema>;
+export type LeaveRequestInput = z.infer<typeof leaveRequestSchema>;
+export type EntitlementInput = z.infer<typeof entitlementSchema>;
+export type EmployeeDocInput = z.infer<typeof employeeDocSchema>;

@@ -71,6 +71,9 @@ export type Permission =
   | "service:read" // workshop service orders (M22)
   | "service:write"
   | "service:approve" // complete & post service orders
+  | "hr:read" // HR: contracts, leave, documents (M24)
+  | "hr:write"
+  | "hr:approve" // approve leave & activate contracts
   | "fx:read" // exchange rates (M8 multi-currency)
   | "fx:write"
   | "consolidation:read" // subsidiary→parent mapping & rollup (M5)
@@ -148,6 +151,9 @@ const ALL: Permission[] = [
   "service:read",
   "service:write",
   "service:approve",
+  "hr:read",
+  "hr:write",
+  "hr:approve",
   "fx:read",
   "fx:write",
   "consolidation:read",
@@ -257,6 +263,9 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "asset:approve",
     "service:read",
     "service:approve",
+    "hr:read",
+    "hr:write",
+    "hr:approve",
     "fx:read",
     "fx:write",
     "consolidation:read",
