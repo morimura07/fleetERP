@@ -1065,3 +1065,48 @@ export type DisputeInput = z.infer<typeof disputeSchema>;
 export type PromiseToPayInput = z.infer<typeof promiseToPaySchema>;
 export type ContactInput = z.infer<typeof contactSchema>;
 export type WriteOffInput = z.infer<typeof writeOffSchema>;
+
+// ── Operational KPI capture (Tier C internal) ────────────────────────────────
+
+export const dockEventSchema = z.object({
+  vehicleId: z.string().min(1, "Vehicle is required"),
+  tripId: os(40),
+  facility: os(120),
+  kind: z.enum(["ARRIVAL", "DEPARTURE"]),
+  eventAt: z.coerce.date(),
+  note: os(500),
+});
+
+export const damageReportSchema = z.object({
+  orderId: os(40),
+  tripId: os(40),
+  reportedAt: z.coerce.date(),
+  cargoValue: z.coerce.number().min(0, "Cargo value cannot be negative"),
+  damageValue: z.coerce.number().min(0, "Damage value cannot be negative"),
+  currency: z.string().length(3).optional(),
+  description: os(1000),
+}).refine((d) => d.damageValue <= d.cargoValue, {
+  message: "Damage value cannot exceed the cargo value",
+  path: ["damageValue"],
+});
+
+export const damageStatusSchema = z.object({
+  status: z.enum(["REPORTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "SETTLED"]),
+});
+
+export const feedbackSchema = z.object({
+  customerId: z.string().min(1, "Customer is required"),
+  orderId: os(40),
+  csat: z.coerce.number().int().min(1).max(5).optional().nullable(),
+  nps: z.coerce.number().int().min(0).max(10).optional().nullable(),
+  comment: os(1000),
+  collectedAt: z.coerce.date(),
+}).refine((d) => d.csat != null || d.nps != null, {
+  message: "Provide at least a CSAT or NPS score",
+  path: ["csat"],
+});
+
+export type DockEventInput = z.infer<typeof dockEventSchema>;
+export type DamageReportInput = z.infer<typeof damageReportSchema>;
+export type DamageStatusInput = z.infer<typeof damageStatusSchema>;
+export type FeedbackInput = z.infer<typeof feedbackSchema>;

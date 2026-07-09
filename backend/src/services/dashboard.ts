@@ -5,6 +5,7 @@ import {
   costPerKm, revenuePerKm, freightCostPerShipment, emptyLoadRatePct,
   fuelEfficiencyKmPerL, maintenanceCostPerKm, breakdownRate,
   driverTurnoverPct, billingAccuracyPct, arRecoveryPct,
+  avgTurnaroundHours, damageRatePct, avgCsat, computeNps,
 } from "@backend/services/dashboard-kpi";
 
 export interface DashboardStats {
@@ -210,7 +211,7 @@ export interface KpiDashboard {
 
 export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard> {
   const now = new Date();
-  const [orders, trips, maint, drivers, invoices, vehicles] = await Promise.all([
+  const [orders, trips, maint, drivers, invoices, vehicles, dockEvents, damageReports, feedback] = await Promise.all([
     prisma.order.findMany({
       where: { dataAreaId, status: { not: "CANCELLED" } },
       select: { status: true, eta: true, freightAmount: true, demurrageAmount: true, grossWeightKg: true, trip: { select: { actualEnd: true } } },
@@ -228,6 +229,9 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
     prisma.driver.findMany({ where: { dataAreaId }, select: { status: true } }),
     prisma.customerInvoice.findMany({ where: { dataAreaId, status: { in: ["POSTED", "PARTIALLY_PAID", "PAID"] } }, select: { total: true, paidAmount: true, disputeStatus: true } }),
     prisma.vehicle.count({ where: { dataAreaId } }),
+    prisma.dockEvent.findMany({ where: { dataAreaId }, select: { vehicleId: true, kind: true, eventAt: true } }),
+    prisma.damageReport.findMany({ where: { dataAreaId }, select: { damageValue: true, cargoValue: true } }),
+    prisma.customerFeedback.findMany({ where: { dataAreaId }, select: { csat: true, nps: true } }),
   ]);
 
   // Distance & fuel totals across trips.
@@ -268,6 +272,14 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
   const terminated = drivers.filter((d) => d.status === "INACTIVE").length;
   const busy = new Set(trips.filter((t) => ["DISPATCHED", "IN_PROGRESS"].includes(t.status)).map((t) => t.orderId)).size;
 
+  // Tier C internal KPIs. Damage rate uses the cargo value logged on the damage
+  // reports themselves as the denominator (no separate shipment-value ledger).
+  const turnaround = avgTurnaroundHours(dockEvents.map((e) => ({ vehicleId: e.vehicleId, kind: e.kind, eventAt: e.eventAt })));
+  const totalCargoValue = damageReports.reduce((s, r) => s.plus(r.cargoValue), new Prisma.Decimal(0));
+  const damageRate = damageRatePct(damageReports, totalCargoValue);
+  const csat = avgCsat(feedback);
+  const nps = computeNps(feedback);
+
   const cats: KpiCategory[] = [
     {
       key: "operational", title: "Operational & Delivery",
@@ -275,6 +287,8 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
         { key: "otd", label: "On-Time Delivery", value: String(onTimeDeliveryPct(otdOrders)), unit: "%", href: "/orders", hint: "Delivered on/before committed ETA" },
         { key: "transit", label: "Avg Transit Time", value: avgTransitHours(completedTrips), unit: "h", href: "/trips", hint: "Mean transit hours on completed trips" },
         { key: "fill", label: "Load Fill Rate", value: String(fillRatePct([{ cargoKg: totalOrderWeight, capacityKg: totalPayload }])), unit: "%", href: "/trips", hint: "Cargo weight vs available payload" },
+        { key: "turnaround", label: "Truck Turnaround", value: turnaround, unit: "h", href: "/dock-events", hint: "Mean arrival→departure gap at facilities" },
+        { key: "damage", label: "Damage & Claim Rate", value: String(damageRate), unit: "%", href: "/damage-reports", hint: "Damage value ÷ cargo value" },
         { key: "deliveries", label: "Delivered Orders", value: String(delivered.length), href: "/orders", hint: "Orders delivered or invoiced" },
       ],
     },
@@ -310,6 +324,8 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
         { key: "billing", label: "Billing Accuracy", value: String(billingAccuracyPct(disputed, invoices.length)), unit: "%", href: "/receivables", hint: "Invoices with no dispute" },
         { key: "recovery", label: "AR Recovery", value: String(arRecoveryPct(paid, invoiced)), unit: "%", href: "/collections", hint: "Collected ÷ invoiced" },
         { key: "outstanding", label: "Outstanding AR", value: invoiced.minus(paid).toFixed(2), unit: "USD", href: "/collections", hint: "Invoiced − collected" },
+        { key: "csat", label: "CSAT", value: csat, unit: "/5", href: "/feedback", hint: "Average customer satisfaction score" },
+        { key: "nps", label: "NPS", value: String(nps), href: "/feedback", hint: "Promoters − detractors (−100…100)" },
       ],
     },
   ];

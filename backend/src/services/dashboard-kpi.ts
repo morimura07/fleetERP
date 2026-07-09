@@ -116,3 +116,64 @@ export function billingAccuracyPct(disputed: number, totalInvoices: number): num
 export function arRecoveryPct(paid: Prisma.Decimal.Value, invoiced: Prisma.Decimal.Value): number {
   return pct(paid, invoiced);
 }
+
+// ── Tier C internal KPIs ────────────────────────────────────────────────────
+
+/**
+ * Average truck-turnaround hours: for each arrival→departure pair at a facility,
+ * the gap between them, meaned. Pairs are matched per vehicle in arrival order.
+ * Pure — takes already-sorted (vehicle, kind, eventAt) rows. Unit-tested.
+ */
+export function avgTurnaroundHours(
+  events: { vehicleId: string; kind: "ARRIVAL" | "DEPARTURE"; eventAt: Date }[],
+): string {
+  // Group by vehicle, then pair each ARRIVAL with the next DEPARTURE after it.
+  const byVehicle = new Map<string, { kind: string; at: number }[]>();
+  for (const e of events) {
+    if (!byVehicle.has(e.vehicleId)) byVehicle.set(e.vehicleId, []);
+    byVehicle.get(e.vehicleId)!.push({ kind: e.kind, at: e.eventAt.getTime() });
+  }
+  let totalMs = 0, pairs = 0;
+  for (const list of byVehicle.values()) {
+    list.sort((a, b) => a.at - b.at);
+    let pendingArrival: number | null = null;
+    for (const ev of list) {
+      if (ev.kind === "ARRIVAL") pendingArrival = ev.at;
+      else if (ev.kind === "DEPARTURE" && pendingArrival != null) {
+        totalMs += ev.at - pendingArrival;
+        pairs++;
+        pendingArrival = null;
+      }
+    }
+  }
+  if (pairs === 0) return "0.0";
+  return (totalMs / pairs / 3_600_000).toFixed(1);
+}
+
+/** Damage & claim rate %: Σ damage value ÷ Σ cargo value transported. Pure. */
+export function damageRatePct(
+  reports: { damageValue: Prisma.Decimal.Value }[],
+  totalCargoValue: Prisma.Decimal.Value,
+): number {
+  const dmg = reports.reduce((s, r) => s.plus(r.damageValue), new Prisma.Decimal(0));
+  return pct(dmg, totalCargoValue);
+}
+
+/** Average CSAT (1–5) across feedback rows with a score, to 1dp. Pure. */
+export function avgCsat(feedback: { csat: number | null }[]): string {
+  const scored = feedback.filter((f) => f.csat != null) as { csat: number }[];
+  if (scored.length === 0) return "0.0";
+  return (scored.reduce((s, f) => s + f.csat, 0) / scored.length).toFixed(1);
+}
+
+/**
+ * Net Promoter Score = %promoters (9–10) − %detractors (0–6), rounded to an
+ * integer, over feedback rows with an NPS score. Range −100…100. Pure.
+ */
+export function computeNps(feedback: { nps: number | null }[]): number {
+  const scored = feedback.filter((f) => f.nps != null) as { nps: number }[];
+  if (scored.length === 0) return 0;
+  const promoters = scored.filter((f) => f.nps >= 9).length;
+  const detractors = scored.filter((f) => f.nps <= 6).length;
+  return Math.round(((promoters - detractors) / scored.length) * 100);
+}

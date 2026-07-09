@@ -510,6 +510,22 @@ enum TimesheetStatus {
   REJECTED
 }
 
+// ── Operational KPI capture (client dashboard spec, Tier C internal) ──
+// Dock/yard arrival & departure, so truck-turnaround time can be computed.
+enum DockEventKind {
+  ARRIVAL
+  DEPARTURE
+}
+
+// Cargo damage / loss claim lifecycle, for the damage & claim-rate KPI.
+enum DamageStatus {
+  REPORTED
+  UNDER_REVIEW
+  APPROVED // claim accepted
+  REJECTED
+  SETTLED
+}
+
 // ───────────────────────── Multi-company (M34) ─────────────────────────
 
 // A legal entity / tenant. Its `code` is the `dataAreaId` used to partition every
@@ -760,6 +776,7 @@ model Vehicle {
   dispatches    Dispatch[]
   trips         Trip[]
   position      VehiclePosition?
+  dockEvents    DockEvent[]
   version       Int                  @default(0) // optimistic concurrency (PRD §7.1)
   createdById   String? // audit: creator user id
   updatedById   String? // audit: last-modifier user id
@@ -1167,9 +1184,11 @@ model Order {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  trip        Trip?
-  version     Int     @default(0) // optimistic concurrency (PRD §7.1)
-  updatedById String? // audit: last-modifier user id
+  trip          Trip?
+  damageReports DamageReport[]
+  feedback      CustomerFeedback[]
+  version       Int                @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById   String? // audit: last-modifier user id
 
   @@index([status])
   @@index([clientId])
@@ -1248,9 +1267,11 @@ model Trip {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  expenses    TripExpense[]
-  version     Int           @default(0) // optimistic concurrency (PRD §7.1)
-  updatedById String? // audit: last-modifier user id
+  expenses      TripExpense[]
+  dockEvents    DockEvent[]
+  damageReports DamageReport[]
+  version       Int            @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById   String? // audit: last-modifier user id
 
   @@index([driverId, scheduledStart])
   @@index([vehicleId, scheduledStart])
@@ -1469,6 +1490,7 @@ model Customer {
 
   invoices             CustomerInvoice[]
   collectionActivities CollectionActivity[]
+  feedback             CustomerFeedback[]
   version              Int                  @default(0) // optimistic concurrency (PRD §7.1)
   createdById          String? // audit: creator user id
   updatedById          String? // audit: last-modifier user id
@@ -2559,4 +2581,82 @@ model Timesheet {
   @@index([dataAreaId])
   @@index([dataAreaId, status])
   @@map("timesheets")
+}
+
+// ── Operational KPI capture (Tier C internal) ───────────────────────────────
+// Records when a vehicle arrives at and departs a dock/yard, so truck-turnaround
+// time (departure − arrival) can be computed without a telematics feed.
+model DockEvent {
+  id         String        @id @default(cuid())
+  dataAreaId String        @default("HQ01")
+  vehicleId  String
+  vehicle    Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  tripId     String?
+  trip       Trip?         @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  facility   String? // dock / yard / warehouse name
+  kind       DockEventKind
+  eventAt    DateTime
+  note       String?
+
+  version     Int      @default(0)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId])
+  @@index([vehicleId, eventAt])
+  @@index([tripId])
+  @@map("dock_events")
+}
+
+// A cargo damage / loss claim on a delivered load — feeds the damage & claim-rate KPI.
+model DamageReport {
+  id           String       @id @default(cuid())
+  dataAreaId   String       @default("HQ01")
+  orderId      String?
+  order        Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  tripId       String?
+  trip         Trip?        @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  reportNumber String
+  status       DamageStatus @default(REPORTED)
+  reportedAt   DateTime     @db.Date
+  cargoValue   Decimal      @default(0) @db.Decimal(18, 2) // value of the affected shipment
+  damageValue  Decimal      @default(0) @db.Decimal(18, 2) // assessed damage / loss
+  currency     String       @default("USD")
+  description  String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, reportNumber])
+  @@index([dataAreaId])
+  @@index([dataAreaId, status])
+  @@map("damage_reports")
+}
+
+// Manually-captured customer satisfaction (CSAT 1–5) and NPS (0–10) — the survey
+// tool is a Tier C integration; until then this is entered by the account team.
+model CustomerFeedback {
+  id          String   @id @default(cuid())
+  dataAreaId  String   @default("HQ01")
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderId     String?
+  order       Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  csat        Int? // 1–5 satisfaction score
+  nps         Int? // 0–10 recommend score
+  comment     String?
+  collectedAt DateTime @db.Date
+
+  version     Int      @default(0)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId])
+  @@index([customerId])
+  @@map("customer_feedback")
 }

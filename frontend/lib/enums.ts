@@ -105,3 +105,5 @@ export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 export type EmployeeDocType = "CONTRACT" | "NATIONAL_ID" | "PASSPORT" | "WORK_PERMIT" | "CERTIFICATE" | "OTHER";
 export type AttendanceSource = "MANUAL" | "MOBILE" | "BIOMETRIC";
 export type TimesheetStatus = "OPEN" | "SUBMITTED" | "APPROVED" | "REJECTED";
+export type DockEventKind = "ARRIVAL" | "DEPARTURE";
+export type DamageStatus = "REPORTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "SETTLED";

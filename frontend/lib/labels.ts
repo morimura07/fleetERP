@@ -53,6 +53,8 @@ import type {
   EmployeeDocType,
   AttendanceSource,
   TimesheetStatus,
+  DockEventKind,
+  DamageStatus,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -654,6 +656,27 @@ export const TIMESHEET_STATUS_VARIANT: Record<TimesheetStatus, BadgeVariant> = {
   SUBMITTED: "info",
   APPROVED: "success",
   REJECTED: "destructive",
+};
+
+export const DOCK_EVENT_KIND_LABEL: Record<DockEventKind, string> = {
+  ARRIVAL: "Arrival",
+  DEPARTURE: "Departure",
+};
+
+export const DAMAGE_STATUS_LABEL: Record<DamageStatus, string> = {
+  REPORTED: "Reported",
+  UNDER_REVIEW: "Under review",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+  SETTLED: "Settled",
+};
+
+export const DAMAGE_STATUS_VARIANT: Record<DamageStatus, BadgeVariant> = {
+  REPORTED: "secondary",
+  UNDER_REVIEW: "info",
+  APPROVED: "success",
+  REJECTED: "destructive",
+  SETTLED: "success",
 };
 
 // ── Fixed-choice option lists for fields the client spec enumerates but the

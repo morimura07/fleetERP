@@ -47,6 +47,7 @@ import { serviceOrders } from "@backend/routes/service-orders";
 import { hr } from "@backend/routes/hr";
 import { attendance } from "@backend/routes/attendance";
 import { companies } from "@backend/routes/companies";
+import { operationalKpi } from "@backend/routes/operational-kpi";
 
 /**
  * FleetERP standalone API (Hono). Deploys independently from the web app and
@@ -122,6 +123,7 @@ app.route("/api/service-orders", serviceOrders);
 app.route("/api/hr", hr);
 app.route("/api/attendance", attendance);
 app.route("/api/companies", companies);
+app.route("/api/operational-kpi", operationalKpi);
 
 app.onError(onError);
 app.notFound((c) => c.json({ error: "Not found" }, 404));

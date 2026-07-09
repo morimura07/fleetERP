@@ -10,6 +10,7 @@ import {
   Landmark, PiggyBank, Combine, Coins,
   ShieldCheck, MapPin, Boxes, ShoppingCart, BadgeDollarSign, Warehouse, Receipt,
   Building, Wrench, UserCog, Clock,
+  Anchor, PackageX, MessageSquareHeart,
 } from "lucide-react";
 import { cn } from "@frontend/lib/utils";
 import { can, type Permission, type Role } from "@frontend/lib/rbac";
@@ -29,6 +30,9 @@ const GROUPS: NavGroup[] = [
       { href: "/trips", label: "Trips", icon: Route, perm: "trip:read" },
       { href: "/jobs", label: "Delivery Jobs", icon: Package, perm: "job:read" },
       { href: "/dispatch", label: "Dispatch", icon: CalendarClock, perm: "dispatch:read" },
+      { href: "/dock-events", label: "Dock Events", icon: Anchor, perm: "kpi:read" },
+      { href: "/damage-reports", label: "Damage Reports", icon: PackageX, perm: "kpi:read" },
+      { href: "/feedback", label: "Customer Feedback", icon: MessageSquareHeart, perm: "kpi:read" },
     ],
   },
   {

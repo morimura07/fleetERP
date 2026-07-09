@@ -4,6 +4,7 @@ import {
   costPerKm, revenuePerKm, freightCostPerShipment, emptyLoadRatePct,
   fuelEfficiencyKmPerL, maintenanceCostPerKm, breakdownRate,
   driverTurnoverPct, billingAccuracyPct, arRecoveryPct,
+  avgTurnaroundHours, damageRatePct, avgCsat, computeNps,
 } from "@backend/services/dashboard-kpi";
 
 const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
@@ -104,5 +105,56 @@ describe("people & back-office KPIs", () => {
   });
   it("AR recovery = paid ÷ invoiced", () => {
     expect(arRecoveryPct("7500", "10000")).toBe(75);
+  });
+});
+
+describe("Tier C internal KPIs", () => {
+  const dt = (iso: string) => new Date(iso);
+
+  it("avgTurnaroundHours pairs each arrival with the next departure per vehicle", () => {
+    // V1: 08:00 arrive → 11:00 depart = 3h. V2: 09:00 arrive → 12:30 depart = 3.5h. Mean = 3.25h.
+    const events = [
+      { vehicleId: "V1", kind: "ARRIVAL" as const, eventAt: dt("2026-07-01T08:00:00Z") },
+      { vehicleId: "V1", kind: "DEPARTURE" as const, eventAt: dt("2026-07-01T11:00:00Z") },
+      { vehicleId: "V2", kind: "ARRIVAL" as const, eventAt: dt("2026-07-01T09:00:00Z") },
+      { vehicleId: "V2", kind: "DEPARTURE" as const, eventAt: dt("2026-07-01T12:30:00Z") },
+    ];
+    expect(avgTurnaroundHours(events)).toBe("3.3");
+  });
+
+  it("avgTurnaroundHours sorts out-of-order rows and ignores an unmatched arrival", () => {
+    const events = [
+      { vehicleId: "V1", kind: "DEPARTURE" as const, eventAt: dt("2026-07-01T10:00:00Z") },
+      { vehicleId: "V1", kind: "ARRIVAL" as const, eventAt: dt("2026-07-01T08:00:00Z") },
+      { vehicleId: "V1", kind: "ARRIVAL" as const, eventAt: dt("2026-07-01T14:00:00Z") }, // no departure → ignored
+    ];
+    expect(avgTurnaroundHours(events)).toBe("2.0");
+  });
+
+  it("avgTurnaroundHours is 0.0 with no complete pairs", () => {
+    expect(avgTurnaroundHours([])).toBe("0.0");
+    expect(avgTurnaroundHours([{ vehicleId: "V1", kind: "ARRIVAL", eventAt: dt("2026-07-01T08:00:00Z") }])).toBe("0.0");
+  });
+
+  it("damageRatePct = Σ damage ÷ total cargo value", () => {
+    expect(damageRatePct([{ damageValue: "200" }, { damageValue: "300" }], "10000")).toBe(5);
+    expect(damageRatePct([], "10000")).toBe(0);
+    expect(damageRatePct([{ damageValue: "500" }], "0")).toBe(0);
+  });
+
+  it("avgCsat means non-null scores to 1dp", () => {
+    expect(avgCsat([{ csat: 5 }, { csat: 4 }, { csat: 3 }])).toBe("4.0");
+    expect(avgCsat([{ csat: 5 }, { csat: null }])).toBe("5.0");
+    expect(avgCsat([{ csat: null }])).toBe("0.0");
+  });
+
+  it("computeNps = %promoters − %detractors", () => {
+    // 5 rows: two 9-10 (promoters), one 7-8 (passive), two 0-6 (detractors) → (40 − 40) = 0.
+    expect(computeNps([{ nps: 10 }, { nps: 9 }, { nps: 8 }, { nps: 6 }, { nps: 3 }])).toBe(0);
+    // all promoters → 100
+    expect(computeNps([{ nps: 9 }, { nps: 10 }])).toBe(100);
+    // all detractors → -100
+    expect(computeNps([{ nps: 0 }, { nps: 6 }])).toBe(-100);
+    expect(computeNps([{ nps: null }])).toBe(0);
   });
 });
