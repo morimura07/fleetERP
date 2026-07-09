@@ -148,6 +148,17 @@ lookups.get("/hr-form", requireAuth, requirePermission("hr:read"), async (c) => 
   return ok(c, { employees });
 });
 
+/** Active employees for the attendance forms (own read permission). */
+lookups.get("/attendance-form", requireAuth, requirePermission("attendance:read"), async (c) => {
+  const user = c.get("user");
+  const employees = await prisma.employee.findMany({
+    where: { ...areaScope(user), status: { not: "TERMINATED" } },
+    select: { id: true, code: true, name: true },
+    orderBy: { name: "asc" },
+  });
+  return ok(c, { employees });
+});
+
 /** Vehicles, vendors, and in-stock parts for the service-order create form. */
 lookups.get("/service-form", requireAuth, requirePermission("service:read"), async (c) => {
   const user = c.get("user");

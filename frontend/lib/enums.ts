@@ -85,3 +85,5 @@ export type ContractStatus = "DRAFT" | "ACTIVE" | "ENDED";
 export type LeaveType = "ANNUAL" | "SICK" | "UNPAID" | "MATERNITY" | "COMPASSIONATE";
 export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 export type EmployeeDocType = "CONTRACT" | "NATIONAL_ID" | "PASSPORT" | "WORK_PERMIT" | "CERTIFICATE" | "OTHER";
+export type AttendanceSource = "MANUAL" | "MOBILE" | "BIOMETRIC";
+export type TimesheetStatus = "OPEN" | "SUBMITTED" | "APPROVED" | "REJECTED";

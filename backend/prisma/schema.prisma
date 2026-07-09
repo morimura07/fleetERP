@@ -353,6 +353,22 @@ enum EmployeeDocType {
   OTHER
 }
 
+// ── Time & Attendance (M26) ──
+// Source of a clock record. BIOMETRIC is integration-gated on a terminal feed
+// (PRD §5); until wired, entries are MANUAL or from the mobile app.
+enum AttendanceSource {
+  MANUAL
+  MOBILE
+  BIOMETRIC
+}
+
+enum TimesheetStatus {
+  OPEN // accruing entries for the period
+  SUBMITTED // sent for approval; entries locked
+  APPROVED // approved; overtime available to payroll
+  REJECTED
+}
+
 // ───────────────────────── Multi-company (M34) ─────────────────────────
 
 // A legal entity / tenant. Its `code` is the `dataAreaId` used to partition every
@@ -1508,6 +1524,8 @@ model Employee {
   leaveRequests LeaveRequest[]
   leaveBalances LeaveBalance[]
   documents     EmployeeDocument[]
+  timeEntries   TimeEntry[]
+  timesheets    Timesheet[]
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
@@ -1896,4 +1914,70 @@ model EmployeeDocument {
   @@index([dataAreaId])
   @@index([expiresAt])
   @@map("employee_documents")
+}
+
+// ── Time & Attendance (M26) ─────────────────────────────────────────────────
+// Clock-in/out records per employee, rolled up into a monthly Timesheet. An
+// approved timesheet's overtime pay is picked up by the Payroll (M9) compute as
+// an addition to base salary (taxable). Multi-tenant via dataAreaId. Biometric
+// terminal ingestion is integration-gated (PRD §5); entries are MANUAL/MOBILE
+// until a feed is wired.
+model TimeEntry {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  workDate DateTime         @db.Date
+  clockIn  DateTime
+  clockOut DateTime? // null = still clocked in
+  source   AttendanceSource @default(MANUAL)
+  note     String?
+
+  // Set when the entry is rolled into a submitted/approved timesheet.
+  timesheetId String?
+  timesheet   Timesheet? @relation(fields: [timesheetId], references: [id], onDelete: SetNull)
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId])
+  @@index([employeeId, workDate])
+  @@index([timesheetId])
+  @@map("time_entries")
+}
+
+// One timesheet per employee per pay period (YYYY-MM). Regular/overtime split is
+// computed from that period's completed time entries against a standard workday.
+model Timesheet {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  period        String // "YYYY-MM"
+  status        TimesheetStatus @default(OPEN)
+  regularHours  Decimal         @default(0) @db.Decimal(10, 2)
+  overtimeHours Decimal         @default(0) @db.Decimal(10, 2)
+  overtimeRate  Decimal         @default(0) @db.Decimal(18, 2) // per-hour OT pay rate
+  overtimePay   Decimal         @default(0) @db.Decimal(18, 2) // overtimeHours × overtimeRate
+
+  reviewedById String?
+  reviewedAt   DateTime?
+
+  entries TimeEntry[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, period])
+  @@index([dataAreaId])
+  @@index([dataAreaId, status])
+  @@map("timesheets")
 }

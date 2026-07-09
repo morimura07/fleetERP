@@ -702,3 +702,29 @@ export type ContractInput = z.infer<typeof contractSchema>;
 export type LeaveRequestInput = z.infer<typeof leaveRequestSchema>;
 export type EntitlementInput = z.infer<typeof entitlementSchema>;
 export type EmployeeDocInput = z.infer<typeof employeeDocSchema>;
+
+// ── Time & Attendance (M26) ──
+export const timeEntrySchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  employeeId: z.string().min(1, "Employee is required"),
+  workDate: z.coerce.date(),
+  clockIn: z.coerce.date(),
+  clockOut: z.coerce.date().optional().nullable(),
+  source: z.enum(["MANUAL", "MOBILE", "BIOMETRIC"]).default("MANUAL"),
+  note: z.string().max(200).optional().nullable(),
+});
+
+export const clockOutSchema = z.object({
+  at: z.coerce.date(),
+});
+
+export const buildTimesheetSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  employeeId: z.string().min(1, "Employee is required"),
+  period: z.string().regex(/^\d{4}-\d{2}$/, "Period must be YYYY-MM"),
+  overtimeRate: z.coerce.number().min(0, "Overtime rate cannot be negative").default(0),
+});
+
+export type TimeEntryInput = z.infer<typeof timeEntrySchema>;
+export type ClockOutInput = z.infer<typeof clockOutSchema>;
+export type BuildTimesheetInput = z.infer<typeof buildTimesheetSchema>;

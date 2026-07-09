@@ -9,7 +9,7 @@ import {
   Percent, AlarmClock,
   Landmark, PiggyBank, Combine, Coins,
   ShieldCheck, MapPin, Boxes, ShoppingCart, BadgeDollarSign, Warehouse, Receipt,
-  Building, Wrench, UserCog,
+  Building, Wrench, UserCog, Clock,
 } from "lucide-react";
 import { cn } from "@frontend/lib/utils";
 import { can, type Permission, type Role } from "@frontend/lib/rbac";
@@ -64,6 +64,7 @@ const GROUPS: NavGroup[] = [
       { href: "/procurement", label: "Procurement", icon: ShoppingCart, perm: "procurement:read" },
       { href: "/compliance", label: "Compliance", icon: ShieldCheck, perm: "compliance:read" },
       { href: "/hr", label: "Human Resources", icon: UserCog, perm: "hr:read" },
+      { href: "/attendance", label: "Time & Attendance", icon: Clock, perm: "attendance:read" },
       { href: "/waypoints", label: "GPS Waypoints", icon: MapPin, perm: "waypoint:read" },
       { href: "/reports", label: "Daily Reports", icon: FileText, perm: "report:read" },
     ],

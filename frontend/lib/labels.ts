@@ -37,6 +37,8 @@ import type {
   LeaveType,
   LeaveStatus,
   EmployeeDocType,
+  AttendanceSource,
+  TimesheetStatus,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -466,4 +468,24 @@ export const EMPLOYEE_DOC_LABEL: Record<EmployeeDocType, string> = {
   WORK_PERMIT: "Work permit",
   CERTIFICATE: "Certificate",
   OTHER: "Other",
+};
+
+export const ATTENDANCE_SOURCE_LABEL: Record<AttendanceSource, string> = {
+  MANUAL: "Manual",
+  MOBILE: "Mobile app",
+  BIOMETRIC: "Biometric",
+};
+
+export const TIMESHEET_STATUS_LABEL: Record<TimesheetStatus, string> = {
+  OPEN: "Open",
+  SUBMITTED: "Submitted",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+};
+
+export const TIMESHEET_STATUS_VARIANT: Record<TimesheetStatus, BadgeVariant> = {
+  OPEN: "secondary",
+  SUBMITTED: "info",
+  APPROVED: "success",
+  REJECTED: "destructive",
 };

@@ -75,6 +75,9 @@ export type Permission =
   | "hr:read"
   | "hr:write"
   | "hr:approve"
+  | "attendance:read"
+  | "attendance:write"
+  | "attendance:approve"
   | "fx:read"
   | "fx:write"
   | "consolidation:read"
@@ -117,6 +120,7 @@ const ALL: Permission[] = [
   "asset:read", "asset:write", "asset:approve",
   "service:read", "service:write", "service:approve",
   "hr:read", "hr:write", "hr:approve",
+  "attendance:read", "attendance:write", "attendance:approve",
   "fx:read", "fx:write",
   "consolidation:read", "consolidation:run",
   "compliance:read",
@@ -141,7 +145,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "order:read", "order:write",
     "trip:read", "trip:write",
     "vendor:read", "payable:read", "customer:read", "receivable:read",
-    "collection:read", "bank:read", "budget:read", "inventory:read", "inventory:write", "warehouse:read", "warehouse:write", "procurement:read", "procurement:write", "expense:read", "expense:write", "service:read", "service:write", "service:approve", "fx:read",
+    "collection:read", "bank:read", "budget:read", "inventory:read", "inventory:write", "warehouse:read", "warehouse:write", "procurement:read", "procurement:write", "expense:read", "expense:write", "service:read", "service:write", "service:approve", "attendance:read", "attendance:write", "fx:read",
     "compliance:read", "waypoint:read", "waypoint:write", "tracking:read",
     "export:run",
   ],
@@ -165,6 +169,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "asset:read", "asset:write", "asset:approve",
     "service:read", "service:approve",
     "hr:read", "hr:write", "hr:approve",
+    "attendance:read", "attendance:write", "attendance:approve",
     "fx:read", "fx:write",
     "consolidation:read", "consolidation:run",
     "compliance:read", "waypoint:read", "tracking:read",
@@ -229,6 +234,7 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/assets", permission: "asset:read" },
   { prefix: "/service", permission: "service:read" },
   { prefix: "/hr", permission: "hr:read" },
+  { prefix: "/attendance", permission: "attendance:read" },
   { prefix: "/fx", permission: "fx:read" },
   { prefix: "/consolidation", permission: "consolidation:read" },
   { prefix: "/compliance", permission: "compliance:read" },
