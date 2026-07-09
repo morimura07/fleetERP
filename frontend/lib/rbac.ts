@@ -48,6 +48,8 @@ export type Permission =
   | "tax:read"
   | "tax:write"
   | "collection:read"
+  | "collection:write"
+  | "collection:approve"
   | "bank:read"
   | "bank:write"
   | "bank:disburse"
@@ -109,7 +111,7 @@ const ALL: Permission[] = [
   "customer:read", "customer:write",
   "receivable:read", "receivable:write", "receivable:post",
   "tax:read", "tax:write",
-  "collection:read",
+  "collection:read", "collection:write", "collection:approve",
   "bank:read", "bank:write", "bank:disburse",
   "budget:read", "budget:write",
   "inventory:read", "inventory:write",
@@ -160,7 +162,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "payable:read", "payable:write", "payable:post",
     "customer:read", "customer:write",
     "receivable:read", "receivable:write", "receivable:post",
-    "tax:read", "tax:write", "collection:read",
+    "tax:read", "tax:write", "collection:read", "collection:write", "collection:approve",
     "bank:read", "bank:write", "bank:disburse",
     "budget:read", "budget:write",
     "inventory:read", "warehouse:read", "procurement:read", "procurement:approve",

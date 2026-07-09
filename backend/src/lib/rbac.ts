@@ -47,6 +47,8 @@ export type Permission =
   | "tax:read" // VAT/WHT return prep
   | "tax:write"
   | "collection:read" // AR aging / collections
+  | "collection:write" // dunning, disputes, promise-to-pay, contacts (M7)
+  | "collection:approve" // write off bad debt (posts to the ledger)
   | "bank:read" // cash & bank accounts (M4)
   | "bank:write" // maintain bank/mobile-money accounts
   | "bank:disburse" // post driver disbursements to the ledger
@@ -130,6 +132,8 @@ const ALL: Permission[] = [
   "tax:read",
   "tax:write",
   "collection:read",
+  "collection:write",
+  "collection:approve",
   "bank:read",
   "bank:write",
   "bank:disburse",
@@ -251,6 +255,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "tax:read",
     "tax:write",
     "collection:read",
+    "collection:write",
+    "collection:approve",
     "bank:read",
     "bank:write",
     "bank:disburse",

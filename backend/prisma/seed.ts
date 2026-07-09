@@ -48,6 +48,7 @@ const CHART_OF_ACCOUNTS: { code: string; name: string; type: AccountType }[] = [
   { code: "5200", name: "Depreciation Expense — Fleet", type: "EXPENSE" },
   { code: "6000", name: "Salaries & Wages", type: "EXPENSE" },
   { code: "6100", name: "Office & Administrative Expense", type: "EXPENSE" },
+  { code: "6200", name: "Bad Debt Expense", type: "EXPENSE" },
   { code: "6910", name: "Loss on Disposal of Assets", type: "EXPENSE" },
   { code: "6900", name: "Foreign Exchange Loss", type: "EXPENSE" },
 ];

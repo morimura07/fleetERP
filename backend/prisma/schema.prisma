@@ -169,6 +169,37 @@ enum PaymentTerm {
   COD // cash on delivery
 }
 
+// Credit & Collections (M7) — dunning sequence stage (spec: Collections §4).
+enum DunningLevel {
+  NONE
+  REMINDER // level 1: friendly reminder
+  FIRST_NOTICE // level 2
+  SECOND_NOTICE // level 3
+  FINAL_NOTICE
+  LEGAL // handed to legal / debt collection
+}
+
+// Dispute lifecycle for a contested invoice (spec: Collections §4).
+enum DisputeStatus {
+  NONE
+  OPEN
+  UNDER_INVESTIGATION
+  RESOLVED
+  WRITTEN_OFF
+}
+
+// Type of a logged collection activity (spec: Collections §4).
+enum CollectionActivityType {
+  CALL
+  EMAIL
+  LETTER
+  DUNNING
+  PROMISE_TO_PAY
+  DISPUTE
+  NOTE
+  WRITE_OFF
+}
+
 enum VendorGroup {
   FUEL_SUPPLIER
   SPARE_PARTS
@@ -1296,13 +1327,29 @@ model Customer {
   preferredCarrier  String?
   communicationLang String? // language for waybills / invoices
 
+  // ── Credit & collections (spec: Collections §1–3) ──
+  accountStatus      PartyStatus  @default(ACTIVE)
+  parentAccount      String? // master org for consolidated credit
+  creditRating       String? // score / D&B rating (if available in region)
+  tempCreditLimit    Decimal?     @db.Decimal(18, 2) // approved seasonal increase
+  creditReviewDate   DateTime?    @db.Date
+  creditHoldOverride Boolean      @default(false) // dispatcher can bill over the limit
+  dunningLevel       DunningLevel @default(NONE)
+  collectionStrategy String? // High-Risk / Standard Carrier …
+  collectorId        String? // assigned AR specialist
+  discountPercent    Decimal      @default(0) @db.Decimal(5, 2) // early-payment incentive
+  discountDays       Int          @default(0)
+  penaltyRate        Decimal      @default(0) @db.Decimal(5, 2) // overdue interest
+  podRequired        Boolean      @default(false) // invoice valid for collection only with POD
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  invoices    CustomerInvoice[]
-  version     Int               @default(0) // optimistic concurrency (PRD §7.1)
-  createdById String? // audit: creator user id
-  updatedById String? // audit: last-modifier user id
+  invoices             CustomerInvoice[]
+  collectionActivities CollectionActivity[]
+  version              Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById          String? // audit: creator user id
+  updatedById          String? // audit: last-modifier user id
 
   @@unique([dataAreaId, code])
   @@index([name])
@@ -1329,6 +1376,15 @@ model CustomerInvoice {
   memo          String?
   status        InvoiceStatus @default(DRAFT)
 
+  // ── Collections lifecycle (spec: Collections §4) ──
+  dunningLevel       DunningLevel  @default(NONE)
+  disputeStatus      DisputeStatus @default(NONE)
+  disputedAmount     Decimal       @default(0) @db.Decimal(18, 2)
+  promiseToPayDate   DateTime?     @db.Date
+  promiseToPayAmount Decimal?      @db.Decimal(18, 2)
+  lastContactDate    DateTime?     @db.Date
+  writeOffAmount     Decimal       @default(0) @db.Decimal(18, 2)
+
   postingEntryId String?       @unique
   postingEntry   JournalEntry? @relation("CustomerInvoicePosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
 
@@ -1337,14 +1393,45 @@ model CustomerInvoice {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  receipts    CustomerReceipt[]
-  version     Int               @default(0) // optimistic concurrency (PRD §7.1)
-  updatedById String? // audit: last-modifier user id
+  receipts             CustomerReceipt[]
+  collectionActivities CollectionActivity[]
+  version              Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById          String? // audit: last-modifier user id
 
   @@unique([dataAreaId, invoiceNumber])
   @@index([status])
   @@index([dueDate])
+  @@index([disputeStatus])
   @@map("customer_invoices")
+}
+
+// A logged collection action — dunning, call, promise-to-pay, dispute, write-off,
+// or a free-form note (spec: Collections §4). Attached to a customer, optionally to
+// a specific invoice. Provides the dunning audit trail and the collector's notes.
+model CollectionActivity {
+  id         String           @id @default(cuid())
+  dataAreaId String           @default("HQ01")
+  customerId String
+  customer   Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoiceId  String?
+  invoice    CustomerInvoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  type          CollectionActivityType
+  activityDate  DateTime               @default(now())
+  note          String?
+  // Snapshot fields for the action taken (nullable per type).
+  dunningLevel  DunningLevel?
+  promiseDate   DateTime?              @db.Date
+  promiseAmount Decimal?               @db.Decimal(18, 2)
+  amount        Decimal?               @db.Decimal(18, 2) // disputed / written-off amount
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([dataAreaId])
+  @@index([customerId])
+  @@index([invoiceId])
+  @@map("collection_activities")
 }
 
 // A receipt against an AR invoice: Dr Bank / Cr Accounts Receivable.

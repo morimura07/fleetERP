@@ -20,6 +20,9 @@ import type {
   PaymentMethod,
   CustomerAccountGroup,
   PartyStatus,
+  DunningLevel,
+  DisputeStatus,
+  CollectionActivityType,
   RateType,
   BankAccountType,
   DisbursementType,
@@ -275,6 +278,51 @@ export const PARTY_STATUS_VARIANT: Record<PartyStatus, BadgeVariant> = {
   ON_HOLD: "warning",
   PROSPECT: "info",
   SUSPENDED: "destructive",
+};
+
+export const DUNNING_LEVEL_LABEL: Record<DunningLevel, string> = {
+  NONE: "None",
+  REMINDER: "Reminder",
+  FIRST_NOTICE: "1st Notice",
+  SECOND_NOTICE: "2nd Notice",
+  FINAL_NOTICE: "Final Notice",
+  LEGAL: "Legal",
+};
+
+export const DUNNING_LEVEL_VARIANT: Record<DunningLevel, BadgeVariant> = {
+  NONE: "secondary",
+  REMINDER: "info",
+  FIRST_NOTICE: "warning",
+  SECOND_NOTICE: "warning",
+  FINAL_NOTICE: "destructive",
+  LEGAL: "destructive",
+};
+
+export const DISPUTE_STATUS_LABEL: Record<DisputeStatus, string> = {
+  NONE: "—",
+  OPEN: "Open",
+  UNDER_INVESTIGATION: "Investigating",
+  RESOLVED: "Resolved",
+  WRITTEN_OFF: "Written off",
+};
+
+export const DISPUTE_STATUS_VARIANT: Record<DisputeStatus, BadgeVariant> = {
+  NONE: "secondary",
+  OPEN: "warning",
+  UNDER_INVESTIGATION: "info",
+  RESOLVED: "success",
+  WRITTEN_OFF: "destructive",
+};
+
+export const COLLECTION_ACTIVITY_LABEL: Record<CollectionActivityType, string> = {
+  CALL: "Call",
+  EMAIL: "Email",
+  LETTER: "Letter",
+  DUNNING: "Dunning",
+  PROMISE_TO_PAY: "Promise to Pay",
+  DISPUTE: "Dispute",
+  NOTE: "Note",
+  WRITE_OFF: "Write-off",
 };
 
 // ───────── Phase 2: Core Finance ─────────

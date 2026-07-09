@@ -515,6 +515,19 @@ export const customerSchema = z.object({
   reconAccount: optStr(20),
   preferredCarrier: optStr(120),
   communicationLang: optStr(40),
+  // Credit & collections (spec: Collections §1–3)
+  accountStatus: z.enum(["ACTIVE", "INACTIVE", "ON_HOLD", "PROSPECT", "SUSPENDED"]).default("ACTIVE"),
+  parentAccount: optStr(120),
+  creditRating: optStr(40),
+  tempCreditLimit: z.coerce.number().min(0).optional().nullable(),
+  creditReviewDate: z.coerce.date().optional().nullable(),
+  creditHoldOverride: z.boolean().default(false),
+  collectionStrategy: optStr(80),
+  collectorId: optStr(60),
+  discountPercent: z.coerce.number().min(0).max(100).default(0),
+  discountDays: z.coerce.number().int().min(0).max(365).default(0),
+  penaltyRate: z.coerce.number().min(0).max(100).default(0),
+  podRequired: z.boolean().default(false),
 });
 
 export const customerInvoiceSchema = z.object({
@@ -870,3 +883,42 @@ export const buildTimesheetSchema = z.object({
 export type TimeEntryInput = z.infer<typeof timeEntrySchema>;
 export type ClockOutInput = z.infer<typeof clockOutSchema>;
 export type BuildTimesheetInput = z.infer<typeof buildTimesheetSchema>;
+
+// ── Credit & Collections workflow (M7) ──
+export const dunningSchema = z.object({
+  invoiceId: z.string().min(1, "Invoice is required"),
+  level: z.enum(["NONE", "REMINDER", "FIRST_NOTICE", "SECOND_NOTICE", "FINAL_NOTICE", "LEGAL"]),
+  note: z.string().max(500).optional().nullable(),
+});
+
+export const disputeSchema = z.object({
+  invoiceId: z.string().min(1, "Invoice is required"),
+  status: z.enum(["NONE", "OPEN", "UNDER_INVESTIGATION", "RESOLVED", "WRITTEN_OFF"]),
+  disputedAmount: z.coerce.number().min(0).default(0),
+  note: z.string().max(500).optional().nullable(),
+});
+
+export const promiseToPaySchema = z.object({
+  invoiceId: z.string().min(1, "Invoice is required"),
+  promiseDate: z.coerce.date(),
+  promiseAmount: z.coerce.number().positive("Promise amount must be positive"),
+  note: z.string().max(500).optional().nullable(),
+});
+
+export const contactSchema = z.object({
+  customerId: z.string().min(1, "Customer is required"),
+  invoiceId: z.string().optional().nullable(),
+  type: z.enum(["CALL", "EMAIL", "LETTER", "NOTE"]),
+  note: z.string().max(1000).optional().nullable(),
+});
+
+export const writeOffSchema = z.object({
+  invoiceId: z.string().min(1, "Invoice is required"),
+  note: z.string().max(500).optional().nullable(),
+});
+
+export type DunningInput = z.infer<typeof dunningSchema>;
+export type DisputeInput = z.infer<typeof disputeSchema>;
+export type PromiseToPayInput = z.infer<typeof promiseToPaySchema>;
+export type ContactInput = z.infer<typeof contactSchema>;
+export type WriteOffInput = z.infer<typeof writeOffSchema>;
