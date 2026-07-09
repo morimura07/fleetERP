@@ -1,6 +1,10 @@
 import type {
   JobStatus,
   DriverStatus,
+  DriverType,
+  OwnershipStatus,
+  FuelType,
+  FacilityType,
   VehicleStatus,
   Role,
   ContractType,
@@ -81,6 +85,36 @@ export const VEHICLE_STATUS_LABEL: Record<VehicleStatus, string> = {
   AVAILABLE: "Available",
   MAINTENANCE: "In Maintenance",
   UNAVAILABLE: "Unavailable",
+};
+
+export const DRIVER_TYPE_LABEL: Record<DriverType, string> = {
+  COMPANY: "Company Driver",
+  OWNER_OPERATOR: "Owner-Operator",
+  SUBCONTRACTOR: "Subcontractor",
+};
+
+export const OWNERSHIP_STATUS_LABEL: Record<OwnershipStatus, string> = {
+  OWNED: "Owned",
+  LEASED: "Leased",
+  SUBCONTRACTED: "Subcontracted",
+};
+
+export const FUEL_TYPE_LABEL: Record<FuelType, string> = {
+  DIESEL: "Diesel",
+  PETROL: "Petrol",
+  ELECTRIC: "Electric",
+  HYBRID: "Hybrid",
+  CNG: "CNG",
+  OTHER: "Other",
+};
+
+export const FACILITY_TYPE_LABEL: Record<FacilityType, string> = {
+  DISTRIBUTION_CENTER: "Distribution Center",
+  CROSS_DOCK: "Cross-Dock",
+  TRANSIT_HUB: "Transit Hub",
+  BONDED_WAREHOUSE: "Bonded Warehouse",
+  YARD: "Yard",
+  OTHER: "Other",
 };
 
 export const ROLE_LABEL: Record<Role, string> = {

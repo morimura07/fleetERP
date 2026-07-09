@@ -77,16 +77,14 @@ drivers.post("/", requireAuth, requirePermission("driver:write"), async (c) => {
       });
       userId = account.id;
     }
+    // Persist every driver field (spec expansion) except the non-model
+    // login helpers, which drive the optional User account above.
+    const { createLogin: _cl, password: _pw, ...driverFields } = body;
     return tx.driver.create({
       data: {
+        ...driverFields,
         dataAreaId: area,
-        name: body.name,
         email: body.email.toLowerCase(),
-        phone: body.phone,
-        address: body.address,
-        contractType: body.contractType,
-        joinedAt: body.joinedAt,
-        status: body.status,
         userId,
       },
     });

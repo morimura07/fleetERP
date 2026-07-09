@@ -36,17 +36,12 @@ payroll.post("/employees", requireAuth, requirePermission("payroll:write"), asyn
   const body = employeeSchema.parse(await c.req.json());
   const emp = await prisma.employee.create({
     data: {
+      ...body,
       dataAreaId: areaForWrite(user, body.dataAreaId),
-      code: body.code,
-      name: body.name,
       nationalId: body.nationalId || null,
       tin: body.tin || null,
       country: body.country.toUpperCase(),
-      grossSalary: body.grossSalary,
-      currency: body.currency,
-      status: body.status,
       bankAccount: body.bankAccount || null,
-      hiredAt: body.hiredAt,
       createdById: user.id,
     },
   });

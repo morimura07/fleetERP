@@ -38,6 +38,40 @@ enum VehicleStatus {
   UNAVAILABLE
 }
 
+// Driver employment relationship (spec: Driver §3).
+enum DriverType {
+  COMPANY // company driver
+  OWNER_OPERATOR
+  SUBCONTRACTOR
+}
+
+// Vehicle ownership (spec: Vehicles §4).
+enum OwnershipStatus {
+  OWNED
+  LEASED
+  SUBCONTRACTED
+}
+
+// Fuel type for a vehicle (spec: Vehicles §4).
+enum FuelType {
+  DIESEL
+  PETROL
+  ELECTRIC
+  HYBRID
+  CNG
+  OTHER
+}
+
+// Warehouse facility classification (spec: Warehouses §1).
+enum FacilityType {
+  DISTRIBUTION_CENTER
+  CROSS_DOCK
+  TRANSIT_HUB
+  BONDED_WAREHOUSE
+  YARD
+  OTHER
+}
+
 enum JobStatus {
   PENDING // 受付
   WAITING_DISPATCH // 配車待ち
@@ -513,8 +547,23 @@ model User {
   image             String?
   resetToken        String?   @unique
   resetTokenExpires DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+
+  // ── Profile & operations (spec: Users §1–2) ──
+  phone          String?
+  jobTitle       String? // Dispatcher / Fleet Manager / Accountant …
+  assignedBranch String? // physical terminal / hub
+
+  // ── Financial & audit access (spec: Users §4) ──
+  costCenter    String?
+  approvalLimit Decimal? @db.Decimal(18, 2) // max freight/procurement approval
+  esignatory    Boolean  @default(false) // can sign freight bills / LRs / PODs
+
+  // ── System (spec: Users §3, §5) ──
+  languagePref String?
+  timeZone     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // 1:1 — a DRIVER user is linked to a Driver record
   driver           Driver?
@@ -548,8 +597,38 @@ model Driver {
   contractType ContractType @default(CONTRACTOR)
   joinedAt     DateTime
   status       DriverStatus @default(ACTIVE)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+
+  // ── Identity & contact (spec: Driver §1) ──
+  dateOfBirth      DateTime? @db.Date
+  gender           String?
+  altPhone         String?
+  homeTerminal     String? // default depot the driver operates from
+  emergencyContact String? // name · relationship · phone
+
+  // ── Qualifications & certifications (spec: Driver §2) ──
+  licenseNumber     String? // CDL / local equivalent
+  licenseClass      String? // class / endorsements (Hazmat, Tanker)
+  licenseExpiry     DateTime? @db.Date
+  medicalCertExpiry DateTime? @db.Date
+  passportNumber    String?
+  passportExpiry    DateTime? @db.Date
+
+  // ── Employment & payroll config (spec: Driver §3) ──
+  driverType      DriverType @default(COMPANY)
+  terminationDate DateTime?  @db.Date
+  payScale        String? // per-mile (loaded/empty) / hourly / % of load
+  taxId           String? // SSN / TIN
+
+  // ── HOS & telematics (spec: Driver §4–5) ──
+  eldId               String? // ELD / telematics hardware ID
+  hosCycleRule        String? // e.g. "70h/8-day"
+  terminalTimeZone    String?
+  assignedVehicle     String? // primary tractor / vehicle ref
+  cargoQualifications String? // trailer / cargo types certified
+  languagePref        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   availability      DriverAvailability[]
   holidays          Holiday[]
@@ -624,9 +703,52 @@ model Vehicle {
   inspectionExpiry DateTime      @db.Date // 車検満了
   status           VehicleStatus @default(AVAILABLE)
 
+  // ── Identification & specs (spec: Vehicles §1) ──
+  vin         String? // VIN / chassis number
+  yearMade    Int?
+  vehicleType String? // Flatbed / Tanker / Box Van / Reefer
+  bodyType    String? // rigid / articulated tractor / trailer
+
+  // ── Physical & technical (spec: Vehicles §2) ──
+  tareWeightKg     Decimal? @db.Decimal(12, 2)
+  gvwKg            Decimal? @db.Decimal(12, 2) // gross vehicle weight
+  payloadKg        Decimal? @db.Decimal(12, 2)
+  loadingVolumeCbm Decimal? @db.Decimal(12, 2)
+  dimensions       String? // L×W×H
+  axleCount        Int?
+  suspensionType   String?
+
+  // ── Compliance & licensing (spec: Vehicles §3) ──
+  registrationExpiry DateTime? @db.Date
+  insurancePolicyNo  String?
+  emissionRating     String? // Euro IV / Euro VI
+  operatingPermit    String? // LATRA etc.
   // M11 cross-border compliance (PRD §4.2). Optional so existing rows stay valid.
   comesaPermitExpiry DateTime? @db.Date // COMESA transit permit
   yellowCardExpiry   DateTime? @db.Date // Yellow Card insurance (cross-border)
+
+  // ── Operations & telematics (spec: Vehicles §4) ──
+  ownershipStatus OwnershipStatus @default(OWNED)
+  transporterName String? // third-party provider (leased/subcontracted)
+  fuelType        FuelType?
+  fuelCardNumber  String?
+  telematicsId    String? // GPS device ID
+  homeTerminal    String?
+  assignedDriver  String?
+
+  // ── Maintenance & workshop (spec: Vehicles §5) ──
+  odometerKm      Int?
+  engineNumber    String?
+  tyreSize        String?
+  batterySpec     String?
+  lastServiceDate DateTime? @db.Date
+  lastServiceKm   Int?
+
+  // ── Financial & asset (spec: Vehicles §6) ──
+  assetAccountCode   String? // links to fixed-asset / GL
+  purchaseDate       DateTime? @db.Date
+  purchasePrice      Decimal?  @db.Decimal(18, 2)
+  depreciationMethod String? // straight-line / declining balance
   // Fuel-efficiency target: km per litre when loaded, for siphoning/efficiency checks.
   fuelTargetKmPerL   Decimal?  @db.Decimal(6, 2)
 
@@ -1632,15 +1754,30 @@ model DriverDocument {
 // A named checkpoint on the corridors (Chalinze, Malaba, Namanga …) with
 // coordinates. Master data for route planning and the border-turnaround tracker.
 model GpsWaypoint {
-  id          String   @id @default(cuid())
-  dataAreaId  String   @default("HQ01") // legal entity (multi-company isolation)
-  code        String   @unique // CHALINZE, MALABA …
-  name        String
-  kind        String   @default("CHECKPOINT") // CHECKPOINT / BORDER / WEIGHBRIDGE / DEPOT
-  lat         Decimal  @db.Decimal(9, 6)
-  lng         Decimal  @db.Decimal(9, 6)
-  country     String? // ISO country of the point
-  isActive    Boolean  @default(true)
+  id         String  @id @default(cuid())
+  dataAreaId String  @default("HQ01") // legal entity (multi-company isolation)
+  code       String  @unique // CHALINZE, MALABA …
+  name       String
+  kind       String  @default("CHECKPOINT") // CHECKPOINT / BORDER / WEIGHBRIDGE / DEPOT
+  lat        Decimal @db.Decimal(9, 6)
+  lng        Decimal @db.Decimal(9, 6)
+  country    String? // ISO country of the point
+  isActive   Boolean @default(true)
+
+  // ── Coordinate & facility (spec: GPS Waypoint §1–2) ──
+  altitude       Decimal? @db.Decimal(9, 2) // metres above sea level
+  locationType   String? // Hub / Warehouse / Port / Customer Site / Fuel Stop
+  address        String?
+  geofenceRadius Int? // metres
+  timeZone       String?
+  contactDetails String? // on-site manager / phone / hours
+
+  // ── Operational rules (spec: GPS Waypoint §3) ──
+  serviceTimeMin     Int? // standard loading/unloading window
+  requiredEquipment  String? // Forklift / Reefer power …
+  accessRestrictions String? // No night deliveries / weight limits
+  sequenceNo         Int? // visit order on a multi-stop route
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   version     Int      @default(0) // optimistic concurrency (PRD §7.1)
@@ -1688,8 +1825,44 @@ model StockItem {
   reorderLevel   Decimal       @default(0) @db.Decimal(18, 3)
   currency       String        @default("USD")
   isActive       Boolean       @default(true)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+
+  // ── Identification & classification (spec: Inventory §1) ──
+  oemPartNumber      String?
+  supplierPartNumber String?
+
+  // ── Fleet & maintenance (spec: Inventory §2) ──
+  applicableFleet String? // vehicle make/model/fleet tag the part fits
+  partCondition   String? // New / Rebuilt / Remanufactured / Used
+  assetSerialNo   String? // for high-value components
+  hazmat          Boolean @default(false)
+
+  // ── Purchasing & financial (spec: Inventory §3) ──
+  standardCost      Decimal? @db.Decimal(18, 4)
+  lastPurchasePrice Decimal? @db.Decimal(18, 4)
+  defaultVendor     String?
+  taxCode           String?
+  valuationMethod   String?  @default("AVERAGE") // AVERAGE / FIFO / LIFO
+
+  // ── Warehousing & location (spec: Inventory §4) ──
+  storageLocation String?
+  binRack         String?
+  batchLot        String?
+  manufactureDate DateTime? @db.Date
+  expiryDate      DateTime? @db.Date
+
+  // ── Inventory control (spec: Inventory §5) ──
+  maxStockLevel    Decimal? @db.Decimal(18, 3)
+  safetyStock      Decimal? @db.Decimal(18, 3)
+  leadTimeDays     Int?
+  economicOrderQty Decimal? @db.Decimal(18, 3)
+
+  // ── Warranty & quality (spec: Inventory §6) ──
+  warrantyPeriod String? // duration or mileage/hours
+  warrantyStart  DateTime? @db.Date
+  qualityStatus  String? // Available / Quarantined / Awaiting Inspection
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   movements    StockMovement[]
   poLines      PurchaseOrderLine[]
@@ -1745,6 +1918,35 @@ model Warehouse {
   location   String? // city / address
   isDefault  Boolean @default(false) // the MAIN warehouse receipts default to
   isActive   Boolean @default(true)
+
+  // ── Identification (spec: Warehouses §1) ──
+  facilityType FacilityType @default(DISTRIBUTION_CENTER)
+  timeZone     String?
+
+  // ── Location & geocoding (spec: Warehouses §2) ──
+  address    String?
+  city       String?
+  country    String?  @default("TZ")
+  postalCode String?
+  latitude   Decimal? @db.Decimal(10, 6)
+  longitude  Decimal? @db.Decimal(10, 6)
+
+  // ── Contact (spec: Warehouses §3) ──
+  managerName String?
+  phone       String?
+  email       String?
+
+  // ── Dock & operations (spec: Warehouses §4) ──
+  dockCapacity   Int?
+  dockScheduling String? // appointment-based / open-arrival
+  operatingHours String?
+
+  // ── Capacity & control (spec: Warehouses §5–6) ──
+  storageTypes    String? // Bulk / Rack / Cold / Hazmat
+  capacityLimit   String? // max weight / volume / pallets
+  putawayStrategy String? // fixed bin / empty bin / closest to dock
+  pickingStrategy String? // FIFO / LIFO / partial pallet
+  countMethod     String? // Annual / Cycle / Continuous
 
   balances  StockBalance[]
   movements StockMovement[]
@@ -1877,9 +2079,24 @@ model Employee {
   status      EmployeeStatus @default(ACTIVE)
   bankAccount String?
   hiredAt     DateTime       @db.Date
+
+  // ── Master data & demographics (spec: Payroll §1) ──
+  jobTitle       String? // Long-Haul Driver / Dispatch / Warehouse Staff
+  employmentType String? // Full-time / Contract / Agency
+  department     String? // department / cost center
+  costCenter     String?
+  payFrequency   String? // Weekly / Bi-weekly / Monthly
+  nssfNumber     String? // pension / social security
+  shifNumber     String? // health insurance
+
+  // ── Standing allowances (spec: Payroll §4) ──
+  perDiem            Decimal @default(0) @db.Decimal(18, 2)
+  overnightAllowance Decimal @default(0) @db.Decimal(18, 2)
+  phoneAllowance     Decimal @default(0) @db.Decimal(18, 2)
+  otherAllowance     Decimal @default(0) @db.Decimal(18, 2)
   // Optional link to a Driver record (a driver may also be an employee).
-  driverId    String?        @unique
-  driver      Driver?        @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  driverId           String? @unique
+  driver             Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
   payslips      Payslip[]
   contracts     EmploymentContract[]

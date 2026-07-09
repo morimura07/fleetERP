@@ -11,12 +11,15 @@ import { Label } from "@frontend/components/ui/label";
 import { Badge } from "@frontend/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
+import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { driverSchema, type DriverInput } from "@frontend/lib/validations";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
-import { CONTRACT_LABEL, DRIVER_STATUS_LABEL } from "@frontend/lib/labels";
+import { CONTRACT_LABEL, DRIVER_STATUS_LABEL, DRIVER_TYPE_LABEL } from "@frontend/lib/labels";
 import { formatDate } from "@frontend/lib/utils";
-import type { DriverStatus, ContractType } from "@frontend/lib/enums";
+import type { DriverStatus, ContractType, DriverType } from "@frontend/lib/enums";
+
+const DRIVER_TYPES = Object.keys(DRIVER_TYPE_LABEL) as DriverType[];
 
 interface Driver {
   id: string; version: number; name: string; email: string; phone: string; address: string;
@@ -49,7 +52,7 @@ export function DriversManager() {
 
   function openCreate() {
     setEditing(null);
-    form.reset({ name: "", email: "", phone: "", address: "", contractType: "CONTRACTOR", status: "ACTIVE", joinedAt: new Date() as never });
+    form.reset({ name: "", email: "", phone: "", address: "", contractType: "CONTRACTOR", status: "ACTIVE", joinedAt: new Date() as never, driverType: "COMPANY" });
     setOpen(true);
   }
   function openEdit(d: Driver) {
@@ -102,7 +105,7 @@ export function DriversManager() {
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{editing ? "Edit Driver" : "New Driver"}</DialogTitle></DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
             <Field label="Name"><Input {...form.register("name")} /></Field>
@@ -128,6 +131,41 @@ export function DriversManager() {
               </Field>
             </div>
             <Field label="Join Date"><Input type="date" {...form.register("joinedAt")} /></Field>
+
+            <FormSection title="Identity & Contact">
+              <div className="space-y-1.5"><Label>Date of Birth</Label><Input type="date" {...form.register("dateOfBirth")} /></div>
+              <div className="space-y-1.5"><Label>Gender</Label><Input {...form.register("gender")} /></div>
+              <div className="space-y-1.5"><Label>Alt. Phone</Label><Input {...form.register("altPhone")} /></div>
+              <div className="space-y-1.5"><Label>Home Terminal / Depot</Label><Input {...form.register("homeTerminal")} /></div>
+              <div className="space-y-1.5 md:col-span-2"><Label>Emergency Contact</Label><Input placeholder="Name · relationship · phone" {...form.register("emergencyContact")} /></div>
+            </FormSection>
+
+            <FormSection title="Qualifications & Licence">
+              <div className="space-y-1.5"><Label>Licence No.</Label><Input {...form.register("licenseNumber")} /></div>
+              <div className="space-y-1.5"><Label>Licence Class / Endorsements</Label><Input placeholder="Hazmat, Tanker…" {...form.register("licenseClass")} /></div>
+              <div className="space-y-1.5"><Label>Licence Expiry</Label><Input type="date" {...form.register("licenseExpiry")} /></div>
+              <div className="space-y-1.5"><Label>Medical Cert. Expiry</Label><Input type="date" {...form.register("medicalCertExpiry")} /></div>
+              <div className="space-y-1.5"><Label>Passport No.</Label><Input {...form.register("passportNumber")} /></div>
+              <div className="space-y-1.5"><Label>Passport Expiry</Label><Input type="date" {...form.register("passportExpiry")} /></div>
+            </FormSection>
+
+            <FormSection title="Employment, HOS & Telematics">
+              <div className="space-y-1.5">
+                <Label>Driver Type</Label>
+                <Select value={form.watch("driverType")} onValueChange={(v) => form.setValue("driverType", v as DriverType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{DRIVER_TYPES.map((t) => <SelectItem key={t} value={t}>{DRIVER_TYPE_LABEL[t]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Termination Date</Label><Input type="date" {...form.register("terminationDate")} /></div>
+              <div className="space-y-1.5"><Label>Pay Scale</Label><Input placeholder="per-mile / hourly / % of load" {...form.register("payScale")} /></div>
+              <div className="space-y-1.5"><Label>Tax ID</Label><Input {...form.register("taxId")} /></div>
+              <div className="space-y-1.5"><Label>ELD / Telematics ID</Label><Input {...form.register("eldId")} /></div>
+              <div className="space-y-1.5"><Label>HOS Cycle Rule</Label><Input placeholder="70h/8-day" {...form.register("hosCycleRule")} /></div>
+              <div className="space-y-1.5"><Label>Assigned Vehicle</Label><Input {...form.register("assignedVehicle")} /></div>
+              <div className="space-y-1.5"><Label>Cargo Qualifications</Label><Input placeholder="Flatbed, Reefer…" {...form.register("cargoQualifications")} /></div>
+            </FormSection>
+
             {!editing && (
               <div className="rounded-md border p-3 space-y-2">
                 <label className="flex items-center gap-2 text-sm">

@@ -10,6 +10,10 @@ export type Role = "ADMIN" | "DISPATCHER" | "FINANCE" | "DRIVER" | "STAFF";
 export type DriverStatus = "ACTIVE" | "VACATION" | "INACTIVE";
 export type ContractType = "EMPLOYEE" | "CONTRACTOR" | "PARTTIME";
 export type VehicleStatus = "AVAILABLE" | "MAINTENANCE" | "UNAVAILABLE";
+export type DriverType = "COMPANY" | "OWNER_OPERATOR" | "SUBCONTRACTOR";
+export type OwnershipStatus = "OWNED" | "LEASED" | "SUBCONTRACTED";
+export type FuelType = "DIESEL" | "PETROL" | "ELECTRIC" | "HYBRID" | "CNG" | "OTHER";
+export type FacilityType = "DISTRIBUTION_CENTER" | "CROSS_DOCK" | "TRANSIT_HUB" | "BONDED_WAREHOUSE" | "YARD" | "OTHER";
 export type JobStatus =
   | "PENDING"
   | "WAITING_DISPATCH"
