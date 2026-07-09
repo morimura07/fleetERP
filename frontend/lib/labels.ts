@@ -13,6 +13,9 @@ import type {
   InvoiceStatus,
   PaymentTerm,
   VendorGroup,
+  PaymentMethod,
+  CustomerAccountGroup,
+  PartyStatus,
   RateType,
   BankAccountType,
   DisbursementType,
@@ -190,7 +193,43 @@ export const VENDOR_GROUP_LABEL: Record<VendorGroup, string> = {
   CLEARING_AGENT: "Clearing Agent",
   SUBCONTRACTED_FLEET: "Subcontracted Fleet",
   STATUTORY: "Statutory",
+  CARRIER: "Carrier (FTL/LTL)",
+  FREIGHT_BROKER: "Freight Broker",
+  OWNER_OPERATOR: "Owner-Operator",
+  WORKSHOP: "Workshop / Garage",
   OTHER: "Other",
+};
+
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  EFT: "EFT",
+  WIRE: "Wire Transfer",
+  CHEQUE: "Cheque",
+  CASH: "Cash",
+  MOBILE_MONEY: "Mobile Money",
+  FUEL_CARD: "Fuel Card",
+};
+
+export const CUSTOMER_ACCOUNT_GROUP_LABEL: Record<CustomerAccountGroup, string> = {
+  SOLD_TO: "Sold-to",
+  SHIP_TO: "Ship-to",
+  BILL_TO: "Bill-to",
+  PAYER: "Payer",
+};
+
+export const PARTY_STATUS_LABEL: Record<PartyStatus, string> = {
+  ACTIVE: "Active",
+  INACTIVE: "Inactive",
+  ON_HOLD: "On Hold",
+  PROSPECT: "Prospect",
+  SUSPENDED: "Suspended",
+};
+
+export const PARTY_STATUS_VARIANT: Record<PartyStatus, BadgeVariant> = {
+  ACTIVE: "success",
+  INACTIVE: "secondary",
+  ON_HOLD: "warning",
+  PROSPECT: "info",
+  SUSPENDED: "destructive",
 };
 
 // ───────── Phase 2: Core Finance ─────────

@@ -128,6 +128,25 @@ export const clientSchema = z.object({
   phone,
   address: z.string().min(1).max(255),
   email: z.string().email(),
+  // General & contact (spec §1)
+  tradeName: z.string().max(150).optional().or(z.literal("")),
+  industry: z.string().max(80).optional().or(z.literal("")),
+  status: z.enum(["ACTIVE", "INACTIVE", "ON_HOLD", "PROSPECT", "SUSPENDED"]).default("ACTIVE"),
+  website: z.string().max(200).optional().or(z.literal("")),
+  // Billing & financial (spec §2)
+  tin: z.string().max(50).optional().or(z.literal("")),
+  currency: z.string().length(3).default("USD"),
+  paymentTerm: z.enum(["NET_30", "NET_60", "COD"]).default("NET_30"),
+  creditLimit: z.coerce.number().min(0).default(0),
+  taxExempt: z.boolean().default(false),
+  // Freight profile (spec §3)
+  shippingPreferences: z.string().max(120).optional().or(z.literal("")),
+  preferredCarriers: z.string().max(200).optional().or(z.literal("")),
+  hazmatCertified: z.boolean().default(false),
+  // Compliance & integration (spec §5–6)
+  insuranceRequirement: z.string().max(200).optional().or(z.literal("")),
+  slaExpiry: z.coerce.date().optional().nullable(),
+  accountManager: z.string().max(120).optional().or(z.literal("")),
 });
 
 // ───────── DeliveryJob ─────────
@@ -297,12 +316,14 @@ export const tripExpenseSchema = z.object({
 // ───────── AP: Vendor (M1) ─────────
 const money0 = decimalAmount.optional().default("0");
 
+const optStr = (max: number) => z.string().max(max).optional().or(z.literal(""));
+
 export const vendorSchema = z.object({
   dataAreaId: z.string().min(1).max(10).default("HQ01"),
   code: z.string().min(1, "Vendor code is required").max(30),
   legalName: z.string().min(1, "Legal name is required").max(150),
   group: z
-    .enum(["FUEL_SUPPLIER", "SPARE_PARTS", "CLEARING_AGENT", "SUBCONTRACTED_FLEET", "STATUTORY", "OTHER"])
+    .enum(["FUEL_SUPPLIER", "SPARE_PARTS", "CLEARING_AGENT", "SUBCONTRACTED_FLEET", "STATUTORY", "CARRIER", "FREIGHT_BROKER", "OWNER_OPERATOR", "WORKSHOP", "OTHER"])
     .default("OTHER"),
   tin: z.string().max(50).optional(),
   vrn: z.string().max(50).optional(),
@@ -311,6 +332,32 @@ export const vendorSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().max(20).optional(),
   isActive: z.boolean().default(true),
+  // General & organizational (spec §1)
+  operatingName: optStr(150),
+  searchTerm: optStr(60),
+  parentCompany: optStr(150),
+  // Contact & compliance (spec §2)
+  address: optStr(255),
+  branchAddress: optStr(255),
+  contactPerson: optStr(100),
+  billingContact: optStr(100),
+  insurancePolicy: optStr(80),
+  insuranceExpiry: z.coerce.date().optional().nullable(),
+  licenseNumber: optStr(80),
+  // Financial (spec §3)
+  paymentMethod: z.enum(["EFT", "WIRE", "CHEQUE", "CASH", "MOBILE_MONEY", "FUEL_CARD"]).optional().nullable(),
+  bankName: optStr(120),
+  bankSwift: optStr(20),
+  bankIban: optStr(40),
+  mobileMoney: optStr(40),
+  reconAccount: optStr(20),
+  // Transport / TMS (spec §4)
+  scacCode: optStr(10),
+  mcDotNumber: optStr(40),
+  equipmentTypes: optStr(200),
+  fleetSize: z.coerce.number().int().min(0).optional().nullable(),
+  rateAgreement: optStr(300),
+  ediEndpoint: optStr(200),
 });
 
 export const vendorInvoiceSchema = z.object({
@@ -347,6 +394,34 @@ export const customerSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().max(20).optional(),
   isActive: z.boolean().default(true),
+  // General (spec §1)
+  accountGroup: z.enum(["SOLD_TO", "SHIP_TO", "BILL_TO", "PAYER"]).default("SOLD_TO"),
+  industry: optStr(80),
+  registrationNo: optStr(60),
+  searchTerm: optStr(60),
+  // Address & geocoding (spec §2)
+  billingAddress: optStr(255),
+  city: optStr(80),
+  country: optStr(2),
+  postalCode: optStr(20),
+  latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
+  longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
+  transportZone: optStr(80),
+  timeZone: optStr(40),
+  // Contact (spec §3)
+  contactPerson: optStr(100),
+  apContact: optStr(100),
+  // Freight profile (spec §4)
+  shippingConditions: optStr(80),
+  meansOfTransport: optStr(80),
+  dockRestrictions: optStr(200),
+  hazmatCertified: z.boolean().default(false),
+  // Financial & operational (spec §5–6)
+  incoterms: optStr(10),
+  paymentTerm: z.enum(["NET_30", "NET_60", "COD"]).default("NET_30"),
+  reconAccount: optStr(20),
+  preferredCarrier: optStr(120),
+  communicationLang: optStr(40),
 });
 
 export const customerInvoiceSchema = z.object({

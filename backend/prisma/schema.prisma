@@ -130,7 +130,38 @@ enum VendorGroup {
   CLEARING_AGENT
   SUBCONTRACTED_FLEET
   STATUTORY
+  CARRIER // FTL/LTL carrier (spec: Vendor §1)
+  FREIGHT_BROKER
+  OWNER_OPERATOR
+  WORKSHOP // garage / service provider
   OTHER
+}
+
+// Vendor remittance method (spec: Vendor §3).
+enum PaymentMethod {
+  EFT
+  WIRE
+  CHEQUE
+  CASH
+  MOBILE_MONEY
+  FUEL_CARD
+}
+
+// Customer account role (spec: Customer §1).
+enum CustomerAccountGroup {
+  SOLD_TO
+  SHIP_TO
+  BILL_TO
+  PAYER
+}
+
+// Master-data lifecycle for partners (spec: Client §1, Collections §1).
+enum PartyStatus {
+  ACTIVE
+  INACTIVE
+  ON_HOLD
+  PROSPECT
+  SUSPENDED
 }
 
 // Invoice lifecycle for both AP bills and AR invoices.
@@ -561,15 +592,39 @@ model VehicleMaintenance {
 // ───────────────────────── Client (荷主) ─────────────────────────
 
 model Client {
-  id            String   @id @default(cuid())
-  dataAreaId    String   @default("HQ01") // legal entity (multi-company isolation)
+  id            String @id @default(cuid())
+  dataAreaId    String @default("HQ01") // legal entity (multi-company isolation)
   companyName   String
   contactPerson String
   phone         String
   address       String
   email         String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+
+  // ── General & contact (spec: Client §1) ──
+  tradeName String? // DBA
+  industry  String? // 3PL / Retail / Manufacturing / Wholesaler
+  status    PartyStatus @default(ACTIVE)
+  website   String?
+
+  // ── Billing & financial (spec: Client §2) ──
+  tin         String?
+  currency    String      @default("USD")
+  paymentTerm PaymentTerm @default(NET_30)
+  creditLimit Decimal     @default(0) @db.Decimal(18, 2)
+  taxExempt   Boolean     @default(false)
+
+  // ── Freight profile (spec: Client §3) ──
+  shippingPreferences String? // LTL / FTL / Air / Ocean / Intermodal
+  preferredCarriers   String?
+  hazmatCertified     Boolean @default(false)
+
+  // ── Compliance & integration (spec: Client §5–6) ──
+  insuranceRequirement String? // minimum cargo value limits
+  slaExpiry            DateTime? @db.Date
+  accountManager       String? // sales rep / account owner
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   jobs        DeliveryJob[]
   orders      Order[]
@@ -932,8 +987,39 @@ model Vendor {
   email       String?
   phone       String?
   isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+
+  // ── General & organizational (spec: Vendor §1) ──
+  operatingName String? // DBA / trading name
+  searchTerm    String? // alias / short code for lookup
+  parentCompany String? // holding company for spend roll-ups
+
+  // ── Contact & compliance (spec: Vendor §2) ──
+  address         String?
+  branchAddress   String?
+  contactPerson   String?
+  billingContact  String?
+  insurancePolicy String? // carrier liability / cargo / WC policy no.
+  insuranceExpiry DateTime? @db.Date // triggers a dispatch block when passed
+  licenseNumber   String? // operating authority / hazmat certification
+
+  // ── Financial (spec: Vendor §3) ──
+  paymentMethod PaymentMethod? // EFT / wire / cheque / mobile money / fuel card
+  bankName      String?
+  bankSwift     String?
+  bankIban      String?
+  mobileMoney   String?
+  reconAccount  String? // COA control account this vendor's sub-ledger maps to (2000)
+
+  // ── Transport / TMS (spec: Vendor §4) ──
+  scacCode       String? // Standard Carrier Alpha Code
+  mcDotNumber    String? // MC / DOT regulatory number
+  equipmentTypes String? // e.g. "Flatbed, Reefer, Tanker"
+  fleetSize      Int? // trucks/trailers available
+  rateAgreement  String? // default rates / FSC formula / lane pricing note
+  ediEndpoint    String? // EDI profile / webhook URL
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   invoices       VendorInvoice[]
   purchaseOrders PurchaseOrder[]
@@ -944,6 +1030,7 @@ model Vendor {
 
   @@unique([dataAreaId, code])
   @@index([group])
+  @@index([insuranceExpiry])
   @@map("vendors")
 }
 
@@ -1009,20 +1096,54 @@ model VendorPayment {
 // ───────────────────────── Customer (M2 — Accounts Receivable) ─────────────────────────
 
 model Customer {
-  id          String   @id @default(cuid())
-  dataAreaId  String   @default("HQ01")
+  id          String  @id @default(cuid())
+  dataAreaId  String  @default("HQ01")
   code        String // AR-CST-001
   name        String
   tin         String?
-  creditLimit Decimal  @default(0) @db.Decimal(18, 2)
-  creditDays  Int      @default(30)
-  taxExempt   Boolean  @default(false) // diplomatic / transit
-  currency    String   @default("USD")
+  creditLimit Decimal @default(0) @db.Decimal(18, 2)
+  creditDays  Int     @default(30)
+  taxExempt   Boolean @default(false) // diplomatic / transit
+  currency    String  @default("USD")
   email       String?
   phone       String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean @default(true)
+
+  // ── General (spec: Customer §1) ──
+  accountGroup   CustomerAccountGroup @default(SOLD_TO)
+  industry       String?
+  registrationNo String?
+  searchTerm     String?
+
+  // ── Address & geocoding (spec: Customer §2) ──
+  billingAddress String?
+  city           String?
+  country        String?  @default("TZ")
+  postalCode     String?
+  latitude       Decimal? @db.Decimal(10, 6)
+  longitude      Decimal? @db.Decimal(10, 6)
+  transportZone  String? // route-optimization grouping
+  timeZone       String?
+
+  // ── Contact (spec: Customer §3) ──
+  contactPerson String?
+  apContact     String? // accounts-payable contact for billing
+
+  // ── Freight profile (spec: Customer §4) ──
+  shippingConditions String? // immediate / normal
+  meansOfTransport   String? // flatbed / reefer / LTL / FTL
+  dockRestrictions   String?
+  hazmatCertified    Boolean @default(false)
+
+  // ── Financial & operational (spec: Customer §5–6) ──
+  incoterms         String? // FOB / CIF / EXW
+  paymentTerm       PaymentTerm @default(NET_30)
+  reconAccount      String? // AR control account (1100)
+  preferredCarrier  String?
+  communicationLang String? // language for waybills / invoices
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   invoices    CustomerInvoice[]
   version     Int               @default(0) // optimistic concurrency (PRD §7.1)

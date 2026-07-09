@@ -45,7 +45,14 @@ export type VendorGroup =
   | "CLEARING_AGENT"
   | "SUBCONTRACTED_FLEET"
   | "STATUTORY"
+  | "CARRIER"
+  | "FREIGHT_BROKER"
+  | "OWNER_OPERATOR"
+  | "WORKSHOP"
   | "OTHER";
+export type PaymentMethod = "EFT" | "WIRE" | "CHEQUE" | "CASH" | "MOBILE_MONEY" | "FUEL_CARD";
+export type CustomerAccountGroup = "SOLD_TO" | "SHIP_TO" | "BILL_TO" | "PAYER";
+export type PartyStatus = "ACTIVE" | "INACTIVE" | "ON_HOLD" | "PROSPECT" | "SUSPENDED";
 export type InvoiceStatus = "DRAFT" | "POSTED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
 export type RateType = "SPOT" | "AVERAGE" | "HISTORICAL";
 export type BankAccountType = "BANK" | "MOBILE_MONEY" | "CASH";
