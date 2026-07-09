@@ -32,6 +32,25 @@ export interface ExecutiveStats {
   compliance: { current: number; expiringSoon: number; expired: number };
 }
 
+export interface KpiTile {
+  key: string;
+  label: string;
+  value: string;
+  unit?: string;
+  href?: string;
+  hint?: string;
+}
+export interface KpiCategory {
+  key: string;
+  title: string;
+  tiles: KpiTile[];
+}
+export interface KpiDashboard {
+  asOf: string;
+  currency: string;
+  categories: KpiCategory[];
+}
+
 export interface AgingCustomerRow {
   customerId: string;
   customerName: string;

@@ -2,8 +2,9 @@ import {
   Package, Truck, Users, CheckCircle2, TrendingUp, Navigation,
   ClipboardList, FileText, Wallet, Gauge, type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { serverApi } from "@frontend/lib/server-api";
-import type { DashboardStats, ExecutiveStats } from "@frontend/lib/api-types";
+import type { DashboardStats, ExecutiveStats, KpiDashboard } from "@frontend/lib/api-types";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { Badge } from "@frontend/components/ui/badge";
 import { PageHeader } from "@frontend/components/layout/page-header";
@@ -34,6 +35,25 @@ function StatCard({ title, value, icon: Icon, tile }: {
   );
 }
 
+function KpiCard({ label, value, unit, href, hint }: {
+  label: string; value: string; unit?: string; href?: string; hint?: string;
+}) {
+  const body = (
+    <Card className="group relative h-full overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40">
+      <CardContent className="p-5">
+        <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="mt-1 flex items-baseline gap-1">
+          <span className="text-2xl font-bold tabular-nums">{value}</span>
+          {unit && <span className="text-sm font-medium text-muted-foreground">{unit}</span>}
+        </p>
+        {hint && <p className="mt-1.5 line-clamp-1 text-[11px] text-muted-foreground">{hint}</p>}
+        {href && <span className="pointer-events-none absolute right-4 top-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">→</span>}
+      </CardContent>
+    </Card>
+  );
+  return href ? <Link href={href} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl">{body}</Link> : body;
+}
+
 function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2.5 pt-3">
@@ -46,9 +66,10 @@ function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; children: Re
 }
 
 export default async function DashboardPage() {
-  const [stats, exec] = await Promise.all([
+  const [stats, exec, kpi] = await Promise.all([
     serverApi<DashboardStats>("/api/dashboard/stats"),
     serverApi<ExecutiveStats>("/api/dashboard/executive"),
+    serverApi<KpiDashboard>("/api/dashboard/kpi"),
   ]);
   const maxRev = Math.max(...stats.monthlySeries.map((m) => m.revenue), 1);
   const profit = parseFloat(exec.tripProfit);
@@ -90,6 +111,24 @@ export default async function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ───── Logistics KPIs, 5 categories (client dashboard spec) ───── */}
+      <SectionTitle icon={Gauge}>Logistics KPIs</SectionTitle>
+      <p className="-mt-3 text-sm text-muted-foreground">
+        As of {kpi.asOf}. Click any tile to drill into the underlying records.
+      </p>
+      <div className="space-y-6">
+        {kpi.categories.map((cat) => (
+          <div key={cat.key} className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{cat.title}</h3>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {cat.tiles.map((t) => (
+                <KpiCard key={t.key} label={t.label} value={t.value} unit={t.unit} href={t.href} hint={t.hint} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* ───── Executive dashboard (PRD §8) ───── */}
       <SectionTitle icon={Gauge}>Executive — Operations &amp; Finance</SectionTitle>
