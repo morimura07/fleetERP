@@ -14,11 +14,15 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@frontend/components/ui/select";
+import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { accountSchema, type AccountInput } from "@frontend/lib/validations";
-import { ACCOUNT_TYPE_LABEL } from "@frontend/lib/labels";
+import { ACCOUNT_TYPE_LABEL, ACCOUNT_SUBTYPE_LABEL, POSTING_TYPE_LABEL } from "@frontend/lib/labels";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
-import type { AccountType } from "@frontend/lib/enums";
+import type { AccountType, AccountSubType, PostingType } from "@frontend/lib/enums";
+
+const SUBTYPES = Object.keys(ACCOUNT_SUBTYPE_LABEL) as AccountSubType[];
+const POSTING_TYPES = Object.keys(POSTING_TYPE_LABEL) as PostingType[];
 
 interface Account extends AccountInput { id: string; }
 
@@ -39,7 +43,7 @@ export function AccountsManager() {
   const form = useForm<AccountInput>({ resolver: zodResolver(accountSchema) });
 
   function openCreate() {
-    form.reset({ dataAreaId: "HQ01", code: "", name: "", type: "ASSET", isActive: true });
+    form.reset({ dataAreaId: "HQ01", code: "", name: "", type: "ASSET", isActive: true, subType: "NONE", postingType: "POSTABLE", reconciliation: false, allowManualPosting: true, budgetingAllowed: false });
     setOpen(true);
   }
 
@@ -87,6 +91,41 @@ export function AccountsManager() {
                 </SelectContent>
               </Select>
             </div>
+
+            <FormSection title="Classification & Posting" defaultOpen>
+              <div className="space-y-1.5">
+                <Label>Sub-type</Label>
+                <Select value={form.watch("subType")} onValueChange={(v) => form.setValue("subType", v as AccountSubType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{SUBTYPES.map((s) => <SelectItem key={s} value={s}>{ACCOUNT_SUBTYPE_LABEL[s]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Posting Type</Label>
+                <Select value={form.watch("postingType")} onValueChange={(v) => form.setValue("postingType", v as PostingType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{POSTING_TYPES.map((p) => <SelectItem key={p} value={p}>{POSTING_TYPE_LABEL[p]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Currency (blank = base)</Label><Input maxLength={3} {...form.register("currency")} /></div>
+              <div className="space-y-1.5"><Label>Default Tax Code</Label><Input {...form.register("defaultTaxCode")} /></div>
+              <label className="col-span-2 flex items-center gap-2 text-sm text-muted-foreground">
+                <input type="checkbox" {...form.register("reconciliation")} /> Reconciliation (control) account — blocks manual postings
+              </label>
+              <label className="col-span-2 flex items-center gap-2 text-sm text-muted-foreground">
+                <input type="checkbox" {...form.register("allowManualPosting")} /> Allow manual posting
+              </label>
+              <label className="col-span-2 flex items-center gap-2 text-sm text-muted-foreground">
+                <input type="checkbox" {...form.register("budgetingAllowed")} /> Budgeting allowed
+              </label>
+            </FormSection>
+
+            <FormSection title="Transport Dimensions">
+              <div className="space-y-1.5"><Label>Fleet / Vehicle Segment</Label><Input {...form.register("fleetSegment")} /></div>
+              <div className="space-y-1.5"><Label>Route / Corridor</Label><Input {...form.register("routeCorridor")} /></div>
+              <div className="space-y-1.5"><Label>Cost / Profit Center</Label><Input placeholder="Long-Haul / Last-Mile…" {...form.register("costCenter")} /></div>
+            </FormSection>
+
             <DialogFooter>
               <Button type="submit" disabled={form.formState.isSubmitting}>Save</Button>
             </DialogFooter>

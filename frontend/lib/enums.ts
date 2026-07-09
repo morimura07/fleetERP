@@ -20,6 +20,9 @@ export type JobStatus =
 export type DispatchStatus = "SCHEDULED" | "IN_PROGRESS" | "DONE" | "CANCELLED";
 export type NotificationType = "DISPATCH" | "JOB_UPDATE" | "COMPLETION" | "SYSTEM";
 export type AccountType = "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+export type AccountSubType = "CURRENT_ASSET" | "FIXED_ASSET" | "CURRENT_LIABILITY" | "LONG_TERM_LIABILITY" | "EQUITY" | "OPERATING_REVENUE" | "OTHER_REVENUE" | "COST_OF_SALES" | "OPERATING_EXPENSE" | "OTHER_EXPENSE" | "NONE";
+export type PostingType = "POSTABLE" | "HEADER" | "CONTROL";
+export type JournalDocType = "GENERAL" | "ACCRUAL" | "DEPRECIATION" | "CASH_DISBURSEMENT" | "CASH_RECEIPT" | "ADJUSTMENT";
 export type JournalStatus = "DRAFT" | "POSTED" | "REVERSED";
 export type OrderStatus =
   | "DRAFT"

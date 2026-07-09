@@ -72,6 +72,38 @@ enum AccountType {
   EXPENSE
 }
 
+// Financial-statement sub-classification of an account (spec: COA §1).
+enum AccountSubType {
+  CURRENT_ASSET
+  FIXED_ASSET
+  CURRENT_LIABILITY
+  LONG_TERM_LIABILITY
+  EQUITY
+  OPERATING_REVENUE
+  OTHER_REVENUE
+  COST_OF_SALES // direct costs
+  OPERATING_EXPENSE
+  OTHER_EXPENSE
+  NONE
+}
+
+// How an account participates in postings (spec: COA §1, §4).
+enum PostingType {
+  POSTABLE // accepts direct journal postings
+  HEADER // grouping node, no direct postings
+  CONTROL // sub-ledger control (AR/AP) — no manual postings
+}
+
+// Journal document classification (spec: Journal §1).
+enum JournalDocType {
+  GENERAL
+  ACCRUAL
+  DEPRECIATION
+  CASH_DISBURSEMENT
+  CASH_RECEIPT
+  ADJUSTMENT
+}
+
 // A journal entry is immutable once POSTED; corrections are made by REVERSED contra-entries.
 enum JournalStatus {
   DRAFT
@@ -798,8 +830,23 @@ model Account {
   parent     Account?    @relation("AccountTree", fields: [parentId], references: [id], onDelete: SetNull)
   children   Account[]   @relation("AccountTree")
   isActive   Boolean     @default(true)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+
+  // ── Classification & posting behaviour (spec: COA §1, §4) ──
+  subType            AccountSubType @default(NONE)
+  postingType        PostingType    @default(POSTABLE)
+  currency           String? // operational currency (null = entity base)
+  defaultTaxCode     String? // default tax code applied on postings
+  reconciliation     Boolean        @default(false) // AR/AP control — blocks manual postings
+  allowManualPosting Boolean        @default(true)
+  budgetingAllowed   Boolean        @default(false)
+
+  // ── Transport dimensions (spec: COA §2) ──
+  fleetSegment  String? // vehicle / fleet classification tag
+  routeCorridor String? // shipping lane / corridor tag
+  costCenter    String? // profit / cost center (Long-Haul, Last-Mile …)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   lines       JournalLine[]
   version     Int           @default(0) // optimistic concurrency (PRD §7.1)
@@ -824,6 +871,11 @@ model JournalEntry {
   exchangeRate  Decimal       @default(1) @db.Decimal(18, 6) // to base currency, recorded per posting
   memo          String?
   status        JournalStatus @default(DRAFT)
+
+  // ── Document header (spec: Journal §1) ──
+  docType      JournalDocType @default(GENERAL)
+  documentDate DateTime?      @db.Date // date the transaction actually occurred
+  referenceNo  String? // external ref: B/L, CMR waybill, vendor invoice
 
   // Correction trail: a REVERSED entry points back to the entry it cancels.
   reversalOfId String?       @unique
@@ -875,6 +927,16 @@ model JournalLine {
   memo      String?
   // Free-form dimension for branch / cost-object tagging (PRD M8 dimensions).
   dimension String?
+
+  // ── Line-item detail & operational dimensions (spec: Journal §2, §3) ──
+  taxCode     String? // VAT / sales-tax code for the line
+  openItemRef String? // matching ref (invoice ↔ receipt)
+  vehicleTag  String? // vehicle / fleet ID for per-asset profitability
+  routeTag    String? // route / corridor ID for per-lane margins
+  costCenter  String? // terminal / depot / business unit
+  driverTag   String? // driver ID (per-diems, fines)
+  partyTag    String? // customer / vendor / subcontractor code
+  tripTag     String? // trip / haulage-contract number
 
   @@index([entryId])
   @@index([accountId])

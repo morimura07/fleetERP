@@ -5,6 +5,9 @@ import type {
   Role,
   ContractType,
   AccountType,
+  AccountSubType,
+  PostingType,
+  JournalDocType,
   JournalStatus,
   OrderStatus,
   TripStatus,
@@ -100,6 +103,35 @@ export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
   EQUITY: "Equity",
   INCOME: "Income",
   EXPENSE: "Expense",
+};
+
+export const ACCOUNT_SUBTYPE_LABEL: Record<AccountSubType, string> = {
+  CURRENT_ASSET: "Current Asset",
+  FIXED_ASSET: "Fixed Asset",
+  CURRENT_LIABILITY: "Current Liability",
+  LONG_TERM_LIABILITY: "Long-term Liability",
+  EQUITY: "Equity",
+  OPERATING_REVENUE: "Operating Revenue",
+  OTHER_REVENUE: "Other Revenue",
+  COST_OF_SALES: "Cost of Sales (Direct)",
+  OPERATING_EXPENSE: "Operating Expense",
+  OTHER_EXPENSE: "Other Expense",
+  NONE: "— None —",
+};
+
+export const POSTING_TYPE_LABEL: Record<PostingType, string> = {
+  POSTABLE: "Postable",
+  HEADER: "Header (roll-up)",
+  CONTROL: "Control (sub-ledger)",
+};
+
+export const JOURNAL_DOC_TYPE_LABEL: Record<JournalDocType, string> = {
+  GENERAL: "General",
+  ACCRUAL: "Accrual",
+  DEPRECIATION: "Depreciation",
+  CASH_DISBURSEMENT: "Cash Disbursement",
+  CASH_RECEIPT: "Cash Receipt",
+  ADJUSTMENT: "Adjustment",
 };
 
 export const JOURNAL_STATUS_LABEL: Record<JournalStatus, string> = {

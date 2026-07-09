@@ -219,6 +219,18 @@ export const accountSchema = z.object({
   type: z.enum(["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]),
   parentId: idSchema.optional().nullable(),
   isActive: z.boolean().default(true),
+  // Classification & posting behaviour (spec: COA §1, §4)
+  subType: z.enum(["CURRENT_ASSET", "FIXED_ASSET", "CURRENT_LIABILITY", "LONG_TERM_LIABILITY", "EQUITY", "OPERATING_REVENUE", "OTHER_REVENUE", "COST_OF_SALES", "OPERATING_EXPENSE", "OTHER_EXPENSE", "NONE"]).default("NONE"),
+  postingType: z.enum(["POSTABLE", "HEADER", "CONTROL"]).default("POSTABLE"),
+  currency: z.string().max(3).optional().or(z.literal("")),
+  defaultTaxCode: z.string().max(20).optional().or(z.literal("")),
+  reconciliation: z.boolean().default(false),
+  allowManualPosting: z.boolean().default(true),
+  budgetingAllowed: z.boolean().default(false),
+  // Transport dimensions (spec: COA §2)
+  fleetSegment: z.string().max(80).optional().or(z.literal("")),
+  routeCorridor: z.string().max(80).optional().or(z.literal("")),
+  costCenter: z.string().max(80).optional().or(z.literal("")),
 });
 
 // ───────── Accounting: Journal Entry (Journal Entry) ─────────
@@ -235,6 +247,15 @@ export const journalLineSchema = z.object({
   credit: money,
   memo: z.string().max(255).optional(),
   dimension: z.string().max(100).optional(),
+  // Line detail & operational dimensions (spec: Journal §2, §3)
+  taxCode: z.string().max(20).optional().or(z.literal("")),
+  openItemRef: z.string().max(80).optional().or(z.literal("")),
+  vehicleTag: z.string().max(60).optional().or(z.literal("")),
+  routeTag: z.string().max(60).optional().or(z.literal("")),
+  costCenter: z.string().max(80).optional().or(z.literal("")),
+  driverTag: z.string().max(60).optional().or(z.literal("")),
+  partyTag: z.string().max(60).optional().or(z.literal("")),
+  tripTag: z.string().max(60).optional().or(z.literal("")),
 });
 
 export const journalEntrySchema = z.object({
@@ -249,6 +270,10 @@ export const journalEntrySchema = z.object({
   memo: z.string().max(500).optional(),
   post: z.boolean().optional().default(false), // post immediately vs save as draft
   lines: z.array(journalLineSchema).min(2, "A journal entry needs at least 2 lines"),
+  // Document header (spec: Journal §1)
+  docType: z.enum(["GENERAL", "ACCRUAL", "DEPRECIATION", "CASH_DISBURSEMENT", "CASH_RECEIPT", "ADJUSTMENT"]).default("GENERAL"),
+  documentDate: z.coerce.date().optional().nullable(),
+  referenceNo: z.string().max(100).optional().or(z.literal("")),
 });
 
 // ───────── Freight: Order (Order) ─────────

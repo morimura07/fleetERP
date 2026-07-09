@@ -19,6 +19,15 @@ export interface LineInput {
   credit?: Prisma.Decimal.Value;
   memo?: string | null;
   dimension?: string | null;
+  // Line-item detail & operational dimensions (spec: Journal §2, §3).
+  taxCode?: string | null;
+  openItemRef?: string | null;
+  vehicleTag?: string | null;
+  routeTag?: string | null;
+  costCenter?: string | null;
+  driverTag?: string | null;
+  partyTag?: string | null;
+  tripTag?: string | null;
 }
 
 export interface BalanceResult {
@@ -82,6 +91,10 @@ export interface CreateEntryInput {
   memo?: string | null;
   lines: LineInput[];
   createdById?: string | null;
+  // Document header (spec: Journal §1).
+  docType?: "GENERAL" | "ACCRUAL" | "DEPRECIATION" | "CASH_DISBURSEMENT" | "CASH_RECEIPT" | "ADJUSTMENT";
+  documentDate?: Date | null;
+  referenceNo?: string | null;
 }
 
 /**
@@ -125,6 +138,9 @@ export async function createJournalEntry(
         status: opts.post ? "POSTED" : "DRAFT",
         postedAt: opts.post ? new Date() : null,
         createdById: input.createdById ?? null,
+        docType: input.docType ?? "GENERAL",
+        documentDate: input.documentDate ?? null,
+        referenceNo: input.referenceNo ?? null,
         lines: {
           create: input.lines.map((l) => ({
             accountId: l.accountId,
@@ -132,6 +148,14 @@ export async function createJournalEntry(
             credit: new Prisma.Decimal(l.credit ?? 0),
             memo: l.memo ?? null,
             dimension: l.dimension ?? null,
+            taxCode: l.taxCode ?? null,
+            openItemRef: l.openItemRef ?? null,
+            vehicleTag: l.vehicleTag ?? null,
+            routeTag: l.routeTag ?? null,
+            costCenter: l.costCenter ?? null,
+            driverTag: l.driverTag ?? null,
+            partyTag: l.partyTag ?? null,
+            tripTag: l.tripTag ?? null,
           })),
         },
       },

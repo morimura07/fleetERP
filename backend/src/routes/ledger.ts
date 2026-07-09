@@ -65,6 +65,9 @@ ledger.post("/", requireAuth, async (c) => {
       memo: body.memo,
       lines: body.lines,
       createdById: user.id,
+      docType: body.docType,
+      documentDate: body.documentDate,
+      referenceNo: body.referenceNo,
     },
     { post: body.post },
   );
