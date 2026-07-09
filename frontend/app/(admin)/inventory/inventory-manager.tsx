@@ -10,6 +10,7 @@ import { Label } from "@frontend/components/ui/label";
 import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
+import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { stockItemSchema, type StockItemInput } from "@frontend/lib/validations";
 import { STOCK_CATEGORY_LABEL, STOCK_UNIT_LABEL } from "@frontend/lib/labels";
@@ -41,7 +42,7 @@ export function InventoryManager() {
   function openCreate() {
     form.reset({
       dataAreaId: "HQ01", code: "", name: "", category: "SPARE_PART", unit: "PIECE",
-      glCode: "1300", expenseCode: "5100", reorderLevel: 0, currency: "USD", isActive: true,
+      glCode: "1300", expenseCode: "5100", reorderLevel: 0, currency: "USD", isActive: true, hazmat: false,
     });
     setItemOpen(true);
   }
@@ -129,6 +130,44 @@ export function InventoryManager() {
               <div className="space-y-1.5"><Label>Reorder Level</Label><Input type="number" step="0.001" {...form.register("reorderLevel")} /></div>
               <div className="space-y-1.5"><Label>Currency</Label><Input maxLength={3} {...form.register("currency")} /></div>
             </div>
+
+            <FormSection title="Part Identification & Fleet">
+              <div className="space-y-1.5"><Label>OEM Part No.</Label><Input {...form.register("oemPartNumber")} /></div>
+              <div className="space-y-1.5"><Label>Supplier Part No.</Label><Input {...form.register("supplierPartNumber")} /></div>
+              <div className="space-y-1.5"><Label>Applicable Fleet</Label><Input placeholder="Scania R450…" {...form.register("applicableFleet")} /></div>
+              <div className="space-y-1.5"><Label>Part Condition</Label><Input placeholder="New / Rebuilt…" {...form.register("partCondition")} /></div>
+              <div className="space-y-1.5"><Label>Asset Serial No.</Label><Input {...form.register("assetSerialNo")} /></div>
+              <label className="col-span-2 flex items-center gap-2 text-sm text-muted-foreground">
+                <input type="checkbox" {...form.register("hazmat")} /> Hazardous material
+              </label>
+            </FormSection>
+
+            <FormSection title="Purchasing & Financial">
+              <div className="space-y-1.5"><Label>Standard Cost</Label><Input inputMode="decimal" {...form.register("standardCost")} /></div>
+              <div className="space-y-1.5"><Label>Last Purchase Price</Label><Input inputMode="decimal" {...form.register("lastPurchasePrice")} /></div>
+              <div className="space-y-1.5"><Label>Default Vendor</Label><Input {...form.register("defaultVendor")} /></div>
+              <div className="space-y-1.5"><Label>Tax Code</Label><Input {...form.register("taxCode")} /></div>
+              <div className="space-y-1.5"><Label>Valuation Method</Label><Input placeholder="AVERAGE / FIFO / LIFO" {...form.register("valuationMethod")} /></div>
+            </FormSection>
+
+            <FormSection title="Warehousing & Location">
+              <div className="space-y-1.5"><Label>Storage Location</Label><Input {...form.register("storageLocation")} /></div>
+              <div className="space-y-1.5"><Label>Bin / Rack</Label><Input {...form.register("binRack")} /></div>
+              <div className="space-y-1.5"><Label>Batch / Lot</Label><Input {...form.register("batchLot")} /></div>
+              <div className="space-y-1.5"><Label>Manufacture Date</Label><Input type="date" {...form.register("manufactureDate")} /></div>
+              <div className="space-y-1.5"><Label>Expiry Date</Label><Input type="date" {...form.register("expiryDate")} /></div>
+            </FormSection>
+
+            <FormSection title="Inventory Control & Warranty">
+              <div className="space-y-1.5"><Label>Max Stock Level</Label><Input type="number" step="0.001" {...form.register("maxStockLevel")} /></div>
+              <div className="space-y-1.5"><Label>Safety Stock</Label><Input type="number" step="0.001" {...form.register("safetyStock")} /></div>
+              <div className="space-y-1.5"><Label>Lead Time (days)</Label><Input type="number" {...form.register("leadTimeDays")} /></div>
+              <div className="space-y-1.5"><Label>Economic Order Qty</Label><Input type="number" step="0.001" {...form.register("economicOrderQty")} /></div>
+              <div className="space-y-1.5"><Label>Warranty Period</Label><Input placeholder="12 months / 50,000 km" {...form.register("warrantyPeriod")} /></div>
+              <div className="space-y-1.5"><Label>Warranty Start</Label><Input type="date" {...form.register("warrantyStart")} /></div>
+              <div className="space-y-1.5"><Label>Quality Status</Label><Input placeholder="Available / Quarantined" {...form.register("qualityStatus")} /></div>
+            </FormSection>
+
             <DialogFooter><Button type="submit" disabled={form.formState.isSubmitting}>Save</Button></DialogFooter>
           </form>
         </DialogContent>

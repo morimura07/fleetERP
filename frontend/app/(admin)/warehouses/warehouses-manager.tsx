@@ -10,9 +10,14 @@ import { Label } from "@frontend/components/ui/label";
 import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
+import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { warehouseSchema, type WarehouseInput } from "@frontend/lib/validations";
+import { FACILITY_TYPE_LABEL } from "@frontend/lib/labels";
+import type { FacilityType } from "@frontend/lib/enums";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
+
+const FACILITY_TYPES = Object.keys(FACILITY_TYPE_LABEL) as FacilityType[];
 
 type Item = { id: string; code: string; name: string; unit: string };
 type WH = { id: string; code: string; name: string };
@@ -30,7 +35,7 @@ export function WarehousesManager({ items, warehouses }: { items: Item[]; wareho
   const form = useForm<WarehouseInput>({ resolver: zodResolver(warehouseSchema) });
 
   function openCreate() {
-    form.reset({ dataAreaId: "HQ01", code: "", name: "", location: "", isDefault: false, isActive: true });
+    form.reset({ dataAreaId: "HQ01", code: "", name: "", location: "", isDefault: false, isActive: true, facilityType: "DISTRIBUTION_CENTER" });
     setOpen(true);
   }
 
@@ -71,17 +76,52 @@ export function WarehousesManager({ items, warehouses }: { items: Item[]; wareho
 
       {/* New warehouse */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>New Warehouse</DialogTitle></DialogHeader>
           <form onSubmit={form.handleSubmit(onCreate)} className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1.5"><Label>Code</Label><Input placeholder="WH-DAR" {...form.register("code")} />{form.formState.errors.code && <p className="text-xs text-destructive">{form.formState.errors.code.message}</p>}</div>
               <div className="space-y-1.5"><Label>Name</Label><Input {...form.register("name")} />{form.formState.errors.name && <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>}</div>
               <div className="space-y-1.5 md:col-span-2"><Label>Location</Label><Input placeholder="Dar es Salaam" {...form.register("location")} /></div>
+              <div className="space-y-1.5">
+                <Label>Facility Type</Label>
+                <Select value={form.watch("facilityType")} onValueChange={(v) => form.setValue("facilityType", v as FacilityType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{FACILITY_TYPES.map((f) => <SelectItem key={f} value={f}>{FACILITY_TYPE_LABEL[f]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Time Zone</Label><Input placeholder="Africa/Dar_es_Salaam" {...form.register("timeZone")} /></div>
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" {...form.register("isDefault")} /> Set as the default warehouse (receipts land here)
             </label>
+
+            <FormSection title="Location & Geocoding">
+              <div className="space-y-1.5 md:col-span-2"><Label>Address</Label><Input {...form.register("address")} /></div>
+              <div className="space-y-1.5"><Label>City</Label><Input {...form.register("city")} /></div>
+              <div className="space-y-1.5"><Label>Country (ISO)</Label><Input maxLength={2} placeholder="TZ" {...form.register("country")} /></div>
+              <div className="space-y-1.5"><Label>Postal Code</Label><Input {...form.register("postalCode")} /></div>
+              <div className="space-y-1.5"><Label>Latitude</Label><Input inputMode="decimal" {...form.register("latitude")} /></div>
+              <div className="space-y-1.5"><Label>Longitude</Label><Input inputMode="decimal" {...form.register("longitude")} /></div>
+            </FormSection>
+
+            <FormSection title="Contact & Dock Operations">
+              <div className="space-y-1.5"><Label>Manager Name</Label><Input {...form.register("managerName")} /></div>
+              <div className="space-y-1.5"><Label>Phone</Label><Input {...form.register("phone")} /></div>
+              <div className="space-y-1.5"><Label>Email</Label><Input type="email" {...form.register("email")} /></div>
+              <div className="space-y-1.5"><Label>Dock Capacity (doors)</Label><Input type="number" {...form.register("dockCapacity")} /></div>
+              <div className="space-y-1.5"><Label>Dock Scheduling</Label><Input placeholder="appointment / open-arrival" {...form.register("dockScheduling")} /></div>
+              <div className="space-y-1.5"><Label>Operating Hours</Label><Input {...form.register("operatingHours")} /></div>
+            </FormSection>
+
+            <FormSection title="Capacity & Control Rules">
+              <div className="space-y-1.5"><Label>Storage Types</Label><Input placeholder="Bulk / Rack / Cold / Hazmat" {...form.register("storageTypes")} /></div>
+              <div className="space-y-1.5"><Label>Capacity Limit</Label><Input placeholder="max weight / volume / pallets" {...form.register("capacityLimit")} /></div>
+              <div className="space-y-1.5"><Label>Putaway Strategy</Label><Input placeholder="fixed bin / closest to dock" {...form.register("putawayStrategy")} /></div>
+              <div className="space-y-1.5"><Label>Picking Strategy</Label><Input placeholder="FIFO / LIFO" {...form.register("pickingStrategy")} /></div>
+              <div className="space-y-1.5"><Label>Count Method</Label><Input placeholder="Cycle / Annual / Continuous" {...form.register("countMethod")} /></div>
+            </FormSection>
+
             <DialogFooter><Button type="submit" disabled={form.formState.isSubmitting}>Save</Button></DialogFooter>
           </form>
         </DialogContent>

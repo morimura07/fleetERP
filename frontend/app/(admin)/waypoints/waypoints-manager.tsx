@@ -10,6 +10,7 @@ import { Label } from "@frontend/components/ui/label";
 import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
+import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { waypointSchema, type WaypointInput } from "@frontend/lib/validations";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
@@ -93,6 +94,20 @@ export function WaypointsManager() {
                 {form.formState.errors.lng && <p className="text-xs text-destructive">{form.formState.errors.lng.message}</p>}
               </div>
             </div>
+
+            <FormSection title="Facility & Operational Rules">
+              <div className="space-y-1.5"><Label>Location Type</Label><Input placeholder="Hub / Port / Fuel Stop" {...form.register("locationType")} /></div>
+              <div className="space-y-1.5"><Label>Altitude (m)</Label><Input type="number" step="any" {...form.register("altitude")} /></div>
+              <div className="space-y-1.5 md:col-span-2"><Label>Address</Label><Input {...form.register("address")} /></div>
+              <div className="space-y-1.5"><Label>Geofence Radius (m)</Label><Input type="number" {...form.register("geofenceRadius")} /></div>
+              <div className="space-y-1.5"><Label>Time Zone</Label><Input {...form.register("timeZone")} /></div>
+              <div className="space-y-1.5 md:col-span-2"><Label>Contact Details</Label><Input placeholder="Manager · phone · hours" {...form.register("contactDetails")} /></div>
+              <div className="space-y-1.5"><Label>Service Time (min)</Label><Input type="number" {...form.register("serviceTimeMin")} /></div>
+              <div className="space-y-1.5"><Label>Sequence No.</Label><Input type="number" {...form.register("sequenceNo")} /></div>
+              <div className="space-y-1.5"><Label>Required Equipment</Label><Input placeholder="Forklift / Reefer power" {...form.register("requiredEquipment")} /></div>
+              <div className="space-y-1.5"><Label>Access Restrictions</Label><Input placeholder="No night deliveries" {...form.register("accessRestrictions")} /></div>
+            </FormSection>
+
             <DialogFooter><Button type="submit" disabled={form.formState.isSubmitting}>Save</Button></DialogFooter>
           </form>
         </DialogContent>

@@ -10,13 +10,17 @@ import { Label } from "@frontend/components/ui/label";
 import { Badge } from "@frontend/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
+import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { vehicleSchema, maintenanceSchema, type VehicleInput } from "@frontend/lib/validations";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
-import { VEHICLE_STATUS_LABEL } from "@frontend/lib/labels";
+import { VEHICLE_STATUS_LABEL, OWNERSHIP_STATUS_LABEL, FUEL_TYPE_LABEL } from "@frontend/lib/labels";
 import { formatDate, formatYen } from "@frontend/lib/utils";
-import type { VehicleStatus } from "@frontend/lib/enums";
+import type { VehicleStatus, OwnershipStatus, FuelType } from "@frontend/lib/enums";
 import { z } from "zod";
+
+const OWNERSHIPS = Object.keys(OWNERSHIP_STATUS_LABEL) as OwnershipStatus[];
+const FUEL_TYPES = Object.keys(FUEL_TYPE_LABEL) as FuelType[];
 
 interface Vehicle {
   id: string; version: number; vehicleNumber: string; plateNumber: string; maker: string; model: string;
@@ -49,7 +53,7 @@ export function VehiclesManager() {
     { key: "status", header: "Status", render: (r) => <Badge variant={STATUS_VARIANT[r.status]}>{VEHICLE_STATUS_LABEL[r.status]}</Badge> },
   ];
 
-  function openCreate() { setEditing(null); form.reset({ vehicleNumber: "", plateNumber: "", maker: "", model: "", status: "AVAILABLE", insuranceExpiry: new Date() as never, inspectionExpiry: new Date() as never }); setOpen(true); }
+  function openCreate() { setEditing(null); form.reset({ vehicleNumber: "", plateNumber: "", maker: "", model: "", status: "AVAILABLE", insuranceExpiry: new Date() as never, inspectionExpiry: new Date() as never, ownershipStatus: "OWNED" }); setOpen(true); }
   function openEdit(v: Vehicle) { setEditing(v); form.reset({ ...v, insuranceExpiry: v.insuranceExpiry.slice(0, 10) as never, inspectionExpiry: v.inspectionExpiry.slice(0, 10) as never }); setOpen(true); }
 
   async function openMaint(v: Vehicle) {
@@ -108,7 +112,7 @@ export function VehiclesManager() {
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{editing ? "Edit Vehicle" : "New Vehicle"}</DialogTitle></DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
             <F label="Vehicle No."><Input {...form.register("vehicleNumber")} /></F>
@@ -127,6 +131,69 @@ export function VehiclesManager() {
                 <SelectContent>{Object.entries(VEHICLE_STATUS_LABEL).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
               </Select>
             </F>
+
+            <FormSection title="Identification & Specs">
+              <div className="space-y-1.5"><Label>VIN / Chassis</Label><Input {...form.register("vin")} /></div>
+              <div className="space-y-1.5"><Label>Year</Label><Input type="number" {...form.register("yearMade")} /></div>
+              <div className="space-y-1.5"><Label>Vehicle Type</Label><Input placeholder="Flatbed / Tanker…" {...form.register("vehicleType")} /></div>
+              <div className="space-y-1.5"><Label>Body Type</Label><Input placeholder="rigid / articulated" {...form.register("bodyType")} /></div>
+            </FormSection>
+
+            <FormSection title="Physical & Technical">
+              <div className="space-y-1.5"><Label>Tare Weight (kg)</Label><Input inputMode="decimal" {...form.register("tareWeightKg")} /></div>
+              <div className="space-y-1.5"><Label>GVW (kg)</Label><Input inputMode="decimal" {...form.register("gvwKg")} /></div>
+              <div className="space-y-1.5"><Label>Payload (kg)</Label><Input inputMode="decimal" {...form.register("payloadKg")} /></div>
+              <div className="space-y-1.5"><Label>Loading Volume (CBM)</Label><Input inputMode="decimal" {...form.register("loadingVolumeCbm")} /></div>
+              <div className="space-y-1.5"><Label>Dimensions (L×W×H)</Label><Input {...form.register("dimensions")} /></div>
+              <div className="space-y-1.5"><Label>Axles</Label><Input type="number" {...form.register("axleCount")} /></div>
+              <div className="space-y-1.5"><Label>Suspension</Label><Input placeholder="Leaf / Air" {...form.register("suspensionType")} /></div>
+            </FormSection>
+
+            <FormSection title="Compliance & Licensing">
+              <div className="space-y-1.5"><Label>Registration Expiry</Label><Input type="date" {...form.register("registrationExpiry")} /></div>
+              <div className="space-y-1.5"><Label>Insurance Policy No.</Label><Input {...form.register("insurancePolicyNo")} /></div>
+              <div className="space-y-1.5"><Label>Emission Rating</Label><Input placeholder="Euro VI" {...form.register("emissionRating")} /></div>
+              <div className="space-y-1.5"><Label>Operating Permit</Label><Input placeholder="LATRA…" {...form.register("operatingPermit")} /></div>
+              <div className="space-y-1.5"><Label>COMESA Permit Expiry</Label><Input type="date" {...form.register("comesaPermitExpiry")} /></div>
+              <div className="space-y-1.5"><Label>Yellow Card Expiry</Label><Input type="date" {...form.register("yellowCardExpiry")} /></div>
+            </FormSection>
+
+            <FormSection title="Operations & Telematics">
+              <div className="space-y-1.5">
+                <Label>Ownership</Label>
+                <Select value={form.watch("ownershipStatus")} onValueChange={(v) => form.setValue("ownershipStatus", v as OwnershipStatus)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{OWNERSHIPS.map((o) => <SelectItem key={o} value={o}>{OWNERSHIP_STATUS_LABEL[o]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Fuel Type</Label>
+                <Select value={form.watch("fuelType") ?? undefined} onValueChange={(v) => form.setValue("fuelType", v as FuelType)}>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>{FUEL_TYPES.map((f) => <SelectItem key={f} value={f}>{FUEL_TYPE_LABEL[f]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Transporter (if leased)</Label><Input {...form.register("transporterName")} /></div>
+              <div className="space-y-1.5"><Label>Fuel Card No.</Label><Input {...form.register("fuelCardNumber")} /></div>
+              <div className="space-y-1.5"><Label>Telematics / GPS ID</Label><Input {...form.register("telematicsId")} /></div>
+              <div className="space-y-1.5"><Label>Home Terminal</Label><Input {...form.register("homeTerminal")} /></div>
+              <div className="space-y-1.5"><Label>Assigned Driver</Label><Input {...form.register("assignedDriver")} /></div>
+              <div className="space-y-1.5"><Label>Fuel Target (km/L)</Label><Input inputMode="decimal" {...form.register("fuelTargetKmPerL")} /></div>
+            </FormSection>
+
+            <FormSection title="Maintenance & Asset">
+              <div className="space-y-1.5"><Label>Odometer (km)</Label><Input type="number" {...form.register("odometerKm")} /></div>
+              <div className="space-y-1.5"><Label>Engine No.</Label><Input {...form.register("engineNumber")} /></div>
+              <div className="space-y-1.5"><Label>Tyre Size</Label><Input {...form.register("tyreSize")} /></div>
+              <div className="space-y-1.5"><Label>Battery Spec</Label><Input {...form.register("batterySpec")} /></div>
+              <div className="space-y-1.5"><Label>Last Service Date</Label><Input type="date" {...form.register("lastServiceDate")} /></div>
+              <div className="space-y-1.5"><Label>Last Service (km)</Label><Input type="number" {...form.register("lastServiceKm")} /></div>
+              <div className="space-y-1.5"><Label>Asset Account Code</Label><Input placeholder="1500" {...form.register("assetAccountCode")} /></div>
+              <div className="space-y-1.5"><Label>Purchase Date</Label><Input type="date" {...form.register("purchaseDate")} /></div>
+              <div className="space-y-1.5"><Label>Purchase Price</Label><Input inputMode="decimal" {...form.register("purchasePrice")} /></div>
+              <div className="space-y-1.5"><Label>Depreciation Method</Label><Input placeholder="straight-line" {...form.register("depreciationMethod")} /></div>
+            </FormSection>
+
             <DialogFooter><Button type="submit" disabled={form.formState.isSubmitting}>Save</Button></DialogFooter>
           </form>
         </DialogContent>

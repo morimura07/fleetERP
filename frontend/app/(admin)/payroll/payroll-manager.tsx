@@ -11,6 +11,7 @@ import { Badge } from "@frontend/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@frontend/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
+import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { employeeSchema, type EmployeeInput } from "@frontend/lib/validations";
 import {
@@ -48,7 +49,7 @@ function EmployeesTab() {
   const form = useForm<EmployeeInput>({ resolver: zodResolver(employeeSchema) });
 
   function openCreate() {
-    form.reset({ dataAreaId: "HQ01", code: "", name: "", country: "TZ", grossSalary: 0, currency: "USD", status: "ACTIVE", hiredAt: new Date() as unknown as Date });
+    form.reset({ dataAreaId: "HQ01", code: "", name: "", country: "TZ", grossSalary: 0, currency: "USD", status: "ACTIVE", hiredAt: new Date() as unknown as Date, perDiem: 0, overnightAllowance: 0, phoneAllowance: 0, otherAllowance: 0 });
     setOpen(true);
   }
 
@@ -100,6 +101,24 @@ function EmployeesTab() {
               <div className="space-y-1.5"><Label>National ID</Label><Input {...form.register("nationalId")} /></div>
               <div className="space-y-1.5"><Label>TIN</Label><Input {...form.register("tin")} /></div>
             </div>
+
+            <FormSection title="Role & Master Data">
+              <div className="space-y-1.5"><Label>Job Title</Label><Input placeholder="Long-Haul Driver…" {...form.register("jobTitle")} /></div>
+              <div className="space-y-1.5"><Label>Employment Type</Label><Input placeholder="Full-time / Contract" {...form.register("employmentType")} /></div>
+              <div className="space-y-1.5"><Label>Department</Label><Input {...form.register("department")} /></div>
+              <div className="space-y-1.5"><Label>Cost Center</Label><Input {...form.register("costCenter")} /></div>
+              <div className="space-y-1.5"><Label>Pay Frequency</Label><Input placeholder="Monthly / Weekly" {...form.register("payFrequency")} /></div>
+              <div className="space-y-1.5"><Label>NSSF Number</Label><Input {...form.register("nssfNumber")} /></div>
+              <div className="space-y-1.5"><Label>SHIF Number</Label><Input {...form.register("shifNumber")} /></div>
+            </FormSection>
+
+            <FormSection title="Standing Allowances">
+              <div className="space-y-1.5"><Label>Per Diem</Label><Input type="number" step="0.01" {...form.register("perDiem")} /></div>
+              <div className="space-y-1.5"><Label>Overnight Allowance</Label><Input type="number" step="0.01" {...form.register("overnightAllowance")} /></div>
+              <div className="space-y-1.5"><Label>Phone Allowance</Label><Input type="number" step="0.01" {...form.register("phoneAllowance")} /></div>
+              <div className="space-y-1.5"><Label>Other Allowance</Label><Input type="number" step="0.01" {...form.register("otherAllowance")} /></div>
+            </FormSection>
+
             <DialogFooter><Button type="submit" disabled={form.formState.isSubmitting}>Save</Button></DialogFooter>
           </form>
         </DialogContent>
