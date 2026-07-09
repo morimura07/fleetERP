@@ -12,6 +12,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@frontend/components/ui/select";
+import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import {
   TRIP_STATUS_LABEL, TRIP_STATUS_VARIANT, CORRIDOR_LABEL, TRIP_EXPENSE_LABEL,
@@ -53,6 +54,16 @@ export function TripsManager({ orders, drivers, vehicles }: { orders: OrderOpt[]
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [mileage, setMileage] = useState("0");
+  // Extra spec fields (kept in one object to keep the form manageable).
+  const emptyExtra = {
+    trailerId: "", secondDriverId: "", originFacility: "", destinationFacility: "",
+    viaPoints: "", plannedDistanceKm: "", routeCode: "", waybillNumber: "",
+    cargoWeightKg: "", packageCount: "", specialHandling: "",
+    advancePayment: "0", driverWages: "0", tollPermitCost: "0", miscExpense: "0",
+    fuelType: "", fuelCardNumber: "", refuelStations: "", ewayBillRef: "", sealNumbers: "", incidentNotes: "",
+  };
+  const [extra, setExtra] = useState({ ...emptyExtra });
+  const setX = (patch: Partial<typeof emptyExtra>) => setExtra((e) => ({ ...e, ...patch }));
 
   // detail dialog
   const [detail, setDetail] = useState<TripDetail | null>(null);
@@ -62,7 +73,19 @@ export function TripsManager({ orders, drivers, vehicles }: { orders: OrderOpt[]
 
   function openCreate() {
     setOrderId(""); setDriverId(""); setVehicleId(""); setStart(""); setEnd(""); setMileage("0");
+    setExtra({ ...emptyExtra });
     setOpen(true);
+  }
+
+  // Build the extra-fields payload: drop empties, coerce numerics.
+  function extraPayload() {
+    const numeric = new Set(["plannedDistanceKm", "cargoWeightKg", "packageCount", "advancePayment", "driverWages", "tollPermitCost", "miscExpense"]);
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(extra)) {
+      if (v === "" || v == null) continue;
+      out[k] = numeric.has(k) ? Number(v) : v;
+    }
+    return out;
   }
 
   async function createTrip() {
@@ -79,6 +102,7 @@ export function TripsManager({ orders, drivers, vehicles }: { orders: OrderOpt[]
           mileageKm: mileage || "0",
           scheduledStart: new Date(start).toISOString(),
           scheduledEnd: new Date(end).toISOString(),
+          ...extraPayload(),
         }),
       });
       toast({ title: "Trip saved", variant: "success" });
@@ -140,7 +164,7 @@ export function TripsManager({ orders, drivers, vehicles }: { orders: OrderOpt[]
 
       {/* Create trip */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader><DialogTitle>New Trip</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
@@ -172,6 +196,45 @@ export function TripsManager({ orders, drivers, vehicles }: { orders: OrderOpt[]
               <div className="space-y-1.5"><Label>End</Label><Input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Distance (km)</Label><Input inputMode="decimal" value={mileage} onChange={(e) => setMileage(e.target.value)} /></div>
             </div>
+
+            <FormSection title="Vehicle & Crew">
+              <div className="space-y-1.5"><Label>Trailer / Container ID</Label><Input value={extra.trailerId} onChange={(e) => setX({ trailerId: e.target.value })} /></div>
+              <div className="space-y-1.5">
+                <Label>Second Driver</Label>
+                <Select value={extra.secondDriverId || undefined} onValueChange={(v) => setX({ secondDriverId: v })}>
+                  <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                  <SelectContent>{drivers.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Route Code</Label><Input value={extra.routeCode} onChange={(e) => setX({ routeCode: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Planned Distance (km)</Label><Input inputMode="decimal" value={extra.plannedDistanceKm} onChange={(e) => setX({ plannedDistanceKm: e.target.value })} /></div>
+            </FormSection>
+
+            <FormSection title="Route & Freight">
+              <div className="space-y-1.5"><Label>Origin Facility</Label><Input value={extra.originFacility} onChange={(e) => setX({ originFacility: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Destination Facility</Label><Input value={extra.destinationFacility} onChange={(e) => setX({ destinationFacility: e.target.value })} /></div>
+              <div className="space-y-1.5 md:col-span-2"><Label>Via Points / Checkpoints</Label><Input value={extra.viaPoints} onChange={(e) => setX({ viaPoints: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Waybill / Consignment No.</Label><Input value={extra.waybillNumber} onChange={(e) => setX({ waybillNumber: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Cargo Weight (kg)</Label><Input inputMode="decimal" value={extra.cargoWeightKg} onChange={(e) => setX({ cargoWeightKg: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Package Count</Label><Input type="number" value={extra.packageCount} onChange={(e) => setX({ packageCount: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Special Handling</Label><Input placeholder="Hazmat / Reefer / Oversized" value={extra.specialHandling} onChange={(e) => setX({ specialHandling: e.target.value })} /></div>
+            </FormSection>
+
+            <FormSection title="Financials & Fuel">
+              <div className="space-y-1.5"><Label>Advance Payment</Label><Input inputMode="decimal" value={extra.advancePayment} onChange={(e) => setX({ advancePayment: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Driver Wages</Label><Input inputMode="decimal" value={extra.driverWages} onChange={(e) => setX({ driverWages: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Toll / Permit Cost</Label><Input inputMode="decimal" value={extra.tollPermitCost} onChange={(e) => setX({ tollPermitCost: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Misc. Expense</Label><Input inputMode="decimal" value={extra.miscExpense} onChange={(e) => setX({ miscExpense: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Fuel Type</Label><Input placeholder="Diesel" value={extra.fuelType} onChange={(e) => setX({ fuelType: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Fuel Card No.</Label><Input value={extra.fuelCardNumber} onChange={(e) => setX({ fuelCardNumber: e.target.value })} /></div>
+              <div className="space-y-1.5 md:col-span-2"><Label>Planned Refuel Stations</Label><Input value={extra.refuelStations} onChange={(e) => setX({ refuelStations: e.target.value })} /></div>
+            </FormSection>
+
+            <FormSection title="Compliance & Safety">
+              <div className="space-y-1.5"><Label>E-Way Bill / Customs Ref</Label><Input value={extra.ewayBillRef} onChange={(e) => setX({ ewayBillRef: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>Seal Numbers</Label><Input value={extra.sealNumbers} onChange={(e) => setX({ sealNumbers: e.target.value })} /></div>
+              <div className="space-y-1.5 md:col-span-2"><Label>Incident Notes</Label><Input placeholder="Breakdowns / accidents / delays" value={extra.incidentNotes} onChange={(e) => setX({ incidentNotes: e.target.value })} /></div>
+            </FormSection>
           </div>
           <DialogFooter><Button onClick={createTrip}>Create</Button></DialogFooter>
         </DialogContent>

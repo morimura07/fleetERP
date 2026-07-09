@@ -105,6 +105,19 @@ enum CorridorType {
   DOMESTIC
 }
 
+// Conveyance / equipment type for a load (spec: Orders §4, Trips §3).
+enum EquipmentType {
+  FLATBED
+  DRY_VAN
+  REEFER // refrigerated
+  TANKER
+  CONTAINER_20FT
+  CONTAINER_40FT
+  CURTAIN_SIDE
+  LTL // less-than-truckload
+  OTHER
+}
+
 // Trip cost categories — map 1:1 to expense accounts in the chart of accounts.
 enum TripExpenseType {
   FUEL // 5000
@@ -475,19 +488,20 @@ model Driver {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  availability  DriverAvailability[]
-  holidays      Holiday[]
-  dispatches    Dispatch[]
-  dailyReports  DailyReport[]
-  payments      Payment[]
-  trips         Trip[]
-  transfers     MoneyTransfer[]
-  documents     DriverDocument[]
-  employee      Employee?
-  expenseClaims ExpenseClaim[]
-  version       Int                  @default(0) // optimistic concurrency (PRD §7.1)
-  createdById   String? // audit: creator user id
-  updatedById   String? // audit: last-modifier user id
+  availability      DriverAvailability[]
+  holidays          Holiday[]
+  dispatches        Dispatch[]
+  dailyReports      DailyReport[]
+  payments          Payment[]
+  trips             Trip[]
+  secondDriverTrips Trip[]               @relation("TripSecondDriver")
+  transfers         MoneyTransfer[]
+  documents         DriverDocument[]
+  employee          Employee?
+  expenseClaims     ExpenseClaim[]
+  version           Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById       String? // audit: creator user id
+  updatedById       String? // audit: last-modifier user id
 
   @@index([status])
   @@index([dataAreaId])
@@ -889,6 +903,46 @@ model Order {
   bookingDate      DateTime     @db.Date
   status           OrderStatus  @default(DRAFT)
 
+  // ── Organizational (spec: Orders §1) ──
+  branch      String? // operating office handling the job
+  salesperson String? // account manager credited with the sale
+  incoterms   String? // FOB / CIF / EXW
+  paymentTerm PaymentTerm @default(NET_30)
+
+  // ── Parties (spec: Orders §2) ──
+  shipper     String? // consignor — sends the goods
+  consignee   String? // receives the goods
+  billTo      String? // pays the freight invoice
+  notifyParty String? // notified on arrival / status change
+
+  // ── Routing (spec: Orders §3) ──
+  pickupAddress   String?
+  deliveryAddress String?
+  pol             String? // port of loading
+  pod             String? // port of delivery
+  etd             DateTime? // estimated departure
+  eta             DateTime? // estimated arrival
+  routingNotes    String?
+
+  // ── Cargo & equipment (spec: Orders §4) ──
+  equipmentType EquipmentType @default(OTHER)
+  pieceCount    Int? // pallets / boxes / parcels
+  dimensions    String? // L×W×H
+  hazmat        Boolean       @default(false)
+  hazmatUnCode  String? // UN number / class / packing group
+
+  // ── Financial (spec: Orders §5) ──
+  freightRate        Decimal? @db.Decimal(18, 2) // agreed per-unit rate
+  accessorialCharges Decimal  @default(0) @db.Decimal(18, 2) // detention, tarping, liftgate…
+  taxAmount          Decimal  @default(0) @db.Decimal(18, 2)
+
+  // ── Documentation (spec: Orders §6) ──
+  customerPo          String? // client's PO number
+  blNumber            String? // Master/House B/L or AWB
+  hsCode              String? // Harmonized System / customs tariff
+  sealNumber          String?
+  specialInstructions String?
+
   // Ledger link: the AR invoice journal entry created on invoicing.
   invoiceEntryId String?       @unique
   invoiceEntry   JournalEntry? @relation("OrderInvoice", fields: [invoiceEntryId], references: [id], onDelete: SetNull)
@@ -929,8 +983,46 @@ model Trip {
   scheduledEnd   DateTime
   status         TripStatus   @default(PLANNED)
 
+  // ── Vehicle & crew (spec: Trips §1) ──
+  trailerId      String? // connected trailer / container number
+  secondDriverId String? // Driver 2
+  secondDriver   Driver?   @relation("TripSecondDriver", fields: [secondDriverId], references: [id], onDelete: SetNull)
+  actualStart    DateTime?
+  actualEnd      DateTime?
+
+  // ── Route (spec: Trips §2) ──
+  originFacility      String?
+  destinationFacility String?
+  viaPoints           String? // transit hubs / border crossings
+  plannedDistanceKm   Decimal? @db.Decimal(12, 2)
+  routeCode           String? // pre-defined route template
+
+  // ── Freight (spec: Trips §3) ──
+  waybillNumber   String?
+  cargoWeightKg   Decimal? @db.Decimal(12, 2)
+  packageCount    Int?
+  specialHandling String? // Hazmat / Refrigerated / Oversized
+
+  // ── Financials (spec: Trips §4) ──
+  advancePayment Decimal @default(0) @db.Decimal(18, 2) // cash / fuel card to driver
+  driverWages    Decimal @default(0) @db.Decimal(18, 2) // fixed / per-diem / commission
+  tollPermitCost Decimal @default(0) @db.Decimal(18, 2)
+  miscExpense    Decimal @default(0) @db.Decimal(18, 2)
+
+  // ── Fuel management (spec: Trips §5) ──
+  fuelType       String? // Diesel …
+  fuelCardNumber String?
+  refuelStations String? // pre-approved stops
+
   // M11 fuel efficiency: actual litres consumed → actual km/L vs vehicle target.
   fuelLitres Decimal? @db.Decimal(10, 2)
+
+  // ── Compliance & safety (spec: Trips §6) ──
+  ewayBillRef   String? // e-way bill / customs reference
+  podStatus     Boolean @default(false) // proof-of-delivery uploaded
+  podUrl        String?
+  sealNumbers   String?
+  incidentNotes String? // breakdowns, accidents, delays
 
   // M12 freight-bill reconciliation against the carrier invoice.
   reconStatus       ReconStatus @default(UNRECONCILED)

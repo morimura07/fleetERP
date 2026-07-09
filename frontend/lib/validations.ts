@@ -256,6 +256,9 @@ const decimalAmount = z
   .string()
   .regex(/^\d+(\.\d{1,2})?$/, "Amount must be a positive number with up to 2 decimals");
 
+const EQUIPMENT = ["FLATBED", "DRY_VAN", "REEFER", "TANKER", "CONTAINER_20FT", "CONTAINER_40FT", "CURTAIN_SIDE", "LTL", "OTHER"] as const;
+const oStr = (max: number) => z.string().max(max).optional().or(z.literal(""));
+
 export const orderSchema = z.object({
   dataAreaId: z.string().min(1).max(10).default("HQ01"),
   clientId: idSchema,
@@ -272,6 +275,40 @@ export const orderSchema = z.object({
   status: z
     .enum(["DRAFT", "CONFIRMED", "IN_TRANSIT", "DELIVERED", "INVOICED", "CANCELLED"])
     .default("DRAFT"),
+  // Organizational (spec §1)
+  branch: oStr(120),
+  salesperson: oStr(120),
+  incoterms: oStr(10),
+  paymentTerm: z.enum(["NET_30", "NET_60", "COD"]).default("NET_30"),
+  // Parties (spec §2)
+  shipper: oStr(150),
+  consignee: oStr(150),
+  billTo: oStr(150),
+  notifyParty: oStr(150),
+  // Routing (spec §3)
+  pickupAddress: oStr(255),
+  deliveryAddress: oStr(255),
+  pol: oStr(80),
+  pod: oStr(80),
+  etd: z.coerce.date().optional().nullable(),
+  eta: z.coerce.date().optional().nullable(),
+  routingNotes: oStr(300),
+  // Cargo & equipment (spec §4)
+  equipmentType: z.enum(EQUIPMENT).default("OTHER"),
+  pieceCount: z.coerce.number().int().min(0).optional().nullable(),
+  dimensions: oStr(80),
+  hazmat: z.boolean().default(false),
+  hazmatUnCode: oStr(40),
+  // Financial (spec §5)
+  freightRate: z.coerce.number().min(0).optional().nullable(),
+  accessorialCharges: decimalAmount.optional().default("0"),
+  taxAmount: decimalAmount.optional().default("0"),
+  // Documentation (spec §6)
+  customerPo: oStr(80),
+  blNumber: oStr(80),
+  hsCode: oStr(40),
+  sealNumber: oStr(40),
+  specialInstructions: oStr(500),
 });
 
 // ───────── Freight: Trip (Trip) ─────────
@@ -290,6 +327,37 @@ export const tripBaseSchema = z.object({
   status: z
     .enum(["PLANNED", "DISPATCHED", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
     .default("PLANNED"),
+  // Vehicle & crew (spec §1)
+  trailerId: oStr(60),
+  secondDriverId: z.string().optional().nullable(),
+  actualStart: z.coerce.date().optional().nullable(),
+  actualEnd: z.coerce.date().optional().nullable(),
+  // Route (spec §2)
+  originFacility: oStr(150),
+  destinationFacility: oStr(150),
+  viaPoints: oStr(300),
+  plannedDistanceKm: z.coerce.number().min(0).optional().nullable(),
+  routeCode: oStr(60),
+  // Freight (spec §3)
+  waybillNumber: oStr(80),
+  cargoWeightKg: z.coerce.number().min(0).optional().nullable(),
+  packageCount: z.coerce.number().int().min(0).optional().nullable(),
+  specialHandling: oStr(200),
+  // Financials (spec §4)
+  advancePayment: decimalAmount.optional().default("0"),
+  driverWages: decimalAmount.optional().default("0"),
+  tollPermitCost: decimalAmount.optional().default("0"),
+  miscExpense: decimalAmount.optional().default("0"),
+  // Fuel management (spec §5)
+  fuelType: oStr(40),
+  fuelCardNumber: oStr(60),
+  refuelStations: oStr(200),
+  // Compliance & safety (spec §6)
+  ewayBillRef: oStr(80),
+  podStatus: z.boolean().default(false),
+  podUrl: oStr(300),
+  sealNumbers: oStr(120),
+  incidentNotes: oStr(500),
 });
 
 export const tripSchema = tripBaseSchema.refine(

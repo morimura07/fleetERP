@@ -9,6 +9,7 @@ import type {
   OrderStatus,
   TripStatus,
   CorridorType,
+  EquipmentType,
   TripExpenseType,
   InvoiceStatus,
   PaymentTerm,
@@ -152,6 +153,18 @@ export const CORRIDOR_LABEL: Record<CorridorType, string> = {
   NORTHERN: "Northern Corridor",
   CENTRAL: "Central Corridor",
   DOMESTIC: "Domestic",
+};
+
+export const EQUIPMENT_TYPE_LABEL: Record<EquipmentType, string> = {
+  FLATBED: "Flatbed",
+  DRY_VAN: "Dry Van",
+  REEFER: "Reefer (Refrigerated)",
+  TANKER: "Tanker",
+  CONTAINER_20FT: "20ft Container",
+  CONTAINER_40FT: "40ft Container",
+  CURTAIN_SIDE: "Curtain-side",
+  LTL: "LTL (Less-than-truckload)",
+  OTHER: "Other",
 };
 
 export const TRIP_EXPENSE_LABEL: Record<TripExpenseType, string> = {

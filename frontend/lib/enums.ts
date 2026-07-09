@@ -30,6 +30,7 @@ export type OrderStatus =
   | "CANCELLED";
 export type TripStatus = "PLANNED" | "DISPATCHED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 export type CorridorType = "NORTHERN" | "CENTRAL" | "DOMESTIC";
+export type EquipmentType = "FLATBED" | "DRY_VAN" | "REEFER" | "TANKER" | "CONTAINER_20FT" | "CONTAINER_40FT" | "CURTAIN_SIDE" | "LTL" | "OTHER";
 export type TripExpenseType =
   | "FUEL"
   | "TOLLS"
