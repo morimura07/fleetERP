@@ -284,6 +284,91 @@ enum ExpenseClaimStatus {
   REJECTED
 }
 
+// Fixed Assets (M20)
+enum AssetCategory {
+  VEHICLE
+  EQUIPMENT
+  FURNITURE
+  BUILDING
+  IT
+  OTHER
+}
+
+enum AssetStatus {
+  ACTIVE // in service, depreciating
+  FULLY_DEPRECIATED // book value at residual
+  DISPOSED // sold / written off
+}
+
+// Service Management (M22) — workshop / vehicle service orders.
+enum ServiceOrderStatus {
+  OPEN // logged, not started
+  IN_PROGRESS // work underway (parts issued, labor added)
+  COMPLETED // work finished, ready to post costs
+  POSTED // labor cost posted to the ledger; order closed
+  CANCELLED
+}
+
+// Where the work is done — own workshop vs an external vendor garage.
+enum ServiceKind {
+  INTERNAL // own mechanics; labor is a memo cost (already in payroll)
+  EXTERNAL // outside garage; labor accrues to the ledger
+}
+
+// ── Human Resources (M24) ──
+enum EmploymentType {
+  PERMANENT // open-ended contract
+  FIXED_TERM // fixed end date
+  PROBATION // probationary period
+  CONTRACTOR // service contract, not an employee
+}
+
+enum ContractStatus {
+  DRAFT // not yet in force
+  ACTIVE // currently in force (at most one per employee)
+  ENDED // superseded, expired, or terminated
+}
+
+enum LeaveType {
+  ANNUAL // paid annual leave (accrues a balance)
+  SICK // paid sick leave (accrues a balance)
+  UNPAID // leave without pay (no balance)
+  MATERNITY
+  COMPASSIONATE
+}
+
+enum LeaveStatus {
+  PENDING // submitted, awaiting approval
+  APPROVED // approved; balance deducted
+  REJECTED
+  CANCELLED // withdrawn before/after approval
+}
+
+enum EmployeeDocType {
+  CONTRACT
+  NATIONAL_ID
+  PASSPORT
+  WORK_PERMIT
+  CERTIFICATE
+  OTHER
+}
+
+// ── Time & Attendance (M26) ──
+// Source of a clock record. BIOMETRIC is integration-gated on a terminal feed
+// (PRD §5); until wired, entries are MANUAL or from the mobile app.
+enum AttendanceSource {
+  MANUAL
+  MOBILE
+  BIOMETRIC
+}
+
+enum TimesheetStatus {
+  OPEN // accruing entries for the period
+  SUBMITTED // sent for approval; entries locked
+  APPROVED // approved; overtime available to payroll
+  REJECTED
+}
+
 // ───────────────────────── Multi-company (M34) ─────────────────────────
 
 // A legal entity / tenant. Its `code` is the `dataAreaId` used to partition every
@@ -440,13 +525,14 @@ model Vehicle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  maintenances VehicleMaintenance[]
-  dispatches   Dispatch[]
-  trips        Trip[]
-  position     VehiclePosition?
-  version      Int                  @default(0) // optimistic concurrency (PRD §7.1)
-  createdById  String? // audit: creator user id
-  updatedById  String? // audit: last-modifier user id
+  maintenances  VehicleMaintenance[]
+  serviceOrders ServiceOrder[]
+  dispatches    Dispatch[]
+  trips         Trip[]
+  position      VehiclePosition?
+  version       Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById   String? // audit: creator user id
+  updatedById   String? // audit: last-modifier user id
 
   @@index([status])
   @@index([dataAreaId])
@@ -684,18 +770,21 @@ model JournalEntry {
   lines JournalLine[]
 
   // Reverse links from freight settlements (a posting may settle an order or expense).
-  orderInvoice           Order?           @relation("OrderInvoice")
-  tripExpense            TripExpense?     @relation("TripExpenseEntry")
+  orderInvoice           Order?             @relation("OrderInvoice")
+  tripExpense            TripExpense?       @relation("TripExpenseEntry")
   // AP / AR settlement links.
-  vendorInvoicePosting   VendorInvoice?   @relation("VendorInvoicePosting")
-  vendorPayment          VendorPayment?   @relation("VendorPaymentEntry")
-  customerInvoicePosting CustomerInvoice? @relation("CustomerInvoicePosting")
-  customerReceipt        CustomerReceipt? @relation("CustomerReceiptEntry")
-  moneyTransfer          MoneyTransfer?   @relation("MoneyTransferEntry")
-  stockMovement          StockMovement?   @relation("StockMovementPosting")
-  payRun                 PayRun?          @relation("PayRunPosting")
-  expenseClaim           ExpenseClaim?    @relation("ExpenseClaimPosting")
-  version                Int              @default(0) // optimistic concurrency (PRD §7.1)
+  vendorInvoicePosting   VendorInvoice?     @relation("VendorInvoicePosting")
+  vendorPayment          VendorPayment?     @relation("VendorPaymentEntry")
+  customerInvoicePosting CustomerInvoice?   @relation("CustomerInvoicePosting")
+  customerReceipt        CustomerReceipt?   @relation("CustomerReceiptEntry")
+  moneyTransfer          MoneyTransfer?     @relation("MoneyTransferEntry")
+  stockMovement          StockMovement?     @relation("StockMovementPosting")
+  payRun                 PayRun?            @relation("PayRunPosting")
+  expenseClaim           ExpenseClaim?      @relation("ExpenseClaimPosting")
+  depreciationEntry      DepreciationEntry? @relation("DepreciationPosting")
+  assetDisposal          FixedAsset?        @relation("AssetDisposalPosting")
+  serviceOrder           ServiceOrder?      @relation("ServiceOrderPosting")
+  version                Int                @default(0) // optimistic concurrency (PRD §7.1)
   updatedById            String? // audit: last-modifier user id
 
   @@unique([dataAreaId, voucherNumber])
@@ -848,6 +937,7 @@ model Vendor {
 
   invoices       VendorInvoice[]
   purchaseOrders PurchaseOrder[]
+  serviceOrders  ServiceOrder[]
   version        Int             @default(0) // optimistic concurrency (PRD §7.1)
   createdById    String? // audit: creator user id
   updatedById    String? // audit: last-modifier user id
@@ -1239,12 +1329,13 @@ model StockItem {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  movements   StockMovement[]
-  poLines     PurchaseOrderLine[]
-  balances    StockBalance[]
-  version     Int                 @default(0) // optimistic concurrency (PRD §7.1)
-  createdById String? // audit
-  updatedById String? // audit
+  movements    StockMovement[]
+  poLines      PurchaseOrderLine[]
+  balances     StockBalance[]
+  serviceParts ServicePart[]
+  version      Int                 @default(0) // optimistic concurrency (PRD §7.1)
+  createdById  String? // audit
+  updatedById  String? // audit
 
   @@unique([dataAreaId, code])
   @@index([category])
@@ -1428,9 +1519,15 @@ model Employee {
   driverId    String?        @unique
   driver      Driver?        @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
-  payslips  Payslip[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  payslips      Payslip[]
+  contracts     EmploymentContract[]
+  leaveRequests LeaveRequest[]
+  leaveBalances LeaveBalance[]
+  documents     EmployeeDocument[]
+  timeEntries   TimeEntry[]
+  timesheets    Timesheet[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 
   version     Int     @default(0) // optimistic concurrency (PRD §7.1)
   createdById String?
@@ -1544,4 +1641,343 @@ model ExpenseLine {
 
   @@index([expenseClaimId])
   @@map("expense_lines")
+}
+
+// ── Fixed Assets (M20) ──────────────────────────────────────────────────────
+// Asset register with straight-line depreciation. Each depreciation run posts
+// Dr Depreciation Expense (5200) / Cr Accumulated Depreciation (1510). Disposal
+// removes the asset's cost + accumulated depreciation and books gain (4900) or
+// loss (6900) against proceeds. Multi-tenant via dataAreaId.
+model FixedAsset {
+  id         String        @id @default(cuid())
+  dataAreaId String        @default("HQ01")
+  code       String // human asset tag, unique within a company
+  name       String
+  category   AssetCategory @default(EQUIPMENT)
+  status     AssetStatus   @default(ACTIVE)
+
+  acquisitionCost  Decimal  @db.Decimal(18, 2)
+  residualValue    Decimal  @default(0) @db.Decimal(18, 2) // salvage value at end of life
+  usefulLifeMonths Int // straight-line depreciation period
+  acquisitionDate  DateTime @db.Date
+  inServiceDate    DateTime @db.Date // depreciation starts from here
+
+  accumulatedDepreciation Decimal @default(0) @db.Decimal(18, 2) // running total, kept in sync with entries
+  lastDepreciatedPeriod   String? // "YYYY-MM" of the most recent run; guards double-posting
+
+  // GL account codes this asset posts against (defaulted from category, overridable).
+  assetAccountCode String @default("1500")
+  accumDepCode     String @default("1510")
+  expenseCode      String @default("5200")
+
+  // Disposal outcome (set once when status → DISPOSED).
+  disposalDate     DateTime?     @db.Date
+  disposalProceeds Decimal?      @db.Decimal(18, 2)
+  disposalEntryId  String?       @unique
+  disposalEntry    JournalEntry? @relation("AssetDisposalPosting", fields: [disposalEntryId], references: [id], onDelete: SetNull)
+
+  entries DepreciationEntry[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, code])
+  @@index([dataAreaId])
+  @@index([dataAreaId, status])
+  @@map("fixed_assets")
+}
+
+model DepreciationEntry {
+  id           String     @id @default(cuid())
+  dataAreaId   String     @default("HQ01")
+  fixedAssetId String
+  fixedAsset   FixedAsset @relation(fields: [fixedAssetId], references: [id], onDelete: Cascade)
+
+  period         String // "YYYY-MM" the depreciation belongs to
+  amount         Decimal @db.Decimal(18, 2) // depreciation charged this period
+  bookValueAfter Decimal @db.Decimal(18, 2) // net book value after this charge
+
+  journalEntryId String?       @unique
+  journalEntry   JournalEntry? @relation("DepreciationPosting", fields: [journalEntryId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([fixedAssetId, period]) // one depreciation charge per asset per month
+  @@index([dataAreaId])
+  @@index([fixedAssetId])
+  @@map("depreciation_entries")
+}
+
+// ── Service Management (M22) ────────────────────────────────────────────────
+// Workshop service orders for the fleet. Parts are drawn from Inventory (each
+// ServicePart issues stock via the inventory service, which posts Dr Maintenance
+// (5100) / Cr Inventory (1300) and relieves the item). Labor is tracked per line;
+// external (vendor) labor accrues to the ledger when the order is posted
+// (Dr Maintenance 5100 / Cr Accrued 2300). Internal labor is a memo cost only,
+// since own mechanics are already paid through Payroll. Multi-tenant via dataAreaId.
+model ServiceOrder {
+  id          String             @id @default(cuid())
+  dataAreaId  String             @default("HQ01")
+  orderNumber String
+  vehicleId   String
+  vehicle     Vehicle            @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  kind        ServiceKind        @default(INTERNAL)
+  status      ServiceOrderStatus @default(OPEN)
+
+  // External garage (only when kind = EXTERNAL).
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  odometerKm Int? // reading at service time
+  fault      String // reported problem / service reason
+  currency   String @default("USD")
+
+  // Cost rollups, kept in sync as parts/labor are added.
+  partsCost Decimal @default(0) @db.Decimal(18, 2)
+  laborCost Decimal @default(0) @db.Decimal(18, 2)
+  totalCost Decimal @default(0) @db.Decimal(18, 2)
+
+  // The labor-accrual posting created when an EXTERNAL order is posted.
+  postingEntryId String?       @unique
+  postingEntry   JournalEntry? @relation("ServiceOrderPosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
+
+  openedAt    DateTime  @default(now())
+  completedAt DateTime?
+
+  parts ServicePart[]
+  labor ServiceLabor[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, orderNumber])
+  @@index([dataAreaId])
+  @@index([dataAreaId, status])
+  @@index([vehicleId])
+  @@map("service_orders")
+}
+
+// A part consumed on a service order. Issuing it relieves inventory and posts the
+// cost; the link to the resulting StockMovement records the trail.
+model ServicePart {
+  id             String       @id @default(cuid())
+  dataAreaId     String       @default("HQ01")
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  description String
+  quantity    Decimal   @db.Decimal(18, 3)
+  unitCost    Decimal   @db.Decimal(18, 2) // average cost at issue
+  totalCost   Decimal   @db.Decimal(18, 2)
+
+  // The inventory movement this part created (posts the GL relief).
+  stockMovementId String? @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([serviceOrderId])
+  @@index([dataAreaId])
+  @@map("service_parts")
+}
+
+// A labor line on a service order (own mechanic or external technician).
+model ServiceLabor {
+  id             String       @id @default(cuid())
+  dataAreaId     String       @default("HQ01")
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+
+  description String
+  hours       Decimal @db.Decimal(10, 2)
+  rate        Decimal @db.Decimal(18, 2) // per-hour rate
+  amount      Decimal @db.Decimal(18, 2) // hours × rate
+
+  createdAt DateTime @default(now())
+
+  @@index([serviceOrderId])
+  @@index([dataAreaId])
+  @@map("service_labor")
+}
+
+// ── Human Resources (M24) ──────────────────────────────────────────────────
+// Layers contract history, leave management, and document-expiry tracking on top
+// of the Employee record (which Payroll M9 already uses). Multi-tenant via
+// dataAreaId. Activating a contract syncs the employee's current salary/status;
+// approving a paid leave request deducts from that year's LeaveBalance.
+model EmploymentContract {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type        EmploymentType @default(PERMANENT)
+  status      ContractStatus @default(DRAFT)
+  title       String // job title / position
+  grossSalary Decimal        @db.Decimal(18, 2) // monthly gross under this contract
+  currency    String         @default("USD")
+  startDate   DateTime       @db.Date
+  endDate     DateTime?      @db.Date // required for FIXED_TERM / PROBATION
+  note        String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId])
+  @@index([employeeId])
+  @@index([dataAreaId, status])
+  @@map("employment_contracts")
+}
+
+model LeaveRequest {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type      LeaveType   @default(ANNUAL)
+  status    LeaveStatus @default(PENDING)
+  startDate DateTime    @db.Date
+  endDate   DateTime    @db.Date
+  days      Int // working days requested (weekends excluded)
+  reason    String?
+
+  reviewedById String?
+  reviewedAt   DateTime?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId])
+  @@index([employeeId])
+  @@index([dataAreaId, status])
+  @@map("leave_requests")
+}
+
+// One row per employee / leave type / leave-year. `remaining` is derived
+// (entitled − taken) and enforced when a paid request is approved.
+model LeaveBalance {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type     LeaveType
+  year     Int // leave year, e.g. 2026
+  entitled Int       @default(0) // days granted for the year
+  taken    Int       @default(0) // days consumed by approved requests
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, type, year])
+  @@index([dataAreaId])
+  @@map("leave_balances")
+}
+
+model EmployeeDocument {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type      EmployeeDocType
+  number    String? // document / certificate number
+  issuedAt  DateTime?       @db.Date
+  expiresAt DateTime?       @db.Date // null = never expires (e.g. a certificate)
+  fileUrl   String? // uploaded scan (/uploads/…)
+  note      String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, type])
+  @@index([dataAreaId])
+  @@index([expiresAt])
+  @@map("employee_documents")
+}
+
+// ── Time & Attendance (M26) ─────────────────────────────────────────────────
+// Clock-in/out records per employee, rolled up into a monthly Timesheet. An
+// approved timesheet's overtime pay is picked up by the Payroll (M9) compute as
+// an addition to base salary (taxable). Multi-tenant via dataAreaId. Biometric
+// terminal ingestion is integration-gated (PRD §5); entries are MANUAL/MOBILE
+// until a feed is wired.
+model TimeEntry {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  workDate DateTime         @db.Date
+  clockIn  DateTime
+  clockOut DateTime? // null = still clocked in
+  source   AttendanceSource @default(MANUAL)
+  note     String?
+
+  // Set when the entry is rolled into a submitted/approved timesheet.
+  timesheetId String?
+  timesheet   Timesheet? @relation(fields: [timesheetId], references: [id], onDelete: SetNull)
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId])
+  @@index([employeeId, workDate])
+  @@index([timesheetId])
+  @@map("time_entries")
+}
+
+// One timesheet per employee per pay period (YYYY-MM). Regular/overtime split is
+// computed from that period's completed time entries against a standard workday.
+model Timesheet {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  period        String // "YYYY-MM"
+  status        TimesheetStatus @default(OPEN)
+  regularHours  Decimal         @default(0) @db.Decimal(10, 2)
+  overtimeHours Decimal         @default(0) @db.Decimal(10, 2)
+  overtimeRate  Decimal         @default(0) @db.Decimal(18, 2) // per-hour OT pay rate
+  overtimePay   Decimal         @default(0) @db.Decimal(18, 2) // overtimeHours × overtimeRate
+
+  reviewedById String?
+  reviewedAt   DateTime?
+
+  entries TimeEntry[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, period])
+  @@index([dataAreaId])
+  @@index([dataAreaId, status])
+  @@map("timesheets")
 }

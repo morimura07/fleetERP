@@ -9,6 +9,7 @@ import {
   Percent, AlarmClock,
   Landmark, PiggyBank, Combine, Coins,
   ShieldCheck, MapPin, Boxes, ShoppingCart, BadgeDollarSign, Warehouse, Receipt,
+  Building, Wrench, UserCog, Clock,
 } from "lucide-react";
 import { cn } from "@frontend/lib/utils";
 import { can, type Permission, type Role } from "@frontend/lib/rbac";
@@ -48,6 +49,7 @@ const GROUPS: NavGroup[] = [
       { href: "/payments", label: "Payments", icon: Wallet, perm: "payment:read" },
       { href: "/payroll", label: "Payroll", icon: BadgeDollarSign, perm: "payroll:read" },
       { href: "/expenses", label: "Expenses", icon: Receipt, perm: "expense:read" },
+      { href: "/assets", label: "Fixed Assets", icon: Building, perm: "asset:read" },
     ],
   },
   {
@@ -55,11 +57,14 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/drivers", label: "Drivers", icon: Users, perm: "driver:read" },
       { href: "/vehicles", label: "Vehicles", icon: Truck, perm: "vehicle:read" },
+      { href: "/service", label: "Service Orders", icon: Wrench, perm: "service:read" },
       { href: "/clients", label: "Clients", icon: Building2, perm: "client:read" },
       { href: "/inventory", label: "Inventory", icon: Boxes, perm: "inventory:read" },
       { href: "/warehouses", label: "Warehouses", icon: Warehouse, perm: "warehouse:read" },
       { href: "/procurement", label: "Procurement", icon: ShoppingCart, perm: "procurement:read" },
       { href: "/compliance", label: "Compliance", icon: ShieldCheck, perm: "compliance:read" },
+      { href: "/hr", label: "Human Resources", icon: UserCog, perm: "hr:read" },
+      { href: "/attendance", label: "Time & Attendance", icon: Clock, perm: "attendance:read" },
       { href: "/waypoints", label: "GPS Waypoints", icon: MapPin, perm: "waypoint:read" },
       { href: "/reports", label: "Daily Reports", icon: FileText, perm: "report:read" },
     ],

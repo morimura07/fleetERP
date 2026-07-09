@@ -28,6 +28,17 @@ import type {
   EmployeeStatus,
   PayRunStatus,
   ExpenseClaimStatus,
+  AssetCategory,
+  AssetStatus,
+  ServiceOrderStatus,
+  ServiceKind,
+  EmploymentType,
+  ContractStatus,
+  LeaveType,
+  LeaveStatus,
+  EmployeeDocType,
+  AttendanceSource,
+  TimesheetStatus,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -364,5 +375,117 @@ export const EXPENSE_STATUS_VARIANT: Record<ExpenseClaimStatus, BadgeVariant> = 
   SUBMITTED: "info",
   APPROVED: "warning",
   POSTED: "success",
+  REJECTED: "destructive",
+};
+
+export const ASSET_CATEGORY_LABEL: Record<AssetCategory, string> = {
+  VEHICLE: "Vehicle",
+  EQUIPMENT: "Equipment",
+  FURNITURE: "Furniture & Fixtures",
+  BUILDING: "Building",
+  IT: "IT & Computers",
+  OTHER: "Other",
+};
+
+export const ASSET_STATUS_LABEL: Record<AssetStatus, string> = {
+  ACTIVE: "Active",
+  FULLY_DEPRECIATED: "Fully depreciated",
+  DISPOSED: "Disposed",
+};
+
+export const ASSET_STATUS_VARIANT: Record<AssetStatus, BadgeVariant> = {
+  ACTIVE: "success",
+  FULLY_DEPRECIATED: "info",
+  DISPOSED: "secondary",
+};
+
+export const SERVICE_STATUS_LABEL: Record<ServiceOrderStatus, string> = {
+  OPEN: "Open",
+  IN_PROGRESS: "In progress",
+  COMPLETED: "Completed",
+  POSTED: "Posted",
+  CANCELLED: "Cancelled",
+};
+
+export const SERVICE_STATUS_VARIANT: Record<ServiceOrderStatus, BadgeVariant> = {
+  OPEN: "secondary",
+  IN_PROGRESS: "info",
+  COMPLETED: "warning",
+  POSTED: "success",
+  CANCELLED: "destructive",
+};
+
+export const SERVICE_KIND_LABEL: Record<ServiceKind, string> = {
+  INTERNAL: "Own workshop",
+  EXTERNAL: "External garage",
+};
+
+export const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
+  PERMANENT: "Permanent",
+  FIXED_TERM: "Fixed term",
+  PROBATION: "Probation",
+  CONTRACTOR: "Contractor",
+};
+
+export const CONTRACT_STATUS_LABEL: Record<ContractStatus, string> = {
+  DRAFT: "Draft",
+  ACTIVE: "Active",
+  ENDED: "Ended",
+};
+
+export const CONTRACT_STATUS_VARIANT: Record<ContractStatus, BadgeVariant> = {
+  DRAFT: "secondary",
+  ACTIVE: "success",
+  ENDED: "secondary",
+};
+
+export const LEAVE_TYPE_LABEL: Record<LeaveType, string> = {
+  ANNUAL: "Annual",
+  SICK: "Sick",
+  UNPAID: "Unpaid",
+  MATERNITY: "Maternity",
+  COMPASSIONATE: "Compassionate",
+};
+
+export const LEAVE_STATUS_LABEL: Record<LeaveStatus, string> = {
+  PENDING: "Pending",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+  CANCELLED: "Cancelled",
+};
+
+export const LEAVE_STATUS_VARIANT: Record<LeaveStatus, BadgeVariant> = {
+  PENDING: "warning",
+  APPROVED: "success",
+  REJECTED: "destructive",
+  CANCELLED: "secondary",
+};
+
+export const EMPLOYEE_DOC_LABEL: Record<EmployeeDocType, string> = {
+  CONTRACT: "Contract",
+  NATIONAL_ID: "National ID",
+  PASSPORT: "Passport",
+  WORK_PERMIT: "Work permit",
+  CERTIFICATE: "Certificate",
+  OTHER: "Other",
+};
+
+export const ATTENDANCE_SOURCE_LABEL: Record<AttendanceSource, string> = {
+  MANUAL: "Manual",
+  MOBILE: "Mobile app",
+  BIOMETRIC: "Biometric",
+};
+
+export const TIMESHEET_STATUS_LABEL: Record<TimesheetStatus, string> = {
+  OPEN: "Open",
+  SUBMITTED: "Submitted",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+};
+
+export const TIMESHEET_STATUS_VARIANT: Record<TimesheetStatus, BadgeVariant> = {
+  OPEN: "secondary",
+  SUBMITTED: "info",
+  APPROVED: "success",
   REJECTED: "destructive",
 };

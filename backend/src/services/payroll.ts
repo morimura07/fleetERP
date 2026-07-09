@@ -3,6 +3,7 @@ import { prisma } from "@backend/lib/prisma";
 import { AuthError } from "@backend/lib/errors";
 import { createJournalEntry } from "@backend/services/ledger";
 import { computeStatutory } from "@backend/services/statutory";
+import { approvedOvertimeByEmployee } from "@backend/services/attendance";
 
 /**
  * Payroll (M9) — monthly pay runs with statutory deductions and ledger posting.
@@ -49,8 +50,15 @@ export async function computePayRun(
   });
   if (employees.length === 0) throw new AuthError("No active employees to run payroll for", 422);
 
+  // Approved overtime for this period (Time & Attendance M26) is added to base
+  // salary as taxable earnings before statutory deductions are computed.
+  const period = `${year}-${String(month).padStart(2, "0")}`;
+  const overtime = await approvedOvertimeByEmployee(dataAreaId, period);
+
   const slips = employees.map((e) => {
-    const s = computeStatutory(e.grossSalary, e.country);
+    const ot = overtime.get(e.id) ?? new Prisma.Decimal(0);
+    const grossWithOt = new Prisma.Decimal(e.grossSalary).plus(ot);
+    const s = computeStatutory(grossWithOt, e.country);
     return {
       employeeId: e.id,
       gross: s.gross.toFixed(2),

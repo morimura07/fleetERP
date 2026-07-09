@@ -65,6 +65,18 @@ export type Permission =
   | "expense:read" // expense claims / cash sheets (M23)
   | "expense:write"
   | "expense:approve" // approve & post claims
+  | "asset:read" // fixed asset register (M20)
+  | "asset:write"
+  | "asset:approve" // run depreciation & dispose assets
+  | "service:read" // workshop service orders (M22)
+  | "service:write"
+  | "service:approve" // complete & post service orders
+  | "hr:read" // HR: contracts, leave, documents (M24)
+  | "hr:write"
+  | "hr:approve" // approve leave & activate contracts
+  | "attendance:read" // time & attendance (M26)
+  | "attendance:write"
+  | "attendance:approve" // approve timesheets (feed payroll)
   | "fx:read" // exchange rates (M8 multi-currency)
   | "fx:write"
   | "consolidation:read" // subsidiary→parent mapping & rollup (M5)
@@ -136,6 +148,18 @@ const ALL: Permission[] = [
   "expense:read",
   "expense:write",
   "expense:approve",
+  "asset:read",
+  "asset:write",
+  "asset:approve",
+  "service:read",
+  "service:write",
+  "service:approve",
+  "hr:read",
+  "hr:write",
+  "hr:approve",
+  "attendance:read",
+  "attendance:write",
+  "attendance:approve",
   "fx:read",
   "fx:write",
   "consolidation:read",
@@ -186,6 +210,11 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "procurement:write",
     "expense:read",
     "expense:write",
+    "service:read",
+    "service:write",
+    "service:approve",
+    "attendance:read",
+    "attendance:write",
     "fx:read",
     "compliance:read",
     "waypoint:read",
@@ -237,6 +266,17 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "expense:read",
     "expense:write",
     "expense:approve",
+    "asset:read",
+    "asset:write",
+    "asset:approve",
+    "service:read",
+    "service:approve",
+    "hr:read",
+    "hr:write",
+    "hr:approve",
+    "attendance:read",
+    "attendance:write",
+    "attendance:approve",
     "fx:read",
     "fx:write",
     "consolidation:read",
