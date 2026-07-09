@@ -21,10 +21,39 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+/**
+ * Guard against a dialog dismissing itself when the user closes a popover that a
+ * control inside it opened — a Select, Dropdown, or Popover. Those render in their
+ * own portal, and dismissing them fires an outside-interaction that bubbles to the
+ * dialog. By the time the dialog's handler runs Radix has already torn the popover
+ * down, so we can't inspect it there. Instead we watch pointerdown in the capture
+ * phase (which fires *before* Radix closes anything) and remember when the pointer
+ * last went down while a popper was open. The dialog then ignores an outside-close
+ * that lands within a short window of that. */
+const POPPER_SELECTOR =
+  "[data-radix-popper-content-wrapper],[data-radix-select-viewport],[data-radix-menu-content],[data-radix-popover-content]";
+let lastPopperPointerDown = 0;
+
+if (typeof document !== "undefined" && !(window as any).__dlgPopperGuard) {
+  (window as any).__dlgPopperGuard = true;
+  document.addEventListener(
+    "pointerdown",
+    () => {
+      if (document.querySelector(POPPER_SELECTOR)) lastPopperPointerDown = Date.now();
+    },
+    true, // capture: runs before Radix's own dismiss logic
+  );
+}
+
+/** True if the pointer went down while a popper was open, within the last ~300ms. */
+function popperWasJustOpen(): boolean {
+  return Date.now() - lastPopperPointerDown < 300;
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onInteractOutside, onPointerDownOutside, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -33,6 +62,14 @@ const DialogContent = React.forwardRef<
         "fixed left-[50%] top-[50%] z-50 grid max-h-[90vh] w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-2xl shadow-black/40 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         className,
       )}
+      onPointerDownOutside={(e) => {
+        if (popperWasJustOpen()) e.preventDefault();
+        onPointerDownOutside?.(e);
+      }}
+      onInteractOutside={(e) => {
+        if (popperWasJustOpen()) e.preventDefault();
+        onInteractOutside?.(e);
+      }}
       {...props}
     >
       {children}
