@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { customerSchema, type CustomerInput } from "@frontend/lib/validations";
-import { CUSTOMER_ACCOUNT_GROUP_LABEL, PAYMENT_TERM_LABEL, PARTY_STATUS_LABEL } from "@frontend/lib/labels";
+import { CUSTOMER_ACCOUNT_GROUP_LABEL, PAYMENT_TERM_LABEL, PARTY_STATUS_LABEL, INCOTERMS_OPTIONS } from "@frontend/lib/labels";
+import { OptionSelect } from "@frontend/components/ui/option-select";
 import type { CustomerAccountGroup, PaymentTerm, PartyStatus } from "@frontend/lib/enums";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 
@@ -127,7 +128,7 @@ export function CustomersManager() {
             <FormSection title="Freight Profile & Preferences">
               <div className="space-y-1.5"><Label>Shipping Conditions</Label><Input placeholder="Immediate / Normal" {...form.register("shippingConditions")} /></div>
               <div className="space-y-1.5"><Label>Means of Transport</Label><Input placeholder="FTL / Reefer…" {...form.register("meansOfTransport")} /></div>
-              <div className="space-y-1.5"><Label>Incoterms</Label><Input placeholder="FOB / CIF / EXW" {...form.register("incoterms")} /></div>
+              <div className="space-y-1.5"><Label>Incoterms</Label><OptionSelect value={form.watch("incoterms")} onChange={(v) => form.setValue("incoterms", v)} options={INCOTERMS_OPTIONS} placeholder="FOB / CIF…" /></div>
               <div className="space-y-1.5"><Label>Preferred Carrier</Label><Input {...form.register("preferredCarrier")} /></div>
               <div className="space-y-1.5"><Label>Communication Language</Label><Input {...form.register("communicationLang")} /></div>
               <div className="space-y-1.5 md:col-span-2"><Label>Dock / Access Restrictions</Label><Input {...form.register("dockRestrictions")} /></div>

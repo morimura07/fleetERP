@@ -10,10 +10,11 @@ import { Label } from "@frontend/components/ui/label";
 import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
+import { OptionSelect } from "@frontend/components/ui/option-select";
 import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { stockItemSchema, type StockItemInput } from "@frontend/lib/validations";
-import { STOCK_CATEGORY_LABEL, STOCK_UNIT_LABEL } from "@frontend/lib/labels";
+import { STOCK_CATEGORY_LABEL, STOCK_UNIT_LABEL, VALUATION_METHOD_OPTIONS, PART_CONDITION_OPTIONS } from "@frontend/lib/labels";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 import type { StockCategory, StockUnit } from "@frontend/lib/enums";
 
@@ -135,7 +136,7 @@ export function InventoryManager() {
               <div className="space-y-1.5"><Label>OEM Part No.</Label><Input {...form.register("oemPartNumber")} /></div>
               <div className="space-y-1.5"><Label>Supplier Part No.</Label><Input {...form.register("supplierPartNumber")} /></div>
               <div className="space-y-1.5"><Label>Applicable Fleet</Label><Input placeholder="Scania R450…" {...form.register("applicableFleet")} /></div>
-              <div className="space-y-1.5"><Label>Part Condition</Label><Input placeholder="New / Rebuilt…" {...form.register("partCondition")} /></div>
+              <div className="space-y-1.5"><Label>Part Condition</Label><OptionSelect value={form.watch("partCondition")} onChange={(v) => form.setValue("partCondition", v)} options={PART_CONDITION_OPTIONS} placeholder="Select condition" /></div>
               <div className="space-y-1.5"><Label>Asset Serial No.</Label><Input {...form.register("assetSerialNo")} /></div>
               <label className="col-span-2 flex items-center gap-2 text-sm text-muted-foreground">
                 <input type="checkbox" {...form.register("hazmat")} /> Hazardous material
@@ -147,7 +148,7 @@ export function InventoryManager() {
               <div className="space-y-1.5"><Label>Last Purchase Price</Label><Input inputMode="decimal" {...form.register("lastPurchasePrice")} /></div>
               <div className="space-y-1.5"><Label>Default Vendor</Label><Input {...form.register("defaultVendor")} /></div>
               <div className="space-y-1.5"><Label>Tax Code</Label><Input {...form.register("taxCode")} /></div>
-              <div className="space-y-1.5"><Label>Valuation Method</Label><Input placeholder="AVERAGE / FIFO / LIFO" {...form.register("valuationMethod")} /></div>
+              <div className="space-y-1.5"><Label>Valuation Method</Label><OptionSelect value={form.watch("valuationMethod")} onChange={(v) => form.setValue("valuationMethod", v)} options={VALUATION_METHOD_OPTIONS} placeholder="AVERAGE" /></div>
             </FormSection>
 
             <FormSection title="Warehousing & Location">

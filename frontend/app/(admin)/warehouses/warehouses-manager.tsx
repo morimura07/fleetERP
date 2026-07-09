@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { warehouseSchema, type WarehouseInput } from "@frontend/lib/validations";
-import { FACILITY_TYPE_LABEL } from "@frontend/lib/labels";
+import { FACILITY_TYPE_LABEL, DOCK_SCHEDULING_OPTIONS, PUTAWAY_STRATEGY_OPTIONS, PICKING_STRATEGY_OPTIONS, COUNT_METHOD_OPTIONS } from "@frontend/lib/labels";
+import { OptionSelect } from "@frontend/components/ui/option-select";
 import type { FacilityType } from "@frontend/lib/enums";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 
@@ -110,16 +111,16 @@ export function WarehousesManager({ items, warehouses }: { items: Item[]; wareho
               <div className="space-y-1.5"><Label>Phone</Label><Input {...form.register("phone")} /></div>
               <div className="space-y-1.5"><Label>Email</Label><Input type="email" {...form.register("email")} /></div>
               <div className="space-y-1.5"><Label>Dock Capacity (doors)</Label><Input type="number" {...form.register("dockCapacity")} /></div>
-              <div className="space-y-1.5"><Label>Dock Scheduling</Label><Input placeholder="appointment / open-arrival" {...form.register("dockScheduling")} /></div>
+              <div className="space-y-1.5"><Label>Dock Scheduling</Label><OptionSelect value={form.watch("dockScheduling")} onChange={(v) => form.setValue("dockScheduling", v)} options={DOCK_SCHEDULING_OPTIONS} /></div>
               <div className="space-y-1.5"><Label>Operating Hours</Label><Input {...form.register("operatingHours")} /></div>
             </FormSection>
 
             <FormSection title="Capacity & Control Rules">
               <div className="space-y-1.5"><Label>Storage Types</Label><Input placeholder="Bulk / Rack / Cold / Hazmat" {...form.register("storageTypes")} /></div>
               <div className="space-y-1.5"><Label>Capacity Limit</Label><Input placeholder="max weight / volume / pallets" {...form.register("capacityLimit")} /></div>
-              <div className="space-y-1.5"><Label>Putaway Strategy</Label><Input placeholder="fixed bin / closest to dock" {...form.register("putawayStrategy")} /></div>
-              <div className="space-y-1.5"><Label>Picking Strategy</Label><Input placeholder="FIFO / LIFO" {...form.register("pickingStrategy")} /></div>
-              <div className="space-y-1.5"><Label>Count Method</Label><Input placeholder="Cycle / Annual / Continuous" {...form.register("countMethod")} /></div>
+              <div className="space-y-1.5"><Label>Putaway Strategy</Label><OptionSelect value={form.watch("putawayStrategy")} onChange={(v) => form.setValue("putawayStrategy", v)} options={PUTAWAY_STRATEGY_OPTIONS} /></div>
+              <div className="space-y-1.5"><Label>Picking Strategy</Label><OptionSelect value={form.watch("pickingStrategy")} onChange={(v) => form.setValue("pickingStrategy", v)} options={PICKING_STRATEGY_OPTIONS} /></div>
+              <div className="space-y-1.5"><Label>Count Method</Label><OptionSelect value={form.watch("countMethod")} onChange={(v) => form.setValue("countMethod", v)} options={COUNT_METHOD_OPTIONS} /></div>
             </FormSection>
 
             <DialogFooter><Button type="submit" disabled={form.formState.isSubmitting}>Save</Button></DialogFooter>

@@ -17,7 +17,8 @@ import {
 import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { orderSchema, type OrderInput } from "@frontend/lib/validations";
-import { ORDER_STATUS_LABEL, ORDER_STATUS_VARIANT, CORRIDOR_LABEL, EQUIPMENT_TYPE_LABEL, PAYMENT_TERM_LABEL } from "@frontend/lib/labels";
+import { ORDER_STATUS_LABEL, ORDER_STATUS_VARIANT, CORRIDOR_LABEL, EQUIPMENT_TYPE_LABEL, PAYMENT_TERM_LABEL, INCOTERMS_OPTIONS } from "@frontend/lib/labels";
+import { OptionSelect } from "@frontend/components/ui/option-select";
 import { formatDate } from "@frontend/lib/utils";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 import type { OrderStatus, CorridorType, EquipmentType, PaymentTerm } from "@frontend/lib/enums";
@@ -150,7 +151,7 @@ export function OrdersManager({ clients }: { clients: Client[] }) {
             <FormSection title="Organizational & Terms">
               <div className="space-y-1.5"><Label>Branch / Division</Label><Input {...form.register("branch")} /></div>
               <div className="space-y-1.5"><Label>Salesperson</Label><Input {...form.register("salesperson")} /></div>
-              <div className="space-y-1.5"><Label>Incoterms</Label><Input placeholder="FOB / CIF / EXW" {...form.register("incoterms")} /></div>
+              <div className="space-y-1.5"><Label>Incoterms</Label><OptionSelect value={form.watch("incoterms")} onChange={(v) => form.setValue("incoterms", v)} options={INCOTERMS_OPTIONS} placeholder="FOB / CIF…" /></div>
               <div className="space-y-1.5">
                 <Label>Payment Terms</Label>
                 <Select value={form.watch("paymentTerm")} onValueChange={(v) => form.setValue("paymentTerm", v as PaymentTerm)}>

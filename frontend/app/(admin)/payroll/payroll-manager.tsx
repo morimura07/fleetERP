@@ -16,7 +16,9 @@ import { useToast } from "@frontend/components/ui/toast";
 import { employeeSchema, type EmployeeInput } from "@frontend/lib/validations";
 import {
   EMPLOYEE_STATUS_LABEL, EMPLOYEE_STATUS_VARIANT, PAYRUN_STATUS_LABEL, PAYRUN_STATUS_VARIANT,
+  PAY_FREQUENCY_OPTIONS, EMPLOYMENT_TYPE_OPTIONS,
 } from "@frontend/lib/labels";
+import { OptionSelect } from "@frontend/components/ui/option-select";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 import type { EmployeeStatus, PayRunStatus } from "@frontend/lib/enums";
 
@@ -104,10 +106,10 @@ function EmployeesTab() {
 
             <FormSection title="Role & Master Data">
               <div className="space-y-1.5"><Label>Job Title</Label><Input placeholder="Long-Haul Driver…" {...form.register("jobTitle")} /></div>
-              <div className="space-y-1.5"><Label>Employment Type</Label><Input placeholder="Full-time / Contract" {...form.register("employmentType")} /></div>
+              <div className="space-y-1.5"><Label>Employment Type</Label><OptionSelect value={form.watch("employmentType")} onChange={(v) => form.setValue("employmentType", v)} options={EMPLOYMENT_TYPE_OPTIONS} /></div>
               <div className="space-y-1.5"><Label>Department</Label><Input {...form.register("department")} /></div>
               <div className="space-y-1.5"><Label>Cost Center</Label><Input {...form.register("costCenter")} /></div>
-              <div className="space-y-1.5"><Label>Pay Frequency</Label><Input placeholder="Monthly / Weekly" {...form.register("payFrequency")} /></div>
+              <div className="space-y-1.5"><Label>Pay Frequency</Label><OptionSelect value={form.watch("payFrequency")} onChange={(v) => form.setValue("payFrequency", v)} options={PAY_FREQUENCY_OPTIONS} /></div>
               <div className="space-y-1.5"><Label>NSSF Number</Label><Input {...form.register("nssfNumber")} /></div>
               <div className="space-y-1.5"><Label>SHIF Number</Label><Input {...form.register("shifNumber")} /></div>
             </FormSection>

@@ -655,3 +655,16 @@ export const TIMESHEET_STATUS_VARIANT: Record<TimesheetStatus, BadgeVariant> = {
   APPROVED: "success",
   REJECTED: "destructive",
 };
+
+// ── Fixed-choice option lists for fields the client spec enumerates but the
+// backend stores as free strings (so they need dropdowns, not enum columns). ──
+export const INCOTERMS_OPTIONS = ["EXW", "FOB", "CIF", "CFR", "DAP", "DDP", "FCA", "CPT"] as const;
+export const VALUATION_METHOD_OPTIONS = ["AVERAGE", "FIFO", "LIFO"] as const;
+export const PART_CONDITION_OPTIONS = ["New", "Rebuilt", "Remanufactured", "Used"] as const;
+export const DOCK_SCHEDULING_OPTIONS = ["Appointment", "Open-arrival"] as const;
+export const PUTAWAY_STRATEGY_OPTIONS = ["Fixed bin", "Empty bin", "Closest to dock"] as const;
+export const PICKING_STRATEGY_OPTIONS = ["FIFO", "LIFO", "Partial pallet"] as const;
+export const COUNT_METHOD_OPTIONS = ["Annual", "Cycle counting", "Continuous"] as const;
+export const GENDER_OPTIONS = ["Male", "Female", "Other"] as const;
+export const PAY_FREQUENCY_OPTIONS = ["Weekly", "Bi-weekly", "Monthly"] as const;
+export const EMPLOYMENT_TYPE_OPTIONS = ["Full-time", "Part-time", "Contract", "Agency"] as const;

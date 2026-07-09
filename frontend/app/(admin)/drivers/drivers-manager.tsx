@@ -15,7 +15,8 @@ import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { driverSchema, type DriverInput } from "@frontend/lib/validations";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
-import { CONTRACT_LABEL, DRIVER_STATUS_LABEL, DRIVER_TYPE_LABEL } from "@frontend/lib/labels";
+import { CONTRACT_LABEL, DRIVER_STATUS_LABEL, DRIVER_TYPE_LABEL, GENDER_OPTIONS } from "@frontend/lib/labels";
+import { OptionSelect } from "@frontend/components/ui/option-select";
 import { formatDate } from "@frontend/lib/utils";
 import type { DriverStatus, ContractType, DriverType } from "@frontend/lib/enums";
 
@@ -134,7 +135,7 @@ export function DriversManager() {
 
             <FormSection title="Identity & Contact">
               <div className="space-y-1.5"><Label>Date of Birth</Label><Input type="date" {...form.register("dateOfBirth")} /></div>
-              <div className="space-y-1.5"><Label>Gender</Label><Input {...form.register("gender")} /></div>
+              <div className="space-y-1.5"><Label>Gender</Label><OptionSelect value={form.watch("gender")} onChange={(v) => form.setValue("gender", v)} options={GENDER_OPTIONS} /></div>
               <div className="space-y-1.5"><Label>Alt. Phone</Label><Input {...form.register("altPhone")} /></div>
               <div className="space-y-1.5"><Label>Home Terminal / Depot</Label><Input {...form.register("homeTerminal")} /></div>
               <div className="space-y-1.5 md:col-span-2"><Label>Emergency Contact</Label><Input placeholder="Name · relationship · phone" {...form.register("emergencyContact")} /></div>
