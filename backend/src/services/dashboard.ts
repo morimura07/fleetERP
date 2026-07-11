@@ -1,5 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
+import {
+  onTimeDeliveryPct, avgTransitHours, fillRatePct,
+  costPerKm, revenuePerKm, freightCostPerShipment, emptyLoadRatePct,
+  fuelEfficiencyKmPerL, maintenanceCostPerKm, breakdownRate,
+  driverTurnoverPct, billingAccuracyPct, arRecoveryPct,
+  avgTurnaroundHours, damageRatePct, avgCsat, computeNps,
+} from "@backend/services/dashboard-kpi";
 
 export interface DashboardStats {
   todayJobs: number;
@@ -179,4 +186,153 @@ export async function getExecutiveStats(): Promise<ExecutiveStats> {
     supplierObligations: { posted: postedExp.toString(), unposted: unpostedExp.toString() },
     compliance: { current, expiringSoon, expired },
   };
+}
+
+// ── Logistics KPI dashboard, grouped into the client's 5 categories ─────────
+
+export interface KpiTile {
+  key: string;
+  label: string;
+  value: string; // formatted display value
+  unit?: string; // % · USD · km/L …
+  href?: string; // drill-down link (clickable tile)
+  hint?: string; // one-line explanation
+}
+export interface KpiCategory {
+  key: string;
+  title: string;
+  tiles: KpiTile[];
+}
+export interface KpiDashboard {
+  asOf: string;
+  currency: string;
+  categories: KpiCategory[];
+}
+
+export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard> {
+  const now = new Date();
+  const [orders, trips, maint, drivers, invoices, vehicles, dockEvents, damageReports, feedback] = await Promise.all([
+    prisma.order.findMany({
+      where: { dataAreaId, status: { not: "CANCELLED" } },
+      select: { status: true, eta: true, freightAmount: true, demurrageAmount: true, grossWeightKg: true, trip: { select: { actualEnd: true } } },
+    }),
+    prisma.trip.findMany({
+      where: { dataAreaId },
+      select: {
+        status: true, mileageKm: true, transitHours: true, fuelLitres: true, orderId: true,
+        driverWages: true, tollPermitCost: true, miscExpense: true,
+        vehicle: { select: { gvwKg: true, payloadKg: true } },
+        expenses: { select: { amount: true } },
+      },
+    }),
+    prisma.vehicleMaintenance.findMany({ where: { dataAreaId }, select: { cost: true } }),
+    prisma.driver.findMany({ where: { dataAreaId }, select: { status: true } }),
+    prisma.customerInvoice.findMany({ where: { dataAreaId, status: { in: ["POSTED", "PARTIALLY_PAID", "PAID"] } }, select: { total: true, paidAmount: true, disputeStatus: true } }),
+    prisma.vehicle.count({ where: { dataAreaId } }),
+    prisma.dockEvent.findMany({ where: { dataAreaId }, select: { vehicleId: true, kind: true, eventAt: true } }),
+    prisma.damageReport.findMany({ where: { dataAreaId }, select: { damageValue: true, cargoValue: true } }),
+    prisma.customerFeedback.findMany({ where: { dataAreaId }, select: { csat: true, nps: true } }),
+  ]);
+
+  // Distance & fuel totals across trips.
+  let totalKm = new Prisma.Decimal(0), totalLitres = new Prisma.Decimal(0);
+  let tripCost = new Prisma.Decimal(0);
+  let emptyTrips = 0;
+  const completedTrips = trips.filter((t) => t.status === "COMPLETED");
+  for (const t of trips) {
+    totalKm = totalKm.plus(t.mileageKm);
+    if (t.fuelLitres) totalLitres = totalLitres.plus(t.fuelLitres);
+    const exp = t.expenses.reduce((s, e) => s.plus(e.amount), new Prisma.Decimal(0));
+    tripCost = tripCost.plus(exp).plus(t.driverWages).plus(t.tollPermitCost).plus(t.miscExpense);
+    if (!t.orderId) emptyTrips++;
+  }
+
+  // Revenue on delivered/invoiced orders.
+  let revenue = new Prisma.Decimal(0);
+  const delivered = orders.filter((o) => ["DELIVERED", "INVOICED"].includes(o.status));
+  for (const o of delivered) revenue = revenue.plus(o.freightAmount).plus(o.demurrageAmount);
+
+  // Maintenance cost total (¥ stored as Int in the legacy model — treated as amount).
+  const maintCost = maint.reduce((s, m) => s.plus(m.cost), new Prisma.Decimal(0));
+
+  // OTD data: delivered orders with an ETA and an actual delivery (trip.actualEnd).
+  const otdOrders = delivered.map((o) => ({ eta: o.eta, actualDelivery: o.trip?.actualEnd ?? null }));
+  // Fill rate: Σ order gross weight vs Σ payload of vehicles that ran a laden trip.
+  const totalOrderWeight = orders.reduce((s, o) => s.plus(o.grossWeightKg), new Prisma.Decimal(0));
+  const totalPayload = trips.reduce((s, t) => s.plus(t.orderId ? (t.vehicle?.payloadKg ?? 0) : 0), new Prisma.Decimal(0));
+
+  // Invoice recovery & billing accuracy.
+  let invoiced = new Prisma.Decimal(0), paid = new Prisma.Decimal(0), disputed = 0;
+  for (const i of invoices) {
+    invoiced = invoiced.plus(i.total);
+    paid = paid.plus(i.paidAmount);
+    if (i.disputeStatus !== "NONE") disputed++;
+  }
+
+  const terminated = drivers.filter((d) => d.status === "INACTIVE").length;
+  const busy = new Set(trips.filter((t) => ["DISPATCHED", "IN_PROGRESS"].includes(t.status)).map((t) => t.orderId)).size;
+
+  // Tier C internal KPIs. Damage rate uses the cargo value logged on the damage
+  // reports themselves as the denominator (no separate shipment-value ledger).
+  const turnaround = avgTurnaroundHours(dockEvents.map((e) => ({ vehicleId: e.vehicleId, kind: e.kind, eventAt: e.eventAt })));
+  const totalCargoValue = damageReports.reduce((s, r) => s.plus(r.cargoValue), new Prisma.Decimal(0));
+  const damageRate = damageRatePct(damageReports, totalCargoValue);
+  const csat = avgCsat(feedback);
+  const nps = computeNps(feedback);
+
+  const cats: KpiCategory[] = [
+    {
+      key: "operational", title: "Operational & Delivery",
+      tiles: [
+        { key: "otd", label: "On-Time Delivery", value: String(onTimeDeliveryPct(otdOrders)), unit: "%", href: "/orders", hint: "Delivered on/before committed ETA" },
+        { key: "transit", label: "Avg Transit Time", value: avgTransitHours(completedTrips), unit: "h", href: "/trips", hint: "Mean transit hours on completed trips" },
+        { key: "fill", label: "Load Fill Rate", value: String(fillRatePct([{ cargoKg: totalOrderWeight, capacityKg: totalPayload }])), unit: "%", href: "/trips", hint: "Cargo weight vs available payload" },
+        { key: "turnaround", label: "Truck Turnaround", value: turnaround, unit: "h", href: "/dock-events", hint: "Mean arrival→departure gap at facilities" },
+        { key: "damage", label: "Damage & Claim Rate", value: String(damageRate), unit: "%", href: "/damage-reports", hint: "Damage value ÷ cargo value" },
+        { key: "deliveries", label: "Delivered Orders", value: String(delivered.length), href: "/orders", hint: "Orders delivered or invoiced" },
+      ],
+    },
+    {
+      key: "cost", title: "Cost & Profitability",
+      tiles: [
+        { key: "cpk", label: "Cost per km", value: costPerKm(tripCost, totalKm), unit: "USD", href: "/trips", hint: "Trip cost ÷ distance" },
+        { key: "rpk", label: "Revenue per km", value: revenuePerKm(revenue, totalKm), unit: "USD", href: "/orders", hint: "Revenue ÷ distance" },
+        { key: "fcps", label: "Freight Cost / Shipment", value: freightCostPerShipment(tripCost, trips.length || 1), unit: "USD", href: "/trips", hint: "Total cost ÷ shipments" },
+        { key: "empty", label: "Empty-Load Rate", value: String(emptyLoadRatePct(emptyTrips, trips.length)), unit: "%", href: "/trips", hint: "Deadhead trips ÷ all trips" },
+      ],
+    },
+    {
+      key: "fleet", title: "Fleet & Asset Utilization",
+      tiles: [
+        { key: "util", label: "Asset Utilization", value: String(pctInt(busy, vehicles)), unit: "%", href: "/vehicles", hint: "Vehicles on an active trip ÷ fleet" },
+        { key: "fuel", label: "Fuel Efficiency", value: fuelEfficiencyKmPerL(totalKm, totalLitres), unit: "km/L", href: "/vehicles", hint: "Distance ÷ litres consumed" },
+        { key: "maintkm", label: "Maintenance / km", value: maintenanceCostPerKm(maintCost, totalKm), unit: "USD", href: "/service", hint: "Maintenance cost ÷ distance" },
+        { key: "breakdown", label: "Breakdown Rate", value: breakdownRate(maint.length, totalKm), unit: "/10k km", href: "/service", hint: "Maintenance events per 10,000 km" },
+      ],
+    },
+    {
+      key: "driver", title: "Driver & Safety",
+      tiles: [
+        { key: "active", label: "Active Drivers", value: String(drivers.filter((d) => d.status === "ACTIVE").length), href: "/drivers", hint: "Drivers currently active" },
+        { key: "turnover", label: "Driver Turnover", value: String(driverTurnoverPct(terminated, drivers.length)), unit: "%", href: "/drivers", hint: "Inactive ÷ total headcount" },
+        { key: "headcount", label: "Total Drivers", value: String(drivers.length), href: "/drivers" },
+      ],
+    },
+    {
+      key: "backoffice", title: "Customer Service & Back-Office",
+      tiles: [
+        { key: "billing", label: "Billing Accuracy", value: String(billingAccuracyPct(disputed, invoices.length)), unit: "%", href: "/receivables", hint: "Invoices with no dispute" },
+        { key: "recovery", label: "AR Recovery", value: String(arRecoveryPct(paid, invoiced)), unit: "%", href: "/collections", hint: "Collected ÷ invoiced" },
+        { key: "outstanding", label: "Outstanding AR", value: invoiced.minus(paid).toFixed(2), unit: "USD", href: "/collections", hint: "Invoiced − collected" },
+        { key: "csat", label: "CSAT", value: csat, unit: "/5", href: "/feedback", hint: "Average customer satisfaction score" },
+        { key: "nps", label: "NPS", value: String(nps), href: "/feedback", hint: "Promoters − detractors (−100…100)" },
+      ],
+    },
+  ];
+
+  return { asOf: now.toISOString().slice(0, 10), currency: "USD", categories: cats };
+}
+
+function pctInt(a: number, b: number): number {
+  return b > 0 ? Math.round((a / b) * 100) : 0;
 }

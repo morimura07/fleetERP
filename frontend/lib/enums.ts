@@ -10,6 +10,10 @@ export type Role = "ADMIN" | "DISPATCHER" | "FINANCE" | "DRIVER" | "STAFF";
 export type DriverStatus = "ACTIVE" | "VACATION" | "INACTIVE";
 export type ContractType = "EMPLOYEE" | "CONTRACTOR" | "PARTTIME";
 export type VehicleStatus = "AVAILABLE" | "MAINTENANCE" | "UNAVAILABLE";
+export type DriverType = "COMPANY" | "OWNER_OPERATOR" | "SUBCONTRACTOR";
+export type OwnershipStatus = "OWNED" | "LEASED" | "SUBCONTRACTED";
+export type FuelType = "DIESEL" | "PETROL" | "ELECTRIC" | "HYBRID" | "CNG" | "OTHER";
+export type FacilityType = "DISTRIBUTION_CENTER" | "CROSS_DOCK" | "TRANSIT_HUB" | "BONDED_WAREHOUSE" | "YARD" | "OTHER";
 export type JobStatus =
   | "PENDING"
   | "WAITING_DISPATCH"
@@ -20,6 +24,9 @@ export type JobStatus =
 export type DispatchStatus = "SCHEDULED" | "IN_PROGRESS" | "DONE" | "CANCELLED";
 export type NotificationType = "DISPATCH" | "JOB_UPDATE" | "COMPLETION" | "SYSTEM";
 export type AccountType = "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+export type AccountSubType = "CURRENT_ASSET" | "FIXED_ASSET" | "CURRENT_LIABILITY" | "LONG_TERM_LIABILITY" | "EQUITY" | "OPERATING_REVENUE" | "OTHER_REVENUE" | "COST_OF_SALES" | "OPERATING_EXPENSE" | "OTHER_EXPENSE" | "NONE";
+export type PostingType = "POSTABLE" | "HEADER" | "CONTROL";
+export type JournalDocType = "GENERAL" | "ACCRUAL" | "DEPRECIATION" | "CASH_DISBURSEMENT" | "CASH_RECEIPT" | "ADJUSTMENT";
 export type JournalStatus = "DRAFT" | "POSTED" | "REVERSED";
 export type OrderStatus =
   | "DRAFT"
@@ -30,6 +37,7 @@ export type OrderStatus =
   | "CANCELLED";
 export type TripStatus = "PLANNED" | "DISPATCHED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 export type CorridorType = "NORTHERN" | "CENTRAL" | "DOMESTIC";
+export type EquipmentType = "FLATBED" | "DRY_VAN" | "REEFER" | "TANKER" | "CONTAINER_20FT" | "CONTAINER_40FT" | "CURTAIN_SIDE" | "LTL" | "OTHER";
 export type TripExpenseType =
   | "FUEL"
   | "TOLLS"
@@ -45,7 +53,17 @@ export type VendorGroup =
   | "CLEARING_AGENT"
   | "SUBCONTRACTED_FLEET"
   | "STATUTORY"
+  | "CARRIER"
+  | "FREIGHT_BROKER"
+  | "OWNER_OPERATOR"
+  | "WORKSHOP"
   | "OTHER";
+export type PaymentMethod = "EFT" | "WIRE" | "CHEQUE" | "CASH" | "MOBILE_MONEY" | "FUEL_CARD";
+export type CustomerAccountGroup = "SOLD_TO" | "SHIP_TO" | "BILL_TO" | "PAYER";
+export type PartyStatus = "ACTIVE" | "INACTIVE" | "ON_HOLD" | "PROSPECT" | "SUSPENDED";
+export type DunningLevel = "NONE" | "REMINDER" | "FIRST_NOTICE" | "SECOND_NOTICE" | "FINAL_NOTICE" | "LEGAL";
+export type DisputeStatus = "NONE" | "OPEN" | "UNDER_INVESTIGATION" | "RESOLVED" | "WRITTEN_OFF";
+export type CollectionActivityType = "CALL" | "EMAIL" | "LETTER" | "DUNNING" | "PROMISE_TO_PAY" | "DISPUTE" | "NOTE" | "WRITE_OFF";
 export type InvoiceStatus = "DRAFT" | "POSTED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
 export type RateType = "SPOT" | "AVERAGE" | "HISTORICAL";
 export type BankAccountType = "BANK" | "MOBILE_MONEY" | "CASH";
@@ -87,3 +105,5 @@ export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 export type EmployeeDocType = "CONTRACT" | "NATIONAL_ID" | "PASSPORT" | "WORK_PERMIT" | "CERTIFICATE" | "OTHER";
 export type AttendanceSource = "MANUAL" | "MOBILE" | "BIOMETRIC";
 export type TimesheetStatus = "OPEN" | "SUBMITTED" | "APPROVED" | "REJECTED";
+export type DockEventKind = "ARRIVAL" | "DEPARTURE";
+export type DamageStatus = "REPORTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "SETTLED";

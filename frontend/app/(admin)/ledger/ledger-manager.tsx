@@ -12,11 +12,14 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@frontend/components/ui/select";
+import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
-import { JOURNAL_STATUS_LABEL, JOURNAL_STATUS_VARIANT } from "@frontend/lib/labels";
+import { JOURNAL_STATUS_LABEL, JOURNAL_STATUS_VARIANT, JOURNAL_DOC_TYPE_LABEL } from "@frontend/lib/labels";
 import { formatDate } from "@frontend/lib/utils";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
-import type { JournalStatus } from "@frontend/lib/enums";
+import type { JournalStatus, JournalDocType } from "@frontend/lib/enums";
+
+const DOC_TYPES = Object.keys(JOURNAL_DOC_TYPE_LABEL) as JournalDocType[];
 
 interface AccountOpt { id: string; code: string; name: string; }
 interface Line { id: string; accountId: string; debit: string; credit: string; account: { code: string; name: string }; memo?: string | null; }
@@ -30,9 +33,18 @@ interface Entry {
   lines: Line[];
 }
 
-interface DraftLine { accountId: string; debit: string; credit: string; memo: string; }
+interface DraftLine {
+  accountId: string; debit: string; credit: string; memo: string;
+  // Operational dimensions (spec: Journal §2, §3)
+  taxCode: string; vehicleTag: string; routeTag: string; costCenter: string;
+  driverTag: string; partyTag: string; tripTag: string; openItemRef: string;
+}
 
-const emptyLine = (): DraftLine => ({ accountId: "", debit: "", credit: "", memo: "" });
+const emptyLine = (): DraftLine => ({
+  accountId: "", debit: "", credit: "", memo: "",
+  taxCode: "", vehicleTag: "", routeTag: "", costCenter: "",
+  driverTag: "", partyTag: "", tripTag: "", openItemRef: "",
+});
 
 export function LedgerManager({ accounts }: { accounts: AccountOpt[] }) {
   const { toast } = useToast();
@@ -44,6 +56,9 @@ export function LedgerManager({ accounts }: { accounts: AccountOpt[] }) {
   const [postingDate, setPostingDate] = useState(new Date().toISOString().slice(0, 10));
   const [currency, setCurrency] = useState("USD");
   const [memo, setMemo] = useState("");
+  const [docType, setDocType] = useState<JournalDocType>("GENERAL");
+  const [documentDate, setDocumentDate] = useState("");
+  const [referenceNo, setReferenceNo] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([emptyLine(), emptyLine()]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -55,6 +70,9 @@ export function LedgerManager({ accounts }: { accounts: AccountOpt[] }) {
     setPostingDate(new Date().toISOString().slice(0, 10));
     setCurrency("USD");
     setMemo("");
+    setDocType("GENERAL");
+    setDocumentDate("");
+    setReferenceNo("");
     setLines([emptyLine(), emptyLine()]);
     setOpen(true);
   }
@@ -76,6 +94,9 @@ export function LedgerManager({ accounts }: { accounts: AccountOpt[] }) {
           postingDate: new Date(postingDate).toISOString(),
           currency,
           memo: memo || undefined,
+          docType,
+          documentDate: documentDate ? new Date(documentDate).toISOString() : undefined,
+          referenceNo: referenceNo || undefined,
           post,
           lines: lines
             .filter((l) => l.accountId && (l.debit || l.credit))
@@ -84,6 +105,14 @@ export function LedgerManager({ accounts }: { accounts: AccountOpt[] }) {
               debit: l.debit || "0",
               credit: l.credit || "0",
               memo: l.memo || undefined,
+              taxCode: l.taxCode || undefined,
+              openItemRef: l.openItemRef || undefined,
+              vehicleTag: l.vehicleTag || undefined,
+              routeTag: l.routeTag || undefined,
+              costCenter: l.costCenter || undefined,
+              driverTag: l.driverTag || undefined,
+              partyTag: l.partyTag || undefined,
+              tripTag: l.tripTag || undefined,
             })),
         }),
       });
@@ -162,6 +191,15 @@ export function LedgerManager({ accounts }: { accounts: AccountOpt[] }) {
             <div className="grid gap-3 md:grid-cols-3">
               <div className="space-y-1.5"><Label>Posting Date</Label><Input type="date" value={postingDate} onChange={(e) => setPostingDate(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Currency</Label><Input value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} /></div>
+              <div className="space-y-1.5">
+                <Label>Document Type</Label>
+                <Select value={docType} onValueChange={(v) => setDocType(v as JournalDocType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{DOC_TYPES.map((d) => <SelectItem key={d} value={d}>{JOURNAL_DOC_TYPE_LABEL[d]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Document Date</Label><Input type="date" value={documentDate} onChange={(e) => setDocumentDate(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Reference No. (B/L, invoice…)</Label><Input value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Memo</Label><Input value={memo} onChange={(e) => setMemo(e.target.value)} /></div>
             </div>
 
@@ -170,18 +208,33 @@ export function LedgerManager({ accounts }: { accounts: AccountOpt[] }) {
                 <span>Account</span><span className="text-right">Debit</span><span className="text-right">Credit</span><span />
               </div>
               {lines.map((l, i) => (
-                <div key={i} className="grid grid-cols-[1fr,7rem,7rem,2rem] items-center gap-2">
-                  <Select value={l.accountId} onValueChange={(v) => updateLine(i, { accountId: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.code} {a.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Input className="text-right" inputMode="decimal" value={l.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: "" })} />
-                  <Input className="text-right" inputMode="decimal" value={l.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: "" })} />
-                  <Button variant="ghost" size="icon" disabled={lines.length <= 2} onClick={() => setLines((ls) => ls.filter((_, idx) => idx !== i))}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                <div key={i} className="rounded-md border border-border/60 p-2">
+                  <div className="grid grid-cols-[1fr,7rem,7rem,2rem] items-center gap-2">
+                    <Select value={l.accountId} onValueChange={(v) => updateLine(i, { accountId: v })}>
+                      <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.code} {a.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Input className="text-right" inputMode="decimal" value={l.debit} onChange={(e) => updateLine(i, { debit: e.target.value, credit: "" })} />
+                    <Input className="text-right" inputMode="decimal" value={l.credit} onChange={(e) => updateLine(i, { credit: e.target.value, debit: "" })} />
+                    <Button variant="ghost" size="icon" disabled={lines.length <= 2} onClick={() => setLines((ls) => ls.filter((_, idx) => idx !== i))}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs text-muted-foreground">Dimensions &amp; tax</summary>
+                    <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+                      <Input placeholder="Memo" value={l.memo} onChange={(e) => updateLine(i, { memo: e.target.value })} />
+                      <Input placeholder="Tax code" value={l.taxCode} onChange={(e) => updateLine(i, { taxCode: e.target.value })} />
+                      <Input placeholder="Vehicle" value={l.vehicleTag} onChange={(e) => updateLine(i, { vehicleTag: e.target.value })} />
+                      <Input placeholder="Route" value={l.routeTag} onChange={(e) => updateLine(i, { routeTag: e.target.value })} />
+                      <Input placeholder="Cost center" value={l.costCenter} onChange={(e) => updateLine(i, { costCenter: e.target.value })} />
+                      <Input placeholder="Driver" value={l.driverTag} onChange={(e) => updateLine(i, { driverTag: e.target.value })} />
+                      <Input placeholder="Party (cust/vendor)" value={l.partyTag} onChange={(e) => updateLine(i, { partyTag: e.target.value })} />
+                      <Input placeholder="Trip / open-item" value={l.tripTag} onChange={(e) => updateLine(i, { tripTag: e.target.value })} />
+                    </div>
+                  </details>
                 </div>
               ))}
               <Button variant="secondary" size="sm" onClick={() => setLines((ls) => [...ls, emptyLine()])}><Plus className="h-4 w-4" />Add Line</Button>

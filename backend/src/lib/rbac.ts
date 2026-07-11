@@ -47,6 +47,8 @@ export type Permission =
   | "tax:read" // VAT/WHT return prep
   | "tax:write"
   | "collection:read" // AR aging / collections
+  | "collection:write" // dunning, disputes, promise-to-pay, contacts (M7)
+  | "collection:approve" // write off bad debt (posts to the ledger)
   | "bank:read" // cash & bank accounts (M4)
   | "bank:write" // maintain bank/mobile-money accounts
   | "bank:disburse" // post driver disbursements to the ledger
@@ -82,6 +84,8 @@ export type Permission =
   | "consolidation:read" // subsidiary→parent mapping & rollup (M5)
   | "consolidation:run"
   | "compliance:read" // vehicle & driver document-expiry dashboard (M11)
+  | "kpi:read" // operational KPI capture: dock events, damage reports, feedback (Tier C)
+  | "kpi:write"
   | "waypoint:read" // GPS waypoint registry (M30 Common)
   | "waypoint:write"
   | "tracking:read" // live vehicle positions (M12 / §5)
@@ -130,6 +134,8 @@ const ALL: Permission[] = [
   "tax:read",
   "tax:write",
   "collection:read",
+  "collection:write",
+  "collection:approve",
   "bank:read",
   "bank:write",
   "bank:disburse",
@@ -165,6 +171,8 @@ const ALL: Permission[] = [
   "consolidation:read",
   "consolidation:run",
   "compliance:read",
+  "kpi:read",
+  "kpi:write",
   "waypoint:read",
   "waypoint:write",
   "tracking:read",
@@ -217,6 +225,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "attendance:write",
     "fx:read",
     "compliance:read",
+    "kpi:read",
+    "kpi:write",
     "waypoint:read",
     "waypoint:write",
     "tracking:read",
@@ -251,6 +261,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "tax:read",
     "tax:write",
     "collection:read",
+    "collection:write",
+    "collection:approve",
     "bank:read",
     "bank:write",
     "bank:disburse",
@@ -282,6 +294,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "consolidation:read",
     "consolidation:run",
     "compliance:read",
+    "kpi:read",
     "waypoint:read",
     "tracking:read",
     "report:read",
@@ -322,6 +335,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "fx:read",
     "consolidation:read",
     "compliance:read",
+    "kpi:read",
     "waypoint:read",
     "tracking:read",
   ],

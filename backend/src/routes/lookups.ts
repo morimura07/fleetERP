@@ -189,6 +189,37 @@ lookups.get("/service-form", requireAuth, requirePermission("service:read"), asy
   });
 });
 
+/** Vehicles, trips, orders, and customers for the operational-KPI capture forms
+ * (dock events, damage reports, customer feedback). */
+lookups.get("/kpi-form", requireAuth, requirePermission("kpi:read"), async (c) => {
+  const user = c.get("user");
+  const [vehicles, trips, orders, customers] = await Promise.all([
+    prisma.vehicle.findMany({
+      where: { ...areaScope(user) },
+      select: { id: true, plateNumber: true, model: true },
+      orderBy: { plateNumber: "asc" },
+    }),
+    prisma.trip.findMany({
+      where: { ...areaScope(user) },
+      select: { id: true, tripCode: true },
+      orderBy: { tripCode: "desc" },
+      take: 200,
+    }),
+    prisma.order.findMany({
+      where: { ...areaScope(user) },
+      select: { id: true, orderCode: true },
+      orderBy: { bookingDate: "desc" },
+      take: 200,
+    }),
+    prisma.customer.findMany({
+      where: { ...areaScope(user), isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+  return ok(c, { vehicles, trips, orders, customers });
+});
+
 /** Jobs still needing a dispatch, for the dispatch board. */
 lookups.get("/undispatched", requireAuth, requirePermission("dispatch:read"), async (c) => {
   const rows = await prisma.deliveryJob.findMany({

@@ -10,16 +10,18 @@ import { Label } from "@frontend/components/ui/label";
 import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
+import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { vendorSchema, type VendorInput } from "@frontend/lib/validations";
-import { VENDOR_GROUP_LABEL, PAYMENT_TERM_LABEL } from "@frontend/lib/labels";
+import { VENDOR_GROUP_LABEL, PAYMENT_TERM_LABEL, PAYMENT_METHOD_LABEL } from "@frontend/lib/labels";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
-import type { VendorGroup, PaymentTerm } from "@frontend/lib/enums";
+import type { VendorGroup, PaymentTerm, PaymentMethod } from "@frontend/lib/enums";
 
 interface Vendor extends VendorInput { id: string; }
 
 const GROUPS = Object.keys(VENDOR_GROUP_LABEL) as VendorGroup[];
 const TERMS = Object.keys(PAYMENT_TERM_LABEL) as PaymentTerm[];
+const METHODS = Object.keys(PAYMENT_METHOD_LABEL) as PaymentMethod[];
 
 const columns: Column<Vendor>[] = [
   { key: "code", header: "Code", render: (r) => <span className="font-mono">{r.code}</span> },
@@ -96,7 +98,45 @@ export function VendorsManager() {
               <div className="space-y-1.5"><Label>Currency</Label><Input maxLength={3} {...form.register("currency")} /></div>
               <div className="space-y-1.5"><Label>Email</Label><Input type="email" {...form.register("email")} /></div>
               <div className="space-y-1.5"><Label>Phone</Label><Input {...form.register("phone")} /></div>
+              <div className="space-y-1.5"><Label>Operating Name (DBA)</Label><Input {...form.register("operatingName")} /></div>
+              <div className="space-y-1.5"><Label>Search Term / Alias</Label><Input {...form.register("searchTerm")} /></div>
+              <div className="space-y-1.5"><Label>Parent / Holding Co.</Label><Input {...form.register("parentCompany")} /></div>
             </div>
+
+            <FormSection title="Contact & Compliance">
+              <div className="space-y-1.5 md:col-span-2"><Label>HQ Address</Label><Input {...form.register("address")} /></div>
+              <div className="space-y-1.5 md:col-span-2"><Label>Branch Address</Label><Input {...form.register("branchAddress")} /></div>
+              <div className="space-y-1.5"><Label>Contact Person</Label><Input {...form.register("contactPerson")} /></div>
+              <div className="space-y-1.5"><Label>Billing Contact</Label><Input {...form.register("billingContact")} /></div>
+              <div className="space-y-1.5"><Label>Insurance Policy No.</Label><Input {...form.register("insurancePolicy")} /></div>
+              <div className="space-y-1.5"><Label>Insurance Expiry</Label><Input type="date" {...form.register("insuranceExpiry")} /></div>
+              <div className="space-y-1.5"><Label>Licence / Authority No.</Label><Input {...form.register("licenseNumber")} /></div>
+            </FormSection>
+
+            <FormSection title="Financial">
+              <div className="space-y-1.5">
+                <Label>Payment Method</Label>
+                <Select value={form.watch("paymentMethod") ?? undefined} onValueChange={(v) => form.setValue("paymentMethod", v as PaymentMethod)}>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>{METHODS.map((m) => <SelectItem key={m} value={m}>{PAYMENT_METHOD_LABEL[m]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Reconciliation Acct</Label><Input placeholder="2000" {...form.register("reconAccount")} /></div>
+              <div className="space-y-1.5"><Label>Bank Name</Label><Input {...form.register("bankName")} /></div>
+              <div className="space-y-1.5"><Label>SWIFT</Label><Input {...form.register("bankSwift")} /></div>
+              <div className="space-y-1.5"><Label>IBAN</Label><Input {...form.register("bankIban")} /></div>
+              <div className="space-y-1.5"><Label>Mobile Money</Label><Input {...form.register("mobileMoney")} /></div>
+            </FormSection>
+
+            <FormSection title="Transport / TMS">
+              <div className="space-y-1.5"><Label>SCAC Code</Label><Input {...form.register("scacCode")} /></div>
+              <div className="space-y-1.5"><Label>MC / DOT No.</Label><Input {...form.register("mcDotNumber")} /></div>
+              <div className="space-y-1.5"><Label>Fleet Size</Label><Input type="number" {...form.register("fleetSize")} /></div>
+              <div className="space-y-1.5"><Label>Equipment Types</Label><Input placeholder="Flatbed, Reefer…" {...form.register("equipmentTypes")} /></div>
+              <div className="space-y-1.5 md:col-span-2"><Label>Rate Agreement / FSC</Label><Input {...form.register("rateAgreement")} /></div>
+              <div className="space-y-1.5 md:col-span-2"><Label>EDI / API Endpoint</Label><Input {...form.register("ediEndpoint")} /></div>
+            </FormSection>
+
             <DialogFooter><Button type="submit" disabled={form.formState.isSubmitting}>Save</Button></DialogFooter>
           </form>
         </DialogContent>

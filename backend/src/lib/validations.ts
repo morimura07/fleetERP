@@ -37,6 +37,8 @@ export const resetPasswordSchema = z
   });
 
 // ───────── Driver ─────────
+const os = (max: number) => z.string().max(max).optional().or(z.literal(""));
+
 export const driverSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   email: z.string().email(),
@@ -48,6 +50,31 @@ export const driverSchema = z.object({
   // optional: create a linked login account
   createLogin: z.boolean().optional(),
   password: z.string().min(8).optional(),
+  // Identity & contact (spec §1)
+  dateOfBirth: z.coerce.date().optional().nullable(),
+  gender: os(20),
+  altPhone: os(30),
+  homeTerminal: os(120),
+  emergencyContact: os(200),
+  // Qualifications (spec §2)
+  licenseNumber: os(60),
+  licenseClass: os(60),
+  licenseExpiry: z.coerce.date().optional().nullable(),
+  medicalCertExpiry: z.coerce.date().optional().nullable(),
+  passportNumber: os(60),
+  passportExpiry: z.coerce.date().optional().nullable(),
+  // Employment & payroll (spec §3)
+  driverType: z.enum(["COMPANY", "OWNER_OPERATOR", "SUBCONTRACTOR"]).default("COMPANY"),
+  terminationDate: z.coerce.date().optional().nullable(),
+  payScale: os(120),
+  taxId: os(60),
+  // HOS & telematics (spec §4–5)
+  eldId: os(60),
+  hosCycleRule: os(40),
+  terminalTimeZone: os(40),
+  assignedVehicle: os(60),
+  cargoQualifications: os(200),
+  languagePref: os(40),
 });
 
 export const availabilitySchema = z.object({
@@ -63,6 +90,8 @@ export const holidaySchema = z.object({
 });
 
 // ───────── Vehicle ─────────
+const onum = () => z.coerce.number().min(0).optional().nullable();
+
 export const vehicleSchema = z.object({
   vehicleNumber: z.string().min(1).max(50),
   plateNumber: z.string().min(1).max(50),
@@ -79,6 +108,44 @@ export const vehicleSchema = z.object({
     .regex(/^\d+(\.\d{1,2})?$/, "km/L must be a positive number")
     .optional()
     .nullable(),
+  // Identification & specs (spec §1)
+  vin: os(40),
+  yearMade: z.coerce.number().int().min(1900).max(2100).optional().nullable(),
+  vehicleType: os(60),
+  bodyType: os(60),
+  // Physical & technical (spec §2)
+  tareWeightKg: onum(),
+  gvwKg: onum(),
+  payloadKg: onum(),
+  loadingVolumeCbm: onum(),
+  dimensions: os(80),
+  axleCount: z.coerce.number().int().min(0).optional().nullable(),
+  suspensionType: os(60),
+  // Compliance (spec §3)
+  registrationExpiry: z.coerce.date().optional().nullable(),
+  insurancePolicyNo: os(60),
+  emissionRating: os(40),
+  operatingPermit: os(60),
+  // Operations & telematics (spec §4)
+  ownershipStatus: z.enum(["OWNED", "LEASED", "SUBCONTRACTED"]).default("OWNED"),
+  transporterName: os(120),
+  fuelType: z.enum(["DIESEL", "PETROL", "ELECTRIC", "HYBRID", "CNG", "OTHER"]).optional().nullable(),
+  fuelCardNumber: os(60),
+  telematicsId: os(60),
+  homeTerminal: os(120),
+  assignedDriver: os(120),
+  // Maintenance (spec §5)
+  odometerKm: z.coerce.number().int().min(0).optional().nullable(),
+  engineNumber: os(60),
+  tyreSize: os(40),
+  batterySpec: os(60),
+  lastServiceDate: z.coerce.date().optional().nullable(),
+  lastServiceKm: z.coerce.number().int().min(0).optional().nullable(),
+  // Financial & asset (spec §6)
+  assetAccountCode: os(20),
+  purchaseDate: z.coerce.date().optional().nullable(),
+  purchasePrice: onum(),
+  depreciationMethod: os(40),
 });
 
 // ───────── Phase 3: Driver compliance documents (M11) ─────────
@@ -101,6 +168,18 @@ export const waypointSchema = z.object({
   lng: coord(-180, 180),
   country: z.string().max(40).optional(),
   isActive: z.boolean().default(true),
+  // Coordinate & facility (spec §1–2)
+  altitude: z.coerce.number().optional().nullable(),
+  locationType: os(40),
+  address: os(255),
+  geofenceRadius: z.coerce.number().int().min(0).optional().nullable(),
+  timeZone: os(40),
+  contactDetails: os(200),
+  // Operational rules (spec §3)
+  serviceTimeMin: z.coerce.number().int().min(0).optional().nullable(),
+  requiredEquipment: os(120),
+  accessRestrictions: os(200),
+  sequenceNo: z.coerce.number().int().min(0).optional().nullable(),
 });
 
 // ───────── Phase 3: Trip freight-bill reconciliation (M12) ─────────
@@ -128,6 +207,25 @@ export const clientSchema = z.object({
   phone,
   address: z.string().min(1).max(255),
   email: z.string().email(),
+  // General & contact (spec §1)
+  tradeName: z.string().max(150).optional().or(z.literal("")),
+  industry: z.string().max(80).optional().or(z.literal("")),
+  status: z.enum(["ACTIVE", "INACTIVE", "ON_HOLD", "PROSPECT", "SUSPENDED"]).default("ACTIVE"),
+  website: z.string().max(200).optional().or(z.literal("")),
+  // Billing & financial (spec §2)
+  tin: z.string().max(50).optional().or(z.literal("")),
+  currency: z.string().length(3).default("USD"),
+  paymentTerm: z.enum(["NET_30", "NET_60", "COD"]).default("NET_30"),
+  creditLimit: z.coerce.number().min(0).default(0),
+  taxExempt: z.boolean().default(false),
+  // Freight profile (spec §3)
+  shippingPreferences: z.string().max(120).optional().or(z.literal("")),
+  preferredCarriers: z.string().max(200).optional().or(z.literal("")),
+  hazmatCertified: z.boolean().default(false),
+  // Compliance & integration (spec §5–6)
+  insuranceRequirement: z.string().max(200).optional().or(z.literal("")),
+  slaExpiry: z.coerce.date().optional().nullable(),
+  accountManager: z.string().max(120).optional().or(z.literal("")),
 });
 
 // ───────── DeliveryJob ─────────
@@ -200,6 +298,18 @@ export const accountSchema = z.object({
   type: z.enum(["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"]),
   parentId: idSchema.optional().nullable(),
   isActive: z.boolean().default(true),
+  // Classification & posting behaviour (spec: COA §1, §4)
+  subType: z.enum(["CURRENT_ASSET", "FIXED_ASSET", "CURRENT_LIABILITY", "LONG_TERM_LIABILITY", "EQUITY", "OPERATING_REVENUE", "OTHER_REVENUE", "COST_OF_SALES", "OPERATING_EXPENSE", "OTHER_EXPENSE", "NONE"]).default("NONE"),
+  postingType: z.enum(["POSTABLE", "HEADER", "CONTROL"]).default("POSTABLE"),
+  currency: z.string().max(3).optional().or(z.literal("")),
+  defaultTaxCode: z.string().max(20).optional().or(z.literal("")),
+  reconciliation: z.boolean().default(false),
+  allowManualPosting: z.boolean().default(true),
+  budgetingAllowed: z.boolean().default(false),
+  // Transport dimensions (spec: COA §2)
+  fleetSegment: z.string().max(80).optional().or(z.literal("")),
+  routeCorridor: z.string().max(80).optional().or(z.literal("")),
+  costCenter: z.string().max(80).optional().or(z.literal("")),
 });
 
 // ───────── Accounting: Journal Entry (Journal Entry) ─────────
@@ -216,6 +326,15 @@ export const journalLineSchema = z.object({
   credit: money,
   memo: z.string().max(255).optional(),
   dimension: z.string().max(100).optional(),
+  // Line detail & operational dimensions (spec: Journal §2, §3)
+  taxCode: z.string().max(20).optional().or(z.literal("")),
+  openItemRef: z.string().max(80).optional().or(z.literal("")),
+  vehicleTag: z.string().max(60).optional().or(z.literal("")),
+  routeTag: z.string().max(60).optional().or(z.literal("")),
+  costCenter: z.string().max(80).optional().or(z.literal("")),
+  driverTag: z.string().max(60).optional().or(z.literal("")),
+  partyTag: z.string().max(60).optional().or(z.literal("")),
+  tripTag: z.string().max(60).optional().or(z.literal("")),
 });
 
 export const journalEntrySchema = z.object({
@@ -230,12 +349,19 @@ export const journalEntrySchema = z.object({
   memo: z.string().max(500).optional(),
   post: z.boolean().optional().default(false), // post immediately vs save as draft
   lines: z.array(journalLineSchema).min(2, "A journal entry needs at least 2 lines"),
+  // Document header (spec: Journal §1)
+  docType: z.enum(["GENERAL", "ACCRUAL", "DEPRECIATION", "CASH_DISBURSEMENT", "CASH_RECEIPT", "ADJUSTMENT"]).default("GENERAL"),
+  documentDate: z.coerce.date().optional().nullable(),
+  referenceNo: z.string().max(100).optional().or(z.literal("")),
 });
 
 // ───────── Freight: Order (Order) ─────────
 const decimalAmount = z
   .string()
   .regex(/^\d+(\.\d{1,2})?$/, "Amount must be a positive number with up to 2 decimals");
+
+const EQUIPMENT = ["FLATBED", "DRY_VAN", "REEFER", "TANKER", "CONTAINER_20FT", "CONTAINER_40FT", "CURTAIN_SIDE", "LTL", "OTHER"] as const;
+const oStr = (max: number) => z.string().max(max).optional().or(z.literal(""));
 
 export const orderSchema = z.object({
   dataAreaId: z.string().min(1).max(10).default("HQ01"),
@@ -253,6 +379,40 @@ export const orderSchema = z.object({
   status: z
     .enum(["DRAFT", "CONFIRMED", "IN_TRANSIT", "DELIVERED", "INVOICED", "CANCELLED"])
     .default("DRAFT"),
+  // Organizational (spec §1)
+  branch: oStr(120),
+  salesperson: oStr(120),
+  incoterms: oStr(10),
+  paymentTerm: z.enum(["NET_30", "NET_60", "COD"]).default("NET_30"),
+  // Parties (spec §2)
+  shipper: oStr(150),
+  consignee: oStr(150),
+  billTo: oStr(150),
+  notifyParty: oStr(150),
+  // Routing (spec §3)
+  pickupAddress: oStr(255),
+  deliveryAddress: oStr(255),
+  pol: oStr(80),
+  pod: oStr(80),
+  etd: z.coerce.date().optional().nullable(),
+  eta: z.coerce.date().optional().nullable(),
+  routingNotes: oStr(300),
+  // Cargo & equipment (spec §4)
+  equipmentType: z.enum(EQUIPMENT).default("OTHER"),
+  pieceCount: z.coerce.number().int().min(0).optional().nullable(),
+  dimensions: oStr(80),
+  hazmat: z.boolean().default(false),
+  hazmatUnCode: oStr(40),
+  // Financial (spec §5)
+  freightRate: z.coerce.number().min(0).optional().nullable(),
+  accessorialCharges: decimalAmount.optional().default("0"),
+  taxAmount: decimalAmount.optional().default("0"),
+  // Documentation (spec §6)
+  customerPo: oStr(80),
+  blNumber: oStr(80),
+  hsCode: oStr(40),
+  sealNumber: oStr(40),
+  specialInstructions: oStr(500),
 });
 
 // ───────── Freight: Trip (Trip) ─────────
@@ -271,6 +431,37 @@ export const tripBaseSchema = z.object({
   status: z
     .enum(["PLANNED", "DISPATCHED", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
     .default("PLANNED"),
+  // Vehicle & crew (spec §1)
+  trailerId: oStr(60),
+  secondDriverId: z.string().optional().nullable(),
+  actualStart: z.coerce.date().optional().nullable(),
+  actualEnd: z.coerce.date().optional().nullable(),
+  // Route (spec §2)
+  originFacility: oStr(150),
+  destinationFacility: oStr(150),
+  viaPoints: oStr(300),
+  plannedDistanceKm: z.coerce.number().min(0).optional().nullable(),
+  routeCode: oStr(60),
+  // Freight (spec §3)
+  waybillNumber: oStr(80),
+  cargoWeightKg: z.coerce.number().min(0).optional().nullable(),
+  packageCount: z.coerce.number().int().min(0).optional().nullable(),
+  specialHandling: oStr(200),
+  // Financials (spec §4)
+  advancePayment: decimalAmount.optional().default("0"),
+  driverWages: decimalAmount.optional().default("0"),
+  tollPermitCost: decimalAmount.optional().default("0"),
+  miscExpense: decimalAmount.optional().default("0"),
+  // Fuel management (spec §5)
+  fuelType: oStr(40),
+  fuelCardNumber: oStr(60),
+  refuelStations: oStr(200),
+  // Compliance & safety (spec §6)
+  ewayBillRef: oStr(80),
+  podStatus: z.boolean().default(false),
+  podUrl: oStr(300),
+  sealNumbers: oStr(120),
+  incidentNotes: oStr(500),
 });
 
 export const tripSchema = tripBaseSchema.refine(
@@ -297,12 +488,14 @@ export const tripExpenseSchema = z.object({
 // ───────── AP: Vendor (M1) ─────────
 const money0 = decimalAmount.optional().default("0");
 
+const optStr = (max: number) => z.string().max(max).optional().or(z.literal(""));
+
 export const vendorSchema = z.object({
   dataAreaId: z.string().min(1).max(10).default("HQ01"),
   code: z.string().min(1, "Vendor code is required").max(30),
   legalName: z.string().min(1, "Legal name is required").max(150),
   group: z
-    .enum(["FUEL_SUPPLIER", "SPARE_PARTS", "CLEARING_AGENT", "SUBCONTRACTED_FLEET", "STATUTORY", "OTHER"])
+    .enum(["FUEL_SUPPLIER", "SPARE_PARTS", "CLEARING_AGENT", "SUBCONTRACTED_FLEET", "STATUTORY", "CARRIER", "FREIGHT_BROKER", "OWNER_OPERATOR", "WORKSHOP", "OTHER"])
     .default("OTHER"),
   tin: z.string().max(50).optional(),
   vrn: z.string().max(50).optional(),
@@ -311,6 +504,32 @@ export const vendorSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().max(20).optional(),
   isActive: z.boolean().default(true),
+  // General & organizational (spec §1)
+  operatingName: optStr(150),
+  searchTerm: optStr(60),
+  parentCompany: optStr(150),
+  // Contact & compliance (spec §2)
+  address: optStr(255),
+  branchAddress: optStr(255),
+  contactPerson: optStr(100),
+  billingContact: optStr(100),
+  insurancePolicy: optStr(80),
+  insuranceExpiry: z.coerce.date().optional().nullable(),
+  licenseNumber: optStr(80),
+  // Financial (spec §3)
+  paymentMethod: z.enum(["EFT", "WIRE", "CHEQUE", "CASH", "MOBILE_MONEY", "FUEL_CARD"]).optional().nullable(),
+  bankName: optStr(120),
+  bankSwift: optStr(20),
+  bankIban: optStr(40),
+  mobileMoney: optStr(40),
+  reconAccount: optStr(20),
+  // Transport / TMS (spec §4)
+  scacCode: optStr(10),
+  mcDotNumber: optStr(40),
+  equipmentTypes: optStr(200),
+  fleetSize: z.coerce.number().int().min(0).optional().nullable(),
+  rateAgreement: optStr(300),
+  ediEndpoint: optStr(200),
 });
 
 export const vendorInvoiceSchema = z.object({
@@ -347,6 +566,47 @@ export const customerSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().max(20).optional(),
   isActive: z.boolean().default(true),
+  // General (spec §1)
+  accountGroup: z.enum(["SOLD_TO", "SHIP_TO", "BILL_TO", "PAYER"]).default("SOLD_TO"),
+  industry: optStr(80),
+  registrationNo: optStr(60),
+  searchTerm: optStr(60),
+  // Address & geocoding (spec §2)
+  billingAddress: optStr(255),
+  city: optStr(80),
+  country: optStr(2),
+  postalCode: optStr(20),
+  latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
+  longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
+  transportZone: optStr(80),
+  timeZone: optStr(40),
+  // Contact (spec §3)
+  contactPerson: optStr(100),
+  apContact: optStr(100),
+  // Freight profile (spec §4)
+  shippingConditions: optStr(80),
+  meansOfTransport: optStr(80),
+  dockRestrictions: optStr(200),
+  hazmatCertified: z.boolean().default(false),
+  // Financial & operational (spec §5–6)
+  incoterms: optStr(10),
+  paymentTerm: z.enum(["NET_30", "NET_60", "COD"]).default("NET_30"),
+  reconAccount: optStr(20),
+  preferredCarrier: optStr(120),
+  communicationLang: optStr(40),
+  // Credit & collections (spec: Collections §1–3)
+  accountStatus: z.enum(["ACTIVE", "INACTIVE", "ON_HOLD", "PROSPECT", "SUSPENDED"]).default("ACTIVE"),
+  parentAccount: optStr(120),
+  creditRating: optStr(40),
+  tempCreditLimit: z.coerce.number().min(0).optional().nullable(),
+  creditReviewDate: z.coerce.date().optional().nullable(),
+  creditHoldOverride: z.boolean().default(false),
+  collectionStrategy: optStr(80),
+  collectorId: optStr(60),
+  discountPercent: z.coerce.number().min(0).max(100).default(0),
+  discountDays: z.coerce.number().int().min(0).max(365).default(0),
+  penaltyRate: z.coerce.number().min(0).max(100).default(0),
+  podRequired: z.boolean().default(false),
 });
 
 export const customerInvoiceSchema = z.object({
@@ -477,6 +737,34 @@ export const stockItemSchema = z.object({
   reorderLevel: z.coerce.number().min(0).default(0),
   currency: z.string().length(3).default("USD"),
   isActive: z.boolean().default(true),
+  // Identification & fleet (spec §1–2)
+  oemPartNumber: os(60),
+  supplierPartNumber: os(60),
+  applicableFleet: os(120),
+  partCondition: os(40),
+  assetSerialNo: os(60),
+  hazmat: z.boolean().default(false),
+  // Purchasing & financial (spec §3)
+  standardCost: z.coerce.number().min(0).optional().nullable(),
+  lastPurchasePrice: z.coerce.number().min(0).optional().nullable(),
+  defaultVendor: os(120),
+  taxCode: os(20),
+  valuationMethod: os(20),
+  // Warehousing & location (spec §4)
+  storageLocation: os(80),
+  binRack: os(40),
+  batchLot: os(60),
+  manufactureDate: z.coerce.date().optional().nullable(),
+  expiryDate: z.coerce.date().optional().nullable(),
+  // Inventory control (spec §5)
+  maxStockLevel: z.coerce.number().min(0).optional().nullable(),
+  safetyStock: z.coerce.number().min(0).optional().nullable(),
+  leadTimeDays: z.coerce.number().int().min(0).optional().nullable(),
+  economicOrderQty: z.coerce.number().min(0).optional().nullable(),
+  // Warranty & quality (spec §6)
+  warrantyPeriod: os(60),
+  warrantyStart: z.coerce.date().optional().nullable(),
+  qualityStatus: os(40),
 });
 
 export const stockMovementSchema = z.object({
@@ -537,6 +825,19 @@ export const employeeSchema = z.object({
   status: z.enum(["ACTIVE", "ON_LEAVE", "TERMINATED"]).default("ACTIVE"),
   bankAccount: z.string().max(60).optional().or(z.literal("")),
   hiredAt: z.coerce.date(),
+  // Master data & demographics (spec: Payroll §1)
+  jobTitle: os(120),
+  employmentType: os(40),
+  department: os(80),
+  costCenter: os(80),
+  payFrequency: os(20),
+  nssfNumber: os(40),
+  shifNumber: os(40),
+  // Standing allowances (spec: Payroll §4)
+  perDiem: z.coerce.number().min(0).default(0),
+  overnightAllowance: z.coerce.number().min(0).default(0),
+  phoneAllowance: z.coerce.number().min(0).default(0),
+  otherAllowance: z.coerce.number().min(0).default(0),
 });
 
 export const payRunSchema = z.object({
@@ -555,6 +856,29 @@ export const warehouseSchema = z.object({
   location: z.string().max(150).optional().or(z.literal("")),
   isDefault: z.boolean().default(false),
   isActive: z.boolean().default(true),
+  // Identification & geocoding (spec §1–2)
+  facilityType: z.enum(["DISTRIBUTION_CENTER", "CROSS_DOCK", "TRANSIT_HUB", "BONDED_WAREHOUSE", "YARD", "OTHER"]).default("DISTRIBUTION_CENTER"),
+  timeZone: os(40),
+  address: os(255),
+  city: os(80),
+  country: os(2),
+  postalCode: os(20),
+  latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
+  longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
+  // Contact (spec §3)
+  managerName: os(120),
+  phone: os(30),
+  email: z.string().email().optional().or(z.literal("")),
+  // Dock & operations (spec §4)
+  dockCapacity: z.coerce.number().int().min(0).optional().nullable(),
+  dockScheduling: os(60),
+  operatingHours: os(120),
+  // Capacity & control (spec §5–6)
+  storageTypes: os(200),
+  capacityLimit: os(120),
+  putawayStrategy: os(80),
+  pickingStrategy: os(80),
+  countMethod: os(40),
 });
 
 export const stockTransferSchema = z.object({
@@ -728,3 +1052,87 @@ export const buildTimesheetSchema = z.object({
 export type TimeEntryInput = z.infer<typeof timeEntrySchema>;
 export type ClockOutInput = z.infer<typeof clockOutSchema>;
 export type BuildTimesheetInput = z.infer<typeof buildTimesheetSchema>;
+
+// ── Credit & Collections workflow (M7) ──
+export const dunningSchema = z.object({
+  invoiceId: z.string().min(1, "Invoice is required"),
+  level: z.enum(["NONE", "REMINDER", "FIRST_NOTICE", "SECOND_NOTICE", "FINAL_NOTICE", "LEGAL"]),
+  note: z.string().max(500).optional().nullable(),
+});
+
+export const disputeSchema = z.object({
+  invoiceId: z.string().min(1, "Invoice is required"),
+  status: z.enum(["NONE", "OPEN", "UNDER_INVESTIGATION", "RESOLVED", "WRITTEN_OFF"]),
+  disputedAmount: z.coerce.number().min(0).default(0),
+  note: z.string().max(500).optional().nullable(),
+});
+
+export const promiseToPaySchema = z.object({
+  invoiceId: z.string().min(1, "Invoice is required"),
+  promiseDate: z.coerce.date(),
+  promiseAmount: z.coerce.number().positive("Promise amount must be positive"),
+  note: z.string().max(500).optional().nullable(),
+});
+
+export const contactSchema = z.object({
+  customerId: z.string().min(1, "Customer is required"),
+  invoiceId: z.string().optional().nullable(),
+  type: z.enum(["CALL", "EMAIL", "LETTER", "NOTE"]),
+  note: z.string().max(1000).optional().nullable(),
+});
+
+export const writeOffSchema = z.object({
+  invoiceId: z.string().min(1, "Invoice is required"),
+  note: z.string().max(500).optional().nullable(),
+});
+
+export type DunningInput = z.infer<typeof dunningSchema>;
+export type DisputeInput = z.infer<typeof disputeSchema>;
+export type PromiseToPayInput = z.infer<typeof promiseToPaySchema>;
+export type ContactInput = z.infer<typeof contactSchema>;
+export type WriteOffInput = z.infer<typeof writeOffSchema>;
+
+// ── Operational KPI capture (Tier C internal) ────────────────────────────────
+
+export const dockEventSchema = z.object({
+  vehicleId: z.string().min(1, "Vehicle is required"),
+  tripId: os(40),
+  facility: os(120),
+  kind: z.enum(["ARRIVAL", "DEPARTURE"]),
+  eventAt: z.coerce.date(),
+  note: os(500),
+});
+
+export const damageReportSchema = z.object({
+  orderId: os(40),
+  tripId: os(40),
+  reportedAt: z.coerce.date(),
+  cargoValue: z.coerce.number().min(0, "Cargo value cannot be negative"),
+  damageValue: z.coerce.number().min(0, "Damage value cannot be negative"),
+  currency: z.string().length(3).optional(),
+  description: os(1000),
+}).refine((d) => d.damageValue <= d.cargoValue, {
+  message: "Damage value cannot exceed the cargo value",
+  path: ["damageValue"],
+});
+
+export const damageStatusSchema = z.object({
+  status: z.enum(["REPORTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "SETTLED"]),
+});
+
+export const feedbackSchema = z.object({
+  customerId: z.string().min(1, "Customer is required"),
+  orderId: os(40),
+  csat: z.coerce.number().int().min(1).max(5).optional().nullable(),
+  nps: z.coerce.number().int().min(0).max(10).optional().nullable(),
+  comment: os(1000),
+  collectedAt: z.coerce.date(),
+}).refine((d) => d.csat != null || d.nps != null, {
+  message: "Provide at least a CSAT or NPS score",
+  path: ["csat"],
+});
+
+export type DockEventInput = z.infer<typeof dockEventSchema>;
+export type DamageReportInput = z.infer<typeof damageReportSchema>;
+export type DamageStatusInput = z.infer<typeof damageStatusSchema>;
+export type FeedbackInput = z.infer<typeof feedbackSchema>;

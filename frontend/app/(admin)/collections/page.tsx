@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Inbox } from "lucide-react";
 import { serverApi } from "@frontend/lib/server-api";
 import type { AgingReport } from "@frontend/lib/api-types";
+import { CollectionsManager } from "./collections-manager";
 
 export const metadata = { title: "Collections | FleetFlow" };
 export const dynamic = "force-dynamic";
@@ -94,6 +95,13 @@ export default async function CollectionsPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Collections worklist — dunning, disputes, promise-to-pay, write-off */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold tracking-tight">Collections Worklist</h2>
+        <p className="text-sm text-muted-foreground">Outstanding invoices with dunning, dispute, promise-to-pay and write-off actions.</p>
+        <CollectionsManager />
+      </div>
     </div>
   );
 }

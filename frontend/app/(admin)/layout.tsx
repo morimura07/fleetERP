@@ -13,11 +13,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <SessionProvider session={session}>
       <TokenSync />
-      <div className="flex min-h-screen">
+      <div className="flex h-screen overflow-hidden">
         <Sidebar role={session.user.role} />
-        <div className="flex flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <Topbar name={session.user.name ?? ""} role={session.user.role} />
-          <main className="scroll-slim flex-1 overflow-x-hidden p-5 md:p-8">
+          <main className="scroll-slim flex-1 overflow-y-auto overflow-x-hidden p-5 md:p-8">
             <div className="mx-auto w-full max-w-[1600px]">{children}</div>
           </main>
         </div>

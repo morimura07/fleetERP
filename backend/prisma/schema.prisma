@@ -38,6 +38,40 @@ enum VehicleStatus {
   UNAVAILABLE
 }
 
+// Driver employment relationship (spec: Driver §3).
+enum DriverType {
+  COMPANY // company driver
+  OWNER_OPERATOR
+  SUBCONTRACTOR
+}
+
+// Vehicle ownership (spec: Vehicles §4).
+enum OwnershipStatus {
+  OWNED
+  LEASED
+  SUBCONTRACTED
+}
+
+// Fuel type for a vehicle (spec: Vehicles §4).
+enum FuelType {
+  DIESEL
+  PETROL
+  ELECTRIC
+  HYBRID
+  CNG
+  OTHER
+}
+
+// Warehouse facility classification (spec: Warehouses §1).
+enum FacilityType {
+  DISTRIBUTION_CENTER
+  CROSS_DOCK
+  TRANSIT_HUB
+  BONDED_WAREHOUSE
+  YARD
+  OTHER
+}
+
 enum JobStatus {
   PENDING // 受付
   WAITING_DISPATCH // 配車待ち
@@ -70,6 +104,38 @@ enum AccountType {
   EQUITY
   INCOME
   EXPENSE
+}
+
+// Financial-statement sub-classification of an account (spec: COA §1).
+enum AccountSubType {
+  CURRENT_ASSET
+  FIXED_ASSET
+  CURRENT_LIABILITY
+  LONG_TERM_LIABILITY
+  EQUITY
+  OPERATING_REVENUE
+  OTHER_REVENUE
+  COST_OF_SALES // direct costs
+  OPERATING_EXPENSE
+  OTHER_EXPENSE
+  NONE
+}
+
+// How an account participates in postings (spec: COA §1, §4).
+enum PostingType {
+  POSTABLE // accepts direct journal postings
+  HEADER // grouping node, no direct postings
+  CONTROL // sub-ledger control (AR/AP) — no manual postings
+}
+
+// Journal document classification (spec: Journal §1).
+enum JournalDocType {
+  GENERAL
+  ACCRUAL
+  DEPRECIATION
+  CASH_DISBURSEMENT
+  CASH_RECEIPT
+  ADJUSTMENT
 }
 
 // A journal entry is immutable once POSTED; corrections are made by REVERSED contra-entries.
@@ -105,6 +171,19 @@ enum CorridorType {
   DOMESTIC
 }
 
+// Conveyance / equipment type for a load (spec: Orders §4, Trips §3).
+enum EquipmentType {
+  FLATBED
+  DRY_VAN
+  REEFER // refrigerated
+  TANKER
+  CONTAINER_20FT
+  CONTAINER_40FT
+  CURTAIN_SIDE
+  LTL // less-than-truckload
+  OTHER
+}
+
 // Trip cost categories — map 1:1 to expense accounts in the chart of accounts.
 enum TripExpenseType {
   FUEL // 5000
@@ -124,13 +203,75 @@ enum PaymentTerm {
   COD // cash on delivery
 }
 
+// Credit & Collections (M7) — dunning sequence stage (spec: Collections §4).
+enum DunningLevel {
+  NONE
+  REMINDER // level 1: friendly reminder
+  FIRST_NOTICE // level 2
+  SECOND_NOTICE // level 3
+  FINAL_NOTICE
+  LEGAL // handed to legal / debt collection
+}
+
+// Dispute lifecycle for a contested invoice (spec: Collections §4).
+enum DisputeStatus {
+  NONE
+  OPEN
+  UNDER_INVESTIGATION
+  RESOLVED
+  WRITTEN_OFF
+}
+
+// Type of a logged collection activity (spec: Collections §4).
+enum CollectionActivityType {
+  CALL
+  EMAIL
+  LETTER
+  DUNNING
+  PROMISE_TO_PAY
+  DISPUTE
+  NOTE
+  WRITE_OFF
+}
+
 enum VendorGroup {
   FUEL_SUPPLIER
   SPARE_PARTS
   CLEARING_AGENT
   SUBCONTRACTED_FLEET
   STATUTORY
+  CARRIER // FTL/LTL carrier (spec: Vendor §1)
+  FREIGHT_BROKER
+  OWNER_OPERATOR
+  WORKSHOP // garage / service provider
   OTHER
+}
+
+// Vendor remittance method (spec: Vendor §3).
+enum PaymentMethod {
+  EFT
+  WIRE
+  CHEQUE
+  CASH
+  MOBILE_MONEY
+  FUEL_CARD
+}
+
+// Customer account role (spec: Customer §1).
+enum CustomerAccountGroup {
+  SOLD_TO
+  SHIP_TO
+  BILL_TO
+  PAYER
+}
+
+// Master-data lifecycle for partners (spec: Client §1, Collections §1).
+enum PartyStatus {
+  ACTIVE
+  INACTIVE
+  ON_HOLD
+  PROSPECT
+  SUSPENDED
 }
 
 // Invoice lifecycle for both AP bills and AR invoices.
@@ -369,6 +510,22 @@ enum TimesheetStatus {
   REJECTED
 }
 
+// ── Operational KPI capture (client dashboard spec, Tier C internal) ──
+// Dock/yard arrival & departure, so truck-turnaround time can be computed.
+enum DockEventKind {
+  ARRIVAL
+  DEPARTURE
+}
+
+// Cargo damage / loss claim lifecycle, for the damage & claim-rate KPI.
+enum DamageStatus {
+  REPORTED
+  UNDER_REVIEW
+  APPROVED // claim accepted
+  REJECTED
+  SETTLED
+}
+
 // ───────────────────────── Multi-company (M34) ─────────────────────────
 
 // A legal entity / tenant. Its `code` is the `dataAreaId` used to partition every
@@ -406,8 +563,23 @@ model User {
   image             String?
   resetToken        String?   @unique
   resetTokenExpires DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+
+  // ── Profile & operations (spec: Users §1–2) ──
+  phone          String?
+  jobTitle       String? // Dispatcher / Fleet Manager / Accountant …
+  assignedBranch String? // physical terminal / hub
+
+  // ── Financial & audit access (spec: Users §4) ──
+  costCenter    String?
+  approvalLimit Decimal? @db.Decimal(18, 2) // max freight/procurement approval
+  esignatory    Boolean  @default(false) // can sign freight bills / LRs / PODs
+
+  // ── System (spec: Users §3, §5) ──
+  languagePref String?
+  timeZone     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // 1:1 — a DRIVER user is linked to a Driver record
   driver           Driver?
@@ -441,22 +613,53 @@ model Driver {
   contractType ContractType @default(CONTRACTOR)
   joinedAt     DateTime
   status       DriverStatus @default(ACTIVE)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
 
-  availability  DriverAvailability[]
-  holidays      Holiday[]
-  dispatches    Dispatch[]
-  dailyReports  DailyReport[]
-  payments      Payment[]
-  trips         Trip[]
-  transfers     MoneyTransfer[]
-  documents     DriverDocument[]
-  employee      Employee?
-  expenseClaims ExpenseClaim[]
-  version       Int                  @default(0) // optimistic concurrency (PRD §7.1)
-  createdById   String? // audit: creator user id
-  updatedById   String? // audit: last-modifier user id
+  // ── Identity & contact (spec: Driver §1) ──
+  dateOfBirth      DateTime? @db.Date
+  gender           String?
+  altPhone         String?
+  homeTerminal     String? // default depot the driver operates from
+  emergencyContact String? // name · relationship · phone
+
+  // ── Qualifications & certifications (spec: Driver §2) ──
+  licenseNumber     String? // CDL / local equivalent
+  licenseClass      String? // class / endorsements (Hazmat, Tanker)
+  licenseExpiry     DateTime? @db.Date
+  medicalCertExpiry DateTime? @db.Date
+  passportNumber    String?
+  passportExpiry    DateTime? @db.Date
+
+  // ── Employment & payroll config (spec: Driver §3) ──
+  driverType      DriverType @default(COMPANY)
+  terminationDate DateTime?  @db.Date
+  payScale        String? // per-mile (loaded/empty) / hourly / % of load
+  taxId           String? // SSN / TIN
+
+  // ── HOS & telematics (spec: Driver §4–5) ──
+  eldId               String? // ELD / telematics hardware ID
+  hosCycleRule        String? // e.g. "70h/8-day"
+  terminalTimeZone    String?
+  assignedVehicle     String? // primary tractor / vehicle ref
+  cargoQualifications String? // trailer / cargo types certified
+  languagePref        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  availability      DriverAvailability[]
+  holidays          Holiday[]
+  dispatches        Dispatch[]
+  dailyReports      DailyReport[]
+  payments          Payment[]
+  trips             Trip[]
+  secondDriverTrips Trip[]               @relation("TripSecondDriver")
+  transfers         MoneyTransfer[]
+  documents         DriverDocument[]
+  employee          Employee?
+  expenseClaims     ExpenseClaim[]
+  version           Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById       String? // audit: creator user id
+  updatedById       String? // audit: last-modifier user id
 
   @@index([status])
   @@index([dataAreaId])
@@ -516,9 +719,52 @@ model Vehicle {
   inspectionExpiry DateTime      @db.Date // 車検満了
   status           VehicleStatus @default(AVAILABLE)
 
+  // ── Identification & specs (spec: Vehicles §1) ──
+  vin         String? // VIN / chassis number
+  yearMade    Int?
+  vehicleType String? // Flatbed / Tanker / Box Van / Reefer
+  bodyType    String? // rigid / articulated tractor / trailer
+
+  // ── Physical & technical (spec: Vehicles §2) ──
+  tareWeightKg     Decimal? @db.Decimal(12, 2)
+  gvwKg            Decimal? @db.Decimal(12, 2) // gross vehicle weight
+  payloadKg        Decimal? @db.Decimal(12, 2)
+  loadingVolumeCbm Decimal? @db.Decimal(12, 2)
+  dimensions       String? // L×W×H
+  axleCount        Int?
+  suspensionType   String?
+
+  // ── Compliance & licensing (spec: Vehicles §3) ──
+  registrationExpiry DateTime? @db.Date
+  insurancePolicyNo  String?
+  emissionRating     String? // Euro IV / Euro VI
+  operatingPermit    String? // LATRA etc.
   // M11 cross-border compliance (PRD §4.2). Optional so existing rows stay valid.
   comesaPermitExpiry DateTime? @db.Date // COMESA transit permit
   yellowCardExpiry   DateTime? @db.Date // Yellow Card insurance (cross-border)
+
+  // ── Operations & telematics (spec: Vehicles §4) ──
+  ownershipStatus OwnershipStatus @default(OWNED)
+  transporterName String? // third-party provider (leased/subcontracted)
+  fuelType        FuelType?
+  fuelCardNumber  String?
+  telematicsId    String? // GPS device ID
+  homeTerminal    String?
+  assignedDriver  String?
+
+  // ── Maintenance & workshop (spec: Vehicles §5) ──
+  odometerKm      Int?
+  engineNumber    String?
+  tyreSize        String?
+  batterySpec     String?
+  lastServiceDate DateTime? @db.Date
+  lastServiceKm   Int?
+
+  // ── Financial & asset (spec: Vehicles §6) ──
+  assetAccountCode   String? // links to fixed-asset / GL
+  purchaseDate       DateTime? @db.Date
+  purchasePrice      Decimal?  @db.Decimal(18, 2)
+  depreciationMethod String? // straight-line / declining balance
   // Fuel-efficiency target: km per litre when loaded, for siphoning/efficiency checks.
   fuelTargetKmPerL   Decimal?  @db.Decimal(6, 2)
 
@@ -530,6 +776,7 @@ model Vehicle {
   dispatches    Dispatch[]
   trips         Trip[]
   position      VehiclePosition?
+  dockEvents    DockEvent[]
   version       Int                  @default(0) // optimistic concurrency (PRD §7.1)
   createdById   String? // audit: creator user id
   updatedById   String? // audit: last-modifier user id
@@ -561,15 +808,39 @@ model VehicleMaintenance {
 // ───────────────────────── Client (荷主) ─────────────────────────
 
 model Client {
-  id            String   @id @default(cuid())
-  dataAreaId    String   @default("HQ01") // legal entity (multi-company isolation)
+  id            String @id @default(cuid())
+  dataAreaId    String @default("HQ01") // legal entity (multi-company isolation)
   companyName   String
   contactPerson String
   phone         String
   address       String
   email         String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+
+  // ── General & contact (spec: Client §1) ──
+  tradeName String? // DBA
+  industry  String? // 3PL / Retail / Manufacturing / Wholesaler
+  status    PartyStatus @default(ACTIVE)
+  website   String?
+
+  // ── Billing & financial (spec: Client §2) ──
+  tin         String?
+  currency    String      @default("USD")
+  paymentTerm PaymentTerm @default(NET_30)
+  creditLimit Decimal     @default(0) @db.Decimal(18, 2)
+  taxExempt   Boolean     @default(false)
+
+  // ── Freight profile (spec: Client §3) ──
+  shippingPreferences String? // LTL / FTL / Air / Ocean / Intermodal
+  preferredCarriers   String?
+  hazmatCertified     Boolean @default(false)
+
+  // ── Compliance & integration (spec: Client §5–6) ──
+  insuranceRequirement String? // minimum cargo value limits
+  slaExpiry            DateTime? @db.Date
+  accountManager       String? // sales rep / account owner
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   jobs        DeliveryJob[]
   orders      Order[]
@@ -729,8 +1000,23 @@ model Account {
   parent     Account?    @relation("AccountTree", fields: [parentId], references: [id], onDelete: SetNull)
   children   Account[]   @relation("AccountTree")
   isActive   Boolean     @default(true)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+
+  // ── Classification & posting behaviour (spec: COA §1, §4) ──
+  subType            AccountSubType @default(NONE)
+  postingType        PostingType    @default(POSTABLE)
+  currency           String? // operational currency (null = entity base)
+  defaultTaxCode     String? // default tax code applied on postings
+  reconciliation     Boolean        @default(false) // AR/AP control — blocks manual postings
+  allowManualPosting Boolean        @default(true)
+  budgetingAllowed   Boolean        @default(false)
+
+  // ── Transport dimensions (spec: COA §2) ──
+  fleetSegment  String? // vehicle / fleet classification tag
+  routeCorridor String? // shipping lane / corridor tag
+  costCenter    String? // profit / cost center (Long-Haul, Last-Mile …)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   lines       JournalLine[]
   version     Int           @default(0) // optimistic concurrency (PRD §7.1)
@@ -755,6 +1041,11 @@ model JournalEntry {
   exchangeRate  Decimal       @default(1) @db.Decimal(18, 6) // to base currency, recorded per posting
   memo          String?
   status        JournalStatus @default(DRAFT)
+
+  // ── Document header (spec: Journal §1) ──
+  docType      JournalDocType @default(GENERAL)
+  documentDate DateTime?      @db.Date // date the transaction actually occurred
+  referenceNo  String? // external ref: B/L, CMR waybill, vendor invoice
 
   // Correction trail: a REVERSED entry points back to the entry it cancels.
   reversalOfId String?       @unique
@@ -807,6 +1098,16 @@ model JournalLine {
   // Free-form dimension for branch / cost-object tagging (PRD M8 dimensions).
   dimension String?
 
+  // ── Line-item detail & operational dimensions (spec: Journal §2, §3) ──
+  taxCode     String? // VAT / sales-tax code for the line
+  openItemRef String? // matching ref (invoice ↔ receipt)
+  vehicleTag  String? // vehicle / fleet ID for per-asset profitability
+  routeTag    String? // route / corridor ID for per-lane margins
+  costCenter  String? // terminal / depot / business unit
+  driverTag   String? // driver ID (per-diems, fines)
+  partyTag    String? // customer / vendor / subcontractor code
+  tripTag     String? // trip / haulage-contract number
+
   @@index([entryId])
   @@index([accountId])
   @@map("journal_lines")
@@ -834,6 +1135,46 @@ model Order {
   bookingDate      DateTime     @db.Date
   status           OrderStatus  @default(DRAFT)
 
+  // ── Organizational (spec: Orders §1) ──
+  branch      String? // operating office handling the job
+  salesperson String? // account manager credited with the sale
+  incoterms   String? // FOB / CIF / EXW
+  paymentTerm PaymentTerm @default(NET_30)
+
+  // ── Parties (spec: Orders §2) ──
+  shipper     String? // consignor — sends the goods
+  consignee   String? // receives the goods
+  billTo      String? // pays the freight invoice
+  notifyParty String? // notified on arrival / status change
+
+  // ── Routing (spec: Orders §3) ──
+  pickupAddress   String?
+  deliveryAddress String?
+  pol             String? // port of loading
+  pod             String? // port of delivery
+  etd             DateTime? // estimated departure
+  eta             DateTime? // estimated arrival
+  routingNotes    String?
+
+  // ── Cargo & equipment (spec: Orders §4) ──
+  equipmentType EquipmentType @default(OTHER)
+  pieceCount    Int? // pallets / boxes / parcels
+  dimensions    String? // L×W×H
+  hazmat        Boolean       @default(false)
+  hazmatUnCode  String? // UN number / class / packing group
+
+  // ── Financial (spec: Orders §5) ──
+  freightRate        Decimal? @db.Decimal(18, 2) // agreed per-unit rate
+  accessorialCharges Decimal  @default(0) @db.Decimal(18, 2) // detention, tarping, liftgate…
+  taxAmount          Decimal  @default(0) @db.Decimal(18, 2)
+
+  // ── Documentation (spec: Orders §6) ──
+  customerPo          String? // client's PO number
+  blNumber            String? // Master/House B/L or AWB
+  hsCode              String? // Harmonized System / customs tariff
+  sealNumber          String?
+  specialInstructions String?
+
   // Ledger link: the AR invoice journal entry created on invoicing.
   invoiceEntryId String?       @unique
   invoiceEntry   JournalEntry? @relation("OrderInvoice", fields: [invoiceEntryId], references: [id], onDelete: SetNull)
@@ -843,9 +1184,11 @@ model Order {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  trip        Trip?
-  version     Int     @default(0) // optimistic concurrency (PRD §7.1)
-  updatedById String? // audit: last-modifier user id
+  trip          Trip?
+  damageReports DamageReport[]
+  feedback      CustomerFeedback[]
+  version       Int                @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById   String? // audit: last-modifier user id
 
   @@index([status])
   @@index([clientId])
@@ -874,8 +1217,46 @@ model Trip {
   scheduledEnd   DateTime
   status         TripStatus   @default(PLANNED)
 
+  // ── Vehicle & crew (spec: Trips §1) ──
+  trailerId      String? // connected trailer / container number
+  secondDriverId String? // Driver 2
+  secondDriver   Driver?   @relation("TripSecondDriver", fields: [secondDriverId], references: [id], onDelete: SetNull)
+  actualStart    DateTime?
+  actualEnd      DateTime?
+
+  // ── Route (spec: Trips §2) ──
+  originFacility      String?
+  destinationFacility String?
+  viaPoints           String? // transit hubs / border crossings
+  plannedDistanceKm   Decimal? @db.Decimal(12, 2)
+  routeCode           String? // pre-defined route template
+
+  // ── Freight (spec: Trips §3) ──
+  waybillNumber   String?
+  cargoWeightKg   Decimal? @db.Decimal(12, 2)
+  packageCount    Int?
+  specialHandling String? // Hazmat / Refrigerated / Oversized
+
+  // ── Financials (spec: Trips §4) ──
+  advancePayment Decimal @default(0) @db.Decimal(18, 2) // cash / fuel card to driver
+  driverWages    Decimal @default(0) @db.Decimal(18, 2) // fixed / per-diem / commission
+  tollPermitCost Decimal @default(0) @db.Decimal(18, 2)
+  miscExpense    Decimal @default(0) @db.Decimal(18, 2)
+
+  // ── Fuel management (spec: Trips §5) ──
+  fuelType       String? // Diesel …
+  fuelCardNumber String?
+  refuelStations String? // pre-approved stops
+
   // M11 fuel efficiency: actual litres consumed → actual km/L vs vehicle target.
   fuelLitres Decimal? @db.Decimal(10, 2)
+
+  // ── Compliance & safety (spec: Trips §6) ──
+  ewayBillRef   String? // e-way bill / customs reference
+  podStatus     Boolean @default(false) // proof-of-delivery uploaded
+  podUrl        String?
+  sealNumbers   String?
+  incidentNotes String? // breakdowns, accidents, delays
 
   // M12 freight-bill reconciliation against the carrier invoice.
   reconStatus       ReconStatus @default(UNRECONCILED)
@@ -886,9 +1267,11 @@ model Trip {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  expenses    TripExpense[]
-  version     Int           @default(0) // optimistic concurrency (PRD §7.1)
-  updatedById String? // audit: last-modifier user id
+  expenses      TripExpense[]
+  dockEvents    DockEvent[]
+  damageReports DamageReport[]
+  version       Int            @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById   String? // audit: last-modifier user id
 
   @@index([driverId, scheduledStart])
   @@index([vehicleId, scheduledStart])
@@ -932,8 +1315,39 @@ model Vendor {
   email       String?
   phone       String?
   isActive    Boolean     @default(true)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+
+  // ── General & organizational (spec: Vendor §1) ──
+  operatingName String? // DBA / trading name
+  searchTerm    String? // alias / short code for lookup
+  parentCompany String? // holding company for spend roll-ups
+
+  // ── Contact & compliance (spec: Vendor §2) ──
+  address         String?
+  branchAddress   String?
+  contactPerson   String?
+  billingContact  String?
+  insurancePolicy String? // carrier liability / cargo / WC policy no.
+  insuranceExpiry DateTime? @db.Date // triggers a dispatch block when passed
+  licenseNumber   String? // operating authority / hazmat certification
+
+  // ── Financial (spec: Vendor §3) ──
+  paymentMethod PaymentMethod? // EFT / wire / cheque / mobile money / fuel card
+  bankName      String?
+  bankSwift     String?
+  bankIban      String?
+  mobileMoney   String?
+  reconAccount  String? // COA control account this vendor's sub-ledger maps to (2000)
+
+  // ── Transport / TMS (spec: Vendor §4) ──
+  scacCode       String? // Standard Carrier Alpha Code
+  mcDotNumber    String? // MC / DOT regulatory number
+  equipmentTypes String? // e.g. "Flatbed, Reefer, Tanker"
+  fleetSize      Int? // trucks/trailers available
+  rateAgreement  String? // default rates / FSC formula / lane pricing note
+  ediEndpoint    String? // EDI profile / webhook URL
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   invoices       VendorInvoice[]
   purchaseOrders PurchaseOrder[]
@@ -944,6 +1358,7 @@ model Vendor {
 
   @@unique([dataAreaId, code])
   @@index([group])
+  @@index([insuranceExpiry])
   @@map("vendors")
 }
 
@@ -1009,25 +1424,76 @@ model VendorPayment {
 // ───────────────────────── Customer (M2 — Accounts Receivable) ─────────────────────────
 
 model Customer {
-  id          String   @id @default(cuid())
-  dataAreaId  String   @default("HQ01")
+  id          String  @id @default(cuid())
+  dataAreaId  String  @default("HQ01")
   code        String // AR-CST-001
   name        String
   tin         String?
-  creditLimit Decimal  @default(0) @db.Decimal(18, 2)
-  creditDays  Int      @default(30)
-  taxExempt   Boolean  @default(false) // diplomatic / transit
-  currency    String   @default("USD")
+  creditLimit Decimal @default(0) @db.Decimal(18, 2)
+  creditDays  Int     @default(30)
+  taxExempt   Boolean @default(false) // diplomatic / transit
+  currency    String  @default("USD")
   email       String?
   phone       String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean @default(true)
 
-  invoices    CustomerInvoice[]
-  version     Int               @default(0) // optimistic concurrency (PRD §7.1)
-  createdById String? // audit: creator user id
-  updatedById String? // audit: last-modifier user id
+  // ── General (spec: Customer §1) ──
+  accountGroup   CustomerAccountGroup @default(SOLD_TO)
+  industry       String?
+  registrationNo String?
+  searchTerm     String?
+
+  // ── Address & geocoding (spec: Customer §2) ──
+  billingAddress String?
+  city           String?
+  country        String?  @default("TZ")
+  postalCode     String?
+  latitude       Decimal? @db.Decimal(10, 6)
+  longitude      Decimal? @db.Decimal(10, 6)
+  transportZone  String? // route-optimization grouping
+  timeZone       String?
+
+  // ── Contact (spec: Customer §3) ──
+  contactPerson String?
+  apContact     String? // accounts-payable contact for billing
+
+  // ── Freight profile (spec: Customer §4) ──
+  shippingConditions String? // immediate / normal
+  meansOfTransport   String? // flatbed / reefer / LTL / FTL
+  dockRestrictions   String?
+  hazmatCertified    Boolean @default(false)
+
+  // ── Financial & operational (spec: Customer §5–6) ──
+  incoterms         String? // FOB / CIF / EXW
+  paymentTerm       PaymentTerm @default(NET_30)
+  reconAccount      String? // AR control account (1100)
+  preferredCarrier  String?
+  communicationLang String? // language for waybills / invoices
+
+  // ── Credit & collections (spec: Collections §1–3) ──
+  accountStatus      PartyStatus  @default(ACTIVE)
+  parentAccount      String? // master org for consolidated credit
+  creditRating       String? // score / D&B rating (if available in region)
+  tempCreditLimit    Decimal?     @db.Decimal(18, 2) // approved seasonal increase
+  creditReviewDate   DateTime?    @db.Date
+  creditHoldOverride Boolean      @default(false) // dispatcher can bill over the limit
+  dunningLevel       DunningLevel @default(NONE)
+  collectionStrategy String? // High-Risk / Standard Carrier …
+  collectorId        String? // assigned AR specialist
+  discountPercent    Decimal      @default(0) @db.Decimal(5, 2) // early-payment incentive
+  discountDays       Int          @default(0)
+  penaltyRate        Decimal      @default(0) @db.Decimal(5, 2) // overdue interest
+  podRequired        Boolean      @default(false) // invoice valid for collection only with POD
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoices             CustomerInvoice[]
+  collectionActivities CollectionActivity[]
+  feedback             CustomerFeedback[]
+  version              Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById          String? // audit: creator user id
+  updatedById          String? // audit: last-modifier user id
 
   @@unique([dataAreaId, code])
   @@index([name])
@@ -1054,6 +1520,15 @@ model CustomerInvoice {
   memo          String?
   status        InvoiceStatus @default(DRAFT)
 
+  // ── Collections lifecycle (spec: Collections §4) ──
+  dunningLevel       DunningLevel  @default(NONE)
+  disputeStatus      DisputeStatus @default(NONE)
+  disputedAmount     Decimal       @default(0) @db.Decimal(18, 2)
+  promiseToPayDate   DateTime?     @db.Date
+  promiseToPayAmount Decimal?      @db.Decimal(18, 2)
+  lastContactDate    DateTime?     @db.Date
+  writeOffAmount     Decimal       @default(0) @db.Decimal(18, 2)
+
   postingEntryId String?       @unique
   postingEntry   JournalEntry? @relation("CustomerInvoicePosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
 
@@ -1062,14 +1537,45 @@ model CustomerInvoice {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  receipts    CustomerReceipt[]
-  version     Int               @default(0) // optimistic concurrency (PRD §7.1)
-  updatedById String? // audit: last-modifier user id
+  receipts             CustomerReceipt[]
+  collectionActivities CollectionActivity[]
+  version              Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById          String? // audit: last-modifier user id
 
   @@unique([dataAreaId, invoiceNumber])
   @@index([status])
   @@index([dueDate])
+  @@index([disputeStatus])
   @@map("customer_invoices")
+}
+
+// A logged collection action — dunning, call, promise-to-pay, dispute, write-off,
+// or a free-form note (spec: Collections §4). Attached to a customer, optionally to
+// a specific invoice. Provides the dunning audit trail and the collector's notes.
+model CollectionActivity {
+  id         String           @id @default(cuid())
+  dataAreaId String           @default("HQ01")
+  customerId String
+  customer   Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoiceId  String?
+  invoice    CustomerInvoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  type          CollectionActivityType
+  activityDate  DateTime               @default(now())
+  note          String?
+  // Snapshot fields for the action taken (nullable per type).
+  dunningLevel  DunningLevel?
+  promiseDate   DateTime?              @db.Date
+  promiseAmount Decimal?               @db.Decimal(18, 2)
+  amount        Decimal?               @db.Decimal(18, 2) // disputed / written-off amount
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([dataAreaId])
+  @@index([customerId])
+  @@index([invoiceId])
+  @@map("collection_activities")
 }
 
 // A receipt against an AR invoice: Dr Bank / Cr Accounts Receivable.
@@ -1270,15 +1776,30 @@ model DriverDocument {
 // A named checkpoint on the corridors (Chalinze, Malaba, Namanga …) with
 // coordinates. Master data for route planning and the border-turnaround tracker.
 model GpsWaypoint {
-  id          String   @id @default(cuid())
-  dataAreaId  String   @default("HQ01") // legal entity (multi-company isolation)
-  code        String   @unique // CHALINZE, MALABA …
-  name        String
-  kind        String   @default("CHECKPOINT") // CHECKPOINT / BORDER / WEIGHBRIDGE / DEPOT
-  lat         Decimal  @db.Decimal(9, 6)
-  lng         Decimal  @db.Decimal(9, 6)
-  country     String? // ISO country of the point
-  isActive    Boolean  @default(true)
+  id         String  @id @default(cuid())
+  dataAreaId String  @default("HQ01") // legal entity (multi-company isolation)
+  code       String  @unique // CHALINZE, MALABA …
+  name       String
+  kind       String  @default("CHECKPOINT") // CHECKPOINT / BORDER / WEIGHBRIDGE / DEPOT
+  lat        Decimal @db.Decimal(9, 6)
+  lng        Decimal @db.Decimal(9, 6)
+  country    String? // ISO country of the point
+  isActive   Boolean @default(true)
+
+  // ── Coordinate & facility (spec: GPS Waypoint §1–2) ──
+  altitude       Decimal? @db.Decimal(9, 2) // metres above sea level
+  locationType   String? // Hub / Warehouse / Port / Customer Site / Fuel Stop
+  address        String?
+  geofenceRadius Int? // metres
+  timeZone       String?
+  contactDetails String? // on-site manager / phone / hours
+
+  // ── Operational rules (spec: GPS Waypoint §3) ──
+  serviceTimeMin     Int? // standard loading/unloading window
+  requiredEquipment  String? // Forklift / Reefer power …
+  accessRestrictions String? // No night deliveries / weight limits
+  sequenceNo         Int? // visit order on a multi-stop route
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   version     Int      @default(0) // optimistic concurrency (PRD §7.1)
@@ -1326,8 +1847,44 @@ model StockItem {
   reorderLevel   Decimal       @default(0) @db.Decimal(18, 3)
   currency       String        @default("USD")
   isActive       Boolean       @default(true)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+
+  // ── Identification & classification (spec: Inventory §1) ──
+  oemPartNumber      String?
+  supplierPartNumber String?
+
+  // ── Fleet & maintenance (spec: Inventory §2) ──
+  applicableFleet String? // vehicle make/model/fleet tag the part fits
+  partCondition   String? // New / Rebuilt / Remanufactured / Used
+  assetSerialNo   String? // for high-value components
+  hazmat          Boolean @default(false)
+
+  // ── Purchasing & financial (spec: Inventory §3) ──
+  standardCost      Decimal? @db.Decimal(18, 4)
+  lastPurchasePrice Decimal? @db.Decimal(18, 4)
+  defaultVendor     String?
+  taxCode           String?
+  valuationMethod   String?  @default("AVERAGE") // AVERAGE / FIFO / LIFO
+
+  // ── Warehousing & location (spec: Inventory §4) ──
+  storageLocation String?
+  binRack         String?
+  batchLot        String?
+  manufactureDate DateTime? @db.Date
+  expiryDate      DateTime? @db.Date
+
+  // ── Inventory control (spec: Inventory §5) ──
+  maxStockLevel    Decimal? @db.Decimal(18, 3)
+  safetyStock      Decimal? @db.Decimal(18, 3)
+  leadTimeDays     Int?
+  economicOrderQty Decimal? @db.Decimal(18, 3)
+
+  // ── Warranty & quality (spec: Inventory §6) ──
+  warrantyPeriod String? // duration or mileage/hours
+  warrantyStart  DateTime? @db.Date
+  qualityStatus  String? // Available / Quarantined / Awaiting Inspection
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   movements    StockMovement[]
   poLines      PurchaseOrderLine[]
@@ -1383,6 +1940,35 @@ model Warehouse {
   location   String? // city / address
   isDefault  Boolean @default(false) // the MAIN warehouse receipts default to
   isActive   Boolean @default(true)
+
+  // ── Identification (spec: Warehouses §1) ──
+  facilityType FacilityType @default(DISTRIBUTION_CENTER)
+  timeZone     String?
+
+  // ── Location & geocoding (spec: Warehouses §2) ──
+  address    String?
+  city       String?
+  country    String?  @default("TZ")
+  postalCode String?
+  latitude   Decimal? @db.Decimal(10, 6)
+  longitude  Decimal? @db.Decimal(10, 6)
+
+  // ── Contact (spec: Warehouses §3) ──
+  managerName String?
+  phone       String?
+  email       String?
+
+  // ── Dock & operations (spec: Warehouses §4) ──
+  dockCapacity   Int?
+  dockScheduling String? // appointment-based / open-arrival
+  operatingHours String?
+
+  // ── Capacity & control (spec: Warehouses §5–6) ──
+  storageTypes    String? // Bulk / Rack / Cold / Hazmat
+  capacityLimit   String? // max weight / volume / pallets
+  putawayStrategy String? // fixed bin / empty bin / closest to dock
+  pickingStrategy String? // FIFO / LIFO / partial pallet
+  countMethod     String? // Annual / Cycle / Continuous
 
   balances  StockBalance[]
   movements StockMovement[]
@@ -1515,9 +2101,24 @@ model Employee {
   status      EmployeeStatus @default(ACTIVE)
   bankAccount String?
   hiredAt     DateTime       @db.Date
+
+  // ── Master data & demographics (spec: Payroll §1) ──
+  jobTitle       String? // Long-Haul Driver / Dispatch / Warehouse Staff
+  employmentType String? // Full-time / Contract / Agency
+  department     String? // department / cost center
+  costCenter     String?
+  payFrequency   String? // Weekly / Bi-weekly / Monthly
+  nssfNumber     String? // pension / social security
+  shifNumber     String? // health insurance
+
+  // ── Standing allowances (spec: Payroll §4) ──
+  perDiem            Decimal @default(0) @db.Decimal(18, 2)
+  overnightAllowance Decimal @default(0) @db.Decimal(18, 2)
+  phoneAllowance     Decimal @default(0) @db.Decimal(18, 2)
+  otherAllowance     Decimal @default(0) @db.Decimal(18, 2)
   // Optional link to a Driver record (a driver may also be an employee).
-  driverId    String?        @unique
-  driver      Driver?        @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  driverId           String? @unique
+  driver             Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
   payslips      Payslip[]
   contracts     EmploymentContract[]
@@ -1980,4 +2581,82 @@ model Timesheet {
   @@index([dataAreaId])
   @@index([dataAreaId, status])
   @@map("timesheets")
+}
+
+// ── Operational KPI capture (Tier C internal) ───────────────────────────────
+// Records when a vehicle arrives at and departs a dock/yard, so truck-turnaround
+// time (departure − arrival) can be computed without a telematics feed.
+model DockEvent {
+  id         String        @id @default(cuid())
+  dataAreaId String        @default("HQ01")
+  vehicleId  String
+  vehicle    Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  tripId     String?
+  trip       Trip?         @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  facility   String? // dock / yard / warehouse name
+  kind       DockEventKind
+  eventAt    DateTime
+  note       String?
+
+  version     Int      @default(0)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId])
+  @@index([vehicleId, eventAt])
+  @@index([tripId])
+  @@map("dock_events")
+}
+
+// A cargo damage / loss claim on a delivered load — feeds the damage & claim-rate KPI.
+model DamageReport {
+  id           String       @id @default(cuid())
+  dataAreaId   String       @default("HQ01")
+  orderId      String?
+  order        Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  tripId       String?
+  trip         Trip?        @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  reportNumber String
+  status       DamageStatus @default(REPORTED)
+  reportedAt   DateTime     @db.Date
+  cargoValue   Decimal      @default(0) @db.Decimal(18, 2) // value of the affected shipment
+  damageValue  Decimal      @default(0) @db.Decimal(18, 2) // assessed damage / loss
+  currency     String       @default("USD")
+  description  String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, reportNumber])
+  @@index([dataAreaId])
+  @@index([dataAreaId, status])
+  @@map("damage_reports")
+}
+
+// Manually-captured customer satisfaction (CSAT 1–5) and NPS (0–10) — the survey
+// tool is a Tier C integration; until then this is entered by the account team.
+model CustomerFeedback {
+  id          String   @id @default(cuid())
+  dataAreaId  String   @default("HQ01")
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderId     String?
+  order       Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  csat        Int? // 1–5 satisfaction score
+  nps         Int? // 0–10 recommend score
+  comment     String?
+  collectedAt DateTime @db.Date
+
+  version     Int      @default(0)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId])
+  @@index([customerId])
+  @@map("customer_feedback")
 }

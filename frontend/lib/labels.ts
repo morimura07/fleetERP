@@ -1,18 +1,32 @@
 import type {
   JobStatus,
   DriverStatus,
+  DriverType,
+  OwnershipStatus,
+  FuelType,
+  FacilityType,
   VehicleStatus,
   Role,
   ContractType,
   AccountType,
+  AccountSubType,
+  PostingType,
+  JournalDocType,
   JournalStatus,
   OrderStatus,
   TripStatus,
   CorridorType,
+  EquipmentType,
   TripExpenseType,
   InvoiceStatus,
   PaymentTerm,
   VendorGroup,
+  PaymentMethod,
+  CustomerAccountGroup,
+  PartyStatus,
+  DunningLevel,
+  DisputeStatus,
+  CollectionActivityType,
   RateType,
   BankAccountType,
   DisbursementType,
@@ -39,6 +53,8 @@ import type {
   EmployeeDocType,
   AttendanceSource,
   TimesheetStatus,
+  DockEventKind,
+  DamageStatus,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -73,6 +89,36 @@ export const VEHICLE_STATUS_LABEL: Record<VehicleStatus, string> = {
   UNAVAILABLE: "Unavailable",
 };
 
+export const DRIVER_TYPE_LABEL: Record<DriverType, string> = {
+  COMPANY: "Company Driver",
+  OWNER_OPERATOR: "Owner-Operator",
+  SUBCONTRACTOR: "Subcontractor",
+};
+
+export const OWNERSHIP_STATUS_LABEL: Record<OwnershipStatus, string> = {
+  OWNED: "Owned",
+  LEASED: "Leased",
+  SUBCONTRACTED: "Subcontracted",
+};
+
+export const FUEL_TYPE_LABEL: Record<FuelType, string> = {
+  DIESEL: "Diesel",
+  PETROL: "Petrol",
+  ELECTRIC: "Electric",
+  HYBRID: "Hybrid",
+  CNG: "CNG",
+  OTHER: "Other",
+};
+
+export const FACILITY_TYPE_LABEL: Record<FacilityType, string> = {
+  DISTRIBUTION_CENTER: "Distribution Center",
+  CROSS_DOCK: "Cross-Dock",
+  TRANSIT_HUB: "Transit Hub",
+  BONDED_WAREHOUSE: "Bonded Warehouse",
+  YARD: "Yard",
+  OTHER: "Other",
+};
+
 export const ROLE_LABEL: Record<Role, string> = {
   ADMIN: "Administrator",
   DISPATCHER: "Operations Planner",
@@ -96,6 +142,35 @@ export const ACCOUNT_TYPE_LABEL: Record<AccountType, string> = {
   EQUITY: "Equity",
   INCOME: "Income",
   EXPENSE: "Expense",
+};
+
+export const ACCOUNT_SUBTYPE_LABEL: Record<AccountSubType, string> = {
+  CURRENT_ASSET: "Current Asset",
+  FIXED_ASSET: "Fixed Asset",
+  CURRENT_LIABILITY: "Current Liability",
+  LONG_TERM_LIABILITY: "Long-term Liability",
+  EQUITY: "Equity",
+  OPERATING_REVENUE: "Operating Revenue",
+  OTHER_REVENUE: "Other Revenue",
+  COST_OF_SALES: "Cost of Sales (Direct)",
+  OPERATING_EXPENSE: "Operating Expense",
+  OTHER_EXPENSE: "Other Expense",
+  NONE: "— None —",
+};
+
+export const POSTING_TYPE_LABEL: Record<PostingType, string> = {
+  POSTABLE: "Postable",
+  HEADER: "Header (roll-up)",
+  CONTROL: "Control (sub-ledger)",
+};
+
+export const JOURNAL_DOC_TYPE_LABEL: Record<JournalDocType, string> = {
+  GENERAL: "General",
+  ACCRUAL: "Accrual",
+  DEPRECIATION: "Depreciation",
+  CASH_DISBURSEMENT: "Cash Disbursement",
+  CASH_RECEIPT: "Cash Receipt",
+  ADJUSTMENT: "Adjustment",
 };
 
 export const JOURNAL_STATUS_LABEL: Record<JournalStatus, string> = {
@@ -151,6 +226,18 @@ export const CORRIDOR_LABEL: Record<CorridorType, string> = {
   DOMESTIC: "Domestic",
 };
 
+export const EQUIPMENT_TYPE_LABEL: Record<EquipmentType, string> = {
+  FLATBED: "Flatbed",
+  DRY_VAN: "Dry Van",
+  REEFER: "Reefer (Refrigerated)",
+  TANKER: "Tanker",
+  CONTAINER_20FT: "20ft Container",
+  CONTAINER_40FT: "40ft Container",
+  CURTAIN_SIDE: "Curtain-side",
+  LTL: "LTL (Less-than-truckload)",
+  OTHER: "Other",
+};
+
 export const TRIP_EXPENSE_LABEL: Record<TripExpenseType, string> = {
   FUEL: "Fuel",
   TOLLS: "Tolls",
@@ -190,7 +277,88 @@ export const VENDOR_GROUP_LABEL: Record<VendorGroup, string> = {
   CLEARING_AGENT: "Clearing Agent",
   SUBCONTRACTED_FLEET: "Subcontracted Fleet",
   STATUTORY: "Statutory",
+  CARRIER: "Carrier (FTL/LTL)",
+  FREIGHT_BROKER: "Freight Broker",
+  OWNER_OPERATOR: "Owner-Operator",
+  WORKSHOP: "Workshop / Garage",
   OTHER: "Other",
+};
+
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  EFT: "EFT",
+  WIRE: "Wire Transfer",
+  CHEQUE: "Cheque",
+  CASH: "Cash",
+  MOBILE_MONEY: "Mobile Money",
+  FUEL_CARD: "Fuel Card",
+};
+
+export const CUSTOMER_ACCOUNT_GROUP_LABEL: Record<CustomerAccountGroup, string> = {
+  SOLD_TO: "Sold-to",
+  SHIP_TO: "Ship-to",
+  BILL_TO: "Bill-to",
+  PAYER: "Payer",
+};
+
+export const PARTY_STATUS_LABEL: Record<PartyStatus, string> = {
+  ACTIVE: "Active",
+  INACTIVE: "Inactive",
+  ON_HOLD: "On Hold",
+  PROSPECT: "Prospect",
+  SUSPENDED: "Suspended",
+};
+
+export const PARTY_STATUS_VARIANT: Record<PartyStatus, BadgeVariant> = {
+  ACTIVE: "success",
+  INACTIVE: "secondary",
+  ON_HOLD: "warning",
+  PROSPECT: "info",
+  SUSPENDED: "destructive",
+};
+
+export const DUNNING_LEVEL_LABEL: Record<DunningLevel, string> = {
+  NONE: "None",
+  REMINDER: "Reminder",
+  FIRST_NOTICE: "1st Notice",
+  SECOND_NOTICE: "2nd Notice",
+  FINAL_NOTICE: "Final Notice",
+  LEGAL: "Legal",
+};
+
+export const DUNNING_LEVEL_VARIANT: Record<DunningLevel, BadgeVariant> = {
+  NONE: "secondary",
+  REMINDER: "info",
+  FIRST_NOTICE: "warning",
+  SECOND_NOTICE: "warning",
+  FINAL_NOTICE: "destructive",
+  LEGAL: "destructive",
+};
+
+export const DISPUTE_STATUS_LABEL: Record<DisputeStatus, string> = {
+  NONE: "—",
+  OPEN: "Open",
+  UNDER_INVESTIGATION: "Investigating",
+  RESOLVED: "Resolved",
+  WRITTEN_OFF: "Written off",
+};
+
+export const DISPUTE_STATUS_VARIANT: Record<DisputeStatus, BadgeVariant> = {
+  NONE: "secondary",
+  OPEN: "warning",
+  UNDER_INVESTIGATION: "info",
+  RESOLVED: "success",
+  WRITTEN_OFF: "destructive",
+};
+
+export const COLLECTION_ACTIVITY_LABEL: Record<CollectionActivityType, string> = {
+  CALL: "Call",
+  EMAIL: "Email",
+  LETTER: "Letter",
+  DUNNING: "Dunning",
+  PROMISE_TO_PAY: "Promise to Pay",
+  DISPUTE: "Dispute",
+  NOTE: "Note",
+  WRITE_OFF: "Write-off",
 };
 
 // ───────── Phase 2: Core Finance ─────────
@@ -489,3 +657,37 @@ export const TIMESHEET_STATUS_VARIANT: Record<TimesheetStatus, BadgeVariant> = {
   APPROVED: "success",
   REJECTED: "destructive",
 };
+
+export const DOCK_EVENT_KIND_LABEL: Record<DockEventKind, string> = {
+  ARRIVAL: "Arrival",
+  DEPARTURE: "Departure",
+};
+
+export const DAMAGE_STATUS_LABEL: Record<DamageStatus, string> = {
+  REPORTED: "Reported",
+  UNDER_REVIEW: "Under review",
+  APPROVED: "Approved",
+  REJECTED: "Rejected",
+  SETTLED: "Settled",
+};
+
+export const DAMAGE_STATUS_VARIANT: Record<DamageStatus, BadgeVariant> = {
+  REPORTED: "secondary",
+  UNDER_REVIEW: "info",
+  APPROVED: "success",
+  REJECTED: "destructive",
+  SETTLED: "success",
+};
+
+// ── Fixed-choice option lists for fields the client spec enumerates but the
+// backend stores as free strings (so they need dropdowns, not enum columns). ──
+export const INCOTERMS_OPTIONS = ["EXW", "FOB", "CIF", "CFR", "DAP", "DDP", "FCA", "CPT"] as const;
+export const VALUATION_METHOD_OPTIONS = ["AVERAGE", "FIFO", "LIFO"] as const;
+export const PART_CONDITION_OPTIONS = ["New", "Rebuilt", "Remanufactured", "Used"] as const;
+export const DOCK_SCHEDULING_OPTIONS = ["Appointment", "Open-arrival"] as const;
+export const PUTAWAY_STRATEGY_OPTIONS = ["Fixed bin", "Empty bin", "Closest to dock"] as const;
+export const PICKING_STRATEGY_OPTIONS = ["FIFO", "LIFO", "Partial pallet"] as const;
+export const COUNT_METHOD_OPTIONS = ["Annual", "Cycle counting", "Continuous"] as const;
+export const GENDER_OPTIONS = ["Male", "Female", "Other"] as const;
+export const PAY_FREQUENCY_OPTIONS = ["Weekly", "Bi-weekly", "Monthly"] as const;
+export const EMPLOYMENT_TYPE_OPTIONS = ["Full-time", "Part-time", "Contract", "Agency"] as const;

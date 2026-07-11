@@ -62,14 +62,11 @@ waypoints.post("/", requireAuth, requirePermission("waypoint:write"), async (c) 
   const body = waypointSchema.parse(await c.req.json());
   const wp = await prisma.gpsWaypoint.create({
     data: {
+      ...body,
       dataAreaId: areaForWrite(user),
-      code: body.code,
-      name: body.name,
-      kind: body.kind,
       lat: body.lat.toString(),
       lng: body.lng.toString(),
       country: body.country || null,
-      isActive: body.isActive,
     },
   });
   await logActivity({ userId: user.id, action: "CREATE", target: `GpsWaypoint:${wp.id}` });

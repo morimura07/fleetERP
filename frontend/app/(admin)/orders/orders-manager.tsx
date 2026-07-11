@@ -14,12 +14,14 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@frontend/components/ui/select";
+import { FormSection } from "@frontend/components/ui/form-section";
 import { useToast } from "@frontend/components/ui/toast";
 import { orderSchema, type OrderInput } from "@frontend/lib/validations";
-import { ORDER_STATUS_LABEL, ORDER_STATUS_VARIANT, CORRIDOR_LABEL } from "@frontend/lib/labels";
+import { ORDER_STATUS_LABEL, ORDER_STATUS_VARIANT, CORRIDOR_LABEL, EQUIPMENT_TYPE_LABEL, PAYMENT_TERM_LABEL, INCOTERMS_OPTIONS } from "@frontend/lib/labels";
+import { OptionSelect } from "@frontend/components/ui/option-select";
 import { formatDate } from "@frontend/lib/utils";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
-import type { OrderStatus, CorridorType } from "@frontend/lib/enums";
+import type { OrderStatus, CorridorType, EquipmentType, PaymentTerm } from "@frontend/lib/enums";
 
 interface Client { id: string; companyName: string; }
 interface Order {
@@ -37,6 +39,8 @@ interface Order {
 }
 
 const CORRIDORS = Object.keys(CORRIDOR_LABEL) as CorridorType[];
+const EQUIPMENT = Object.keys(EQUIPMENT_TYPE_LABEL) as EquipmentType[];
+const ORDER_TERMS = Object.keys(PAYMENT_TERM_LABEL) as PaymentTerm[];
 
 export function OrdersManager({ clients }: { clients: Client[] }) {
   const { toast } = useToast();
@@ -51,6 +55,8 @@ export function OrdersManager({ clients }: { clients: Client[] }) {
       corridor: "DOMESTIC", cargoDescription: "", grossWeightKg: "0", volumeCbm: "0",
       freightAmount: "", demurrageAmount: "0", currency: "USD",
       bookingDate: new Date(), status: "DRAFT",
+      paymentTerm: "NET_30", equipmentType: "OTHER", hazmat: false,
+      accessorialCharges: "0", taxAmount: "0",
     });
     setOpen(true);
   }
@@ -105,7 +111,7 @@ export function OrdersManager({ clients }: { clients: Client[] }) {
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader><DialogTitle>New Order</DialogTitle></DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
@@ -134,6 +140,66 @@ export function OrdersManager({ clients }: { clients: Client[] }) {
               <div className="space-y-1.5"><Label>Currency</Label><Input maxLength={3} {...form.register("currency")} /></div>
               <div className="space-y-1.5"><Label>Booking Date</Label><Input type="date" {...form.register("bookingDate", { valueAsDate: true })} /></div>
             </div>
+
+            <FormSection title="Parties">
+              <div className="space-y-1.5"><Label>Shipper / Consignor</Label><Input {...form.register("shipper")} /></div>
+              <div className="space-y-1.5"><Label>Consignee</Label><Input {...form.register("consignee")} /></div>
+              <div className="space-y-1.5"><Label>Bill-To Party</Label><Input {...form.register("billTo")} /></div>
+              <div className="space-y-1.5"><Label>Notify Party</Label><Input {...form.register("notifyParty")} /></div>
+            </FormSection>
+
+            <FormSection title="Organizational & Terms">
+              <div className="space-y-1.5"><Label>Branch / Division</Label><Input {...form.register("branch")} /></div>
+              <div className="space-y-1.5"><Label>Salesperson</Label><Input {...form.register("salesperson")} /></div>
+              <div className="space-y-1.5"><Label>Incoterms</Label><OptionSelect value={form.watch("incoterms")} onChange={(v) => form.setValue("incoterms", v)} options={INCOTERMS_OPTIONS} placeholder="FOB / CIF…" /></div>
+              <div className="space-y-1.5">
+                <Label>Payment Terms</Label>
+                <Select value={form.watch("paymentTerm")} onValueChange={(v) => form.setValue("paymentTerm", v as PaymentTerm)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{ORDER_TERMS.map((t) => <SelectItem key={t} value={t}>{PAYMENT_TERM_LABEL[t]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </FormSection>
+
+            <FormSection title="Routing">
+              <div className="space-y-1.5 md:col-span-2"><Label>Pickup Address</Label><Input {...form.register("pickupAddress")} /></div>
+              <div className="space-y-1.5 md:col-span-2"><Label>Delivery Address</Label><Input {...form.register("deliveryAddress")} /></div>
+              <div className="space-y-1.5"><Label>Port of Loading (POL)</Label><Input {...form.register("pol")} /></div>
+              <div className="space-y-1.5"><Label>Port of Delivery (POD)</Label><Input {...form.register("pod")} /></div>
+              <div className="space-y-1.5"><Label>ETD</Label><Input type="datetime-local" {...form.register("etd")} /></div>
+              <div className="space-y-1.5"><Label>ETA</Label><Input type="datetime-local" {...form.register("eta")} /></div>
+              <div className="space-y-1.5 md:col-span-2"><Label>Routing Instructions</Label><Input {...form.register("routingNotes")} /></div>
+            </FormSection>
+
+            <FormSection title="Cargo & Equipment">
+              <div className="space-y-1.5">
+                <Label>Equipment Type</Label>
+                <Select value={form.watch("equipmentType")} onValueChange={(v) => form.setValue("equipmentType", v as EquipmentType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{EQUIPMENT.map((e) => <SelectItem key={e} value={e}>{EQUIPMENT_TYPE_LABEL[e]}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Gross Weight (kg)</Label><Input inputMode="decimal" {...form.register("grossWeightKg")} /></div>
+              <div className="space-y-1.5"><Label>Volume (CBM)</Label><Input inputMode="decimal" {...form.register("volumeCbm")} /></div>
+              <div className="space-y-1.5"><Label>Piece Count</Label><Input type="number" {...form.register("pieceCount")} /></div>
+              <div className="space-y-1.5"><Label>Dimensions (L×W×H)</Label><Input {...form.register("dimensions")} /></div>
+              <div className="space-y-1.5"><Label>HAZMAT UN / Class</Label><Input {...form.register("hazmatUnCode")} /></div>
+              <label className="col-span-2 flex items-center gap-2 text-sm text-muted-foreground">
+                <input type="checkbox" {...form.register("hazmat")} /> Hazardous materials (HAZMAT)
+              </label>
+            </FormSection>
+
+            <FormSection title="Financial & Documentation">
+              <div className="space-y-1.5"><Label>Freight Rate (per unit)</Label><Input inputMode="decimal" {...form.register("freightRate")} /></div>
+              <div className="space-y-1.5"><Label>Accessorial Charges</Label><Input inputMode="decimal" {...form.register("accessorialCharges")} /></div>
+              <div className="space-y-1.5"><Label>Tax Amount</Label><Input inputMode="decimal" {...form.register("taxAmount")} /></div>
+              <div className="space-y-1.5"><Label>Customer PO No.</Label><Input {...form.register("customerPo")} /></div>
+              <div className="space-y-1.5"><Label>Master/House B/L or AWB</Label><Input {...form.register("blNumber")} /></div>
+              <div className="space-y-1.5"><Label>HS Code</Label><Input {...form.register("hsCode")} /></div>
+              <div className="space-y-1.5"><Label>Seal Number</Label><Input {...form.register("sealNumber")} /></div>
+              <div className="space-y-1.5 md:col-span-2"><Label>Special Instructions</Label><Input {...form.register("specialInstructions")} /></div>
+            </FormSection>
+
             <DialogFooter>
               <Button type="submit" disabled={form.formState.isSubmitting}>Save</Button>
             </DialogFooter>

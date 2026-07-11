@@ -7,12 +7,22 @@ import { logActivity } from "@backend/lib/activity";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
+const ou = (max: number) => z.string().max(max).optional().or(z.literal(""));
 const userSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8),
   role: z.enum(["ADMIN", "DISPATCHER", "FINANCE", "DRIVER", "STAFF"]),
   dataAreaId: z.string().min(1).max(10).optional(), // company the user belongs to
+  // Profile & access (spec: Users §1–5)
+  phone: ou(30),
+  jobTitle: ou(120),
+  assignedBranch: ou(120),
+  costCenter: ou(80),
+  approvalLimit: z.coerce.number().min(0).optional().nullable(),
+  esignatory: z.boolean().default(false),
+  languagePref: ou(40),
+  timeZone: ou(40),
 });
 
 export const users = new Hono();
@@ -50,6 +60,14 @@ users.post("/", requireAuth, requirePermission("user:manage"), async (c) => {
       role: body.role,
       dataAreaId: body.dataAreaId ?? admin.dataAreaId, // assign company (default: admin's)
       passwordHash: await hashPassword(body.password),
+      phone: body.phone || null,
+      jobTitle: body.jobTitle || null,
+      assignedBranch: body.assignedBranch || null,
+      costCenter: body.costCenter || null,
+      approvalLimit: body.approvalLimit ?? null,
+      esignatory: body.esignatory,
+      languagePref: body.languagePref || null,
+      timeZone: body.timeZone || null,
     },
     select: { id: true, name: true, email: true, role: true, dataAreaId: true },
   });
