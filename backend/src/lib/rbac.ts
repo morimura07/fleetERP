@@ -84,6 +84,15 @@ export type Permission =
   | "consolidation:read" // subsidiary→parent mapping & rollup (M5)
   | "consolidation:run"
   | "compliance:read" // vehicle & driver document-expiry dashboard (M11)
+  | "sales:read" // sales & marketing: leads, quotes (M27)
+  | "sales:write"
+  | "sales:convert" // convert an accepted quote into a freight order
+  | "project:read" // project / contract P&L (M29)
+  | "project:write"
+  | "planning:read" // master planning: demand forecasts & capacity plan (M33)
+  | "planning:write"
+  | "pos:read" // retail / point-of-sale (M28)
+  | "pos:write"
   | "kpi:read" // operational KPI capture: dock events, damage reports, feedback (Tier C)
   | "kpi:write"
   | "waypoint:read" // GPS waypoint registry (M30 Common)
@@ -171,6 +180,15 @@ const ALL: Permission[] = [
   "consolidation:read",
   "consolidation:run",
   "compliance:read",
+  "sales:read",
+  "sales:write",
+  "sales:convert",
+  "project:read",
+  "project:write",
+  "planning:read",
+  "planning:write",
+  "pos:read",
+  "pos:write",
   "kpi:read",
   "kpi:write",
   "waypoint:read",
@@ -225,6 +243,15 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "attendance:write",
     "fx:read",
     "compliance:read",
+    "sales:read",
+    "sales:write",
+    "sales:convert",
+    "project:read",
+    "project:write",
+    "planning:read",
+    "planning:write",
+    "pos:read",
+    "pos:write",
     "kpi:read",
     "kpi:write",
     "waypoint:read",
@@ -294,6 +321,11 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "consolidation:read",
     "consolidation:run",
     "compliance:read",
+    "sales:read",
+    "project:read",
+    "project:write",
+    "planning:read",
+    "pos:read",
     "kpi:read",
     "waypoint:read",
     "tracking:read",
@@ -335,6 +367,10 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "fx:read",
     "consolidation:read",
     "compliance:read",
+    "sales:read",
+    "project:read",
+    "planning:read",
+    "pos:read",
     "kpi:read",
     "waypoint:read",
     "tracking:read",

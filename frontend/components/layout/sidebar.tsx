@@ -11,6 +11,7 @@ import {
   ShieldCheck, MapPin, Boxes, ShoppingCart, BadgeDollarSign, Warehouse, Receipt,
   Building, Wrench, UserCog, Clock,
   Anchor, PackageX, MessageSquareHeart,
+  Target, FileSignature, FolderKanban, CalendarRange, ShoppingBag,
 } from "lucide-react";
 import { cn } from "@frontend/lib/utils";
 import { can, type Permission, type Role } from "@frontend/lib/rbac";
@@ -28,11 +29,21 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/orders", label: "Orders", icon: ClipboardList, perm: "order:read" },
       { href: "/trips", label: "Trips", icon: Route, perm: "trip:read" },
+      { href: "/projects", label: "Projects", icon: FolderKanban, perm: "project:read" },
       { href: "/jobs", label: "Delivery Jobs", icon: Package, perm: "job:read" },
       { href: "/dispatch", label: "Dispatch", icon: CalendarClock, perm: "dispatch:read" },
+      { href: "/planning", label: "Master Planning", icon: CalendarRange, perm: "planning:read" },
       { href: "/dock-events", label: "Dock Events", icon: Anchor, perm: "kpi:read" },
       { href: "/damage-reports", label: "Damage Reports", icon: PackageX, perm: "kpi:read" },
       { href: "/feedback", label: "Customer Feedback", icon: MessageSquareHeart, perm: "kpi:read" },
+    ],
+  },
+  {
+    label: "Sales & Marketing",
+    items: [
+      { href: "/leads", label: "Leads", icon: Target, perm: "sales:read" },
+      { href: "/quotes", label: "Quotes", icon: FileSignature, perm: "sales:read" },
+      { href: "/pos", label: "Retail POS", icon: ShoppingBag, perm: "pos:read" },
     ],
   },
   {

@@ -85,6 +85,15 @@ export type Permission =
   | "consolidation:read"
   | "consolidation:run"
   | "compliance:read"
+  | "sales:read"
+  | "sales:write"
+  | "sales:convert"
+  | "project:read"
+  | "project:write"
+  | "planning:read"
+  | "planning:write"
+  | "pos:read"
+  | "pos:write"
   | "kpi:read"
   | "kpi:write"
   | "waypoint:read"
@@ -128,6 +137,10 @@ const ALL: Permission[] = [
   "fx:read", "fx:write",
   "consolidation:read", "consolidation:run",
   "compliance:read",
+  "sales:read", "sales:write", "sales:convert",
+  "project:read", "project:write",
+  "planning:read", "planning:write",
+  "pos:read", "pos:write",
   "kpi:read", "kpi:write",
   "waypoint:read", "waypoint:write",
   "tracking:read",
@@ -151,7 +164,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "trip:read", "trip:write",
     "vendor:read", "payable:read", "customer:read", "receivable:read",
     "collection:read", "bank:read", "budget:read", "inventory:read", "inventory:write", "warehouse:read", "warehouse:write", "procurement:read", "procurement:write", "expense:read", "expense:write", "service:read", "service:write", "service:approve", "attendance:read", "attendance:write", "fx:read",
-    "compliance:read", "kpi:read", "kpi:write", "waypoint:read", "waypoint:write", "tracking:read",
+    "compliance:read", "sales:read", "sales:write", "sales:convert", "project:read", "project:write", "planning:read", "planning:write", "pos:read", "pos:write", "kpi:read", "kpi:write", "waypoint:read", "waypoint:write", "tracking:read",
     "export:run",
   ],
   FINANCE: [
@@ -177,7 +190,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "attendance:read", "attendance:write", "attendance:approve",
     "fx:read", "fx:write",
     "consolidation:read", "consolidation:run",
-    "compliance:read", "kpi:read", "waypoint:read", "tracking:read",
+    "compliance:read", "sales:read", "project:read", "project:write", "planning:read", "pos:read", "kpi:read", "waypoint:read", "tracking:read",
     "report:read", "activity:read", "export:run",
   ],
   DRIVER: ["job:read", "report:read", "report:write"],
@@ -188,7 +201,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "order:read", "trip:read", "vendor:read", "payable:read",
     "customer:read", "receivable:read", "tax:read", "collection:read",
     "bank:read", "budget:read", "inventory:read", "warehouse:read", "procurement:read", "payroll:read", "expense:read", "fx:read", "consolidation:read",
-    "compliance:read", "kpi:read", "waypoint:read", "tracking:read",
+    "compliance:read", "sales:read", "project:read", "planning:read", "pos:read", "kpi:read", "waypoint:read", "tracking:read",
   ],
 };
 
@@ -243,6 +256,11 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/fx", permission: "fx:read" },
   { prefix: "/consolidation", permission: "consolidation:read" },
   { prefix: "/compliance", permission: "compliance:read" },
+  { prefix: "/leads", permission: "sales:read" },
+  { prefix: "/quotes", permission: "sales:read" },
+  { prefix: "/projects", permission: "project:read" },
+  { prefix: "/planning", permission: "planning:read" },
+  { prefix: "/pos", permission: "pos:read" },
   { prefix: "/dock-events", permission: "kpi:read" },
   { prefix: "/damage-reports", permission: "kpi:read" },
   { prefix: "/feedback", permission: "kpi:read" },

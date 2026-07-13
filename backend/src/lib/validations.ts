@@ -1136,3 +1136,128 @@ export type DockEventInput = z.infer<typeof dockEventSchema>;
 export type DamageReportInput = z.infer<typeof damageReportSchema>;
 export type DamageStatusInput = z.infer<typeof damageStatusSchema>;
 export type FeedbackInput = z.infer<typeof feedbackSchema>;
+
+// ── Sales & Marketing (M27) ──────────────────────────────────────────────────
+
+export const leadSchema = z.object({
+  companyName: z.string().min(1, "Company name is required").max(200),
+  contactPerson: os(120),
+  email: os(160),
+  phone: os(40),
+  source: os(80),
+  stage: z.enum(["NEW", "CONTACTED", "QUALIFIED", "WON", "LOST"]).default("NEW"),
+  estimatedValue: z.coerce.number().min(0).default(0),
+  currency: z.string().length(3).optional(),
+  ownerId: os(40),
+  notes: os(1000),
+});
+
+export const leadStageSchema = z.object({
+  stage: z.enum(["NEW", "CONTACTED", "QUALIFIED", "WON", "LOST"]),
+});
+
+export const quoteLineSchema = z.object({
+  description: z.string().min(1, "Description is required").max(300),
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+  unitPrice: z.coerce.number().min(0, "Unit price cannot be negative"),
+});
+
+export const quoteSchema = z.object({
+  clientId: os(40),
+  leadId: os(40),
+  salesperson: os(120),
+  originZone: os(120),
+  destinationZone: os(120),
+  cargoDescription: os(300),
+  currency: z.string().length(3).optional(),
+  validUntil: z.coerce.date(),
+  notes: os(1000),
+  lines: z.array(quoteLineSchema).min(1, "Add at least one line item"),
+});
+
+export const quoteStatusSchema = z.object({
+  status: z.enum(["DRAFT", "SENT", "ACCEPTED", "REJECTED", "EXPIRED"]),
+});
+
+export type LeadInput = z.infer<typeof leadSchema>;
+export type LeadStageInput = z.infer<typeof leadStageSchema>;
+export type QuoteInput = z.infer<typeof quoteSchema>;
+export type QuoteStatusInput = z.infer<typeof quoteStatusSchema>;
+
+// ── Project Management (M29) ─────────────────────────────────────────────────
+
+export const projectSchema = z.object({
+  name: z.string().min(1, "Project name is required").max(200),
+  clientId: os(40),
+  manager: os(120),
+  currency: z.string().length(3).optional(),
+  budgetRevenue: z.coerce.number().min(0).default(0),
+  budgetCost: z.coerce.number().min(0).default(0),
+  startDate: z.coerce.date().optional().nullable(),
+  endDate: z.coerce.date().optional().nullable(),
+  description: os(1000),
+});
+
+export const projectStatusSchema = z.object({
+  status: z.enum(["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"]),
+});
+
+export const orderProjectSchema = z.object({
+  orderId: z.string().min(1, "Order is required"),
+  projectId: z.string().min(1).nullable(),
+});
+
+export type ProjectInput = z.infer<typeof projectSchema>;
+export type ProjectStatusInput = z.infer<typeof projectStatusSchema>;
+export type OrderProjectInput = z.infer<typeof orderProjectSchema>;
+
+// ── Master Planning (M33) ────────────────────────────────────────────────────
+
+const corridorEnum = z.enum(["NORTHERN", "CENTRAL", "DOMESTIC"]);
+const optInt = () => z.coerce.number().int().min(0).optional().nullable();
+
+export const forecastSchema = z.object({
+  period: z.string().min(1, "Period is required").max(20),
+  corridor: corridorEnum,
+  forecastLoads: z.coerce.number().int().min(0).default(0),
+  forecastTonnes: z.coerce.number().min(0).default(0),
+  plannedTrucks: optInt(),
+  plannedDrivers: optInt(),
+  notes: os(1000),
+});
+
+export const forecastUpdateSchema = z.object({
+  forecastLoads: z.coerce.number().int().min(0).optional(),
+  forecastTonnes: z.coerce.number().min(0).optional(),
+  plannedTrucks: optInt(),
+  plannedDrivers: optInt(),
+  notes: os(1000),
+});
+
+export const forecastStatusSchema = z.object({
+  status: z.enum(["DRAFT", "CONFIRMED", "ARCHIVED"]),
+});
+
+export type ForecastInput = z.infer<typeof forecastSchema>;
+export type ForecastUpdateInput = z.infer<typeof forecastUpdateSchema>;
+export type ForecastStatusInput = z.infer<typeof forecastStatusSchema>;
+
+// ── Retail / POS (M28) ───────────────────────────────────────────────────────
+
+export const posLineSchema = z.object({
+  stockItemId: z.string().min(1, "Stock item is required"),
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+  unitPrice: z.coerce.number().min(0, "Unit price cannot be negative"),
+});
+
+export const posSaleSchema = z.object({
+  customerName: os(120),
+  paymentMethod: z.enum(["CASH", "MOBILE_MONEY", "CARD"]).default("CASH"),
+  currency: z.string().length(3).optional(),
+  taxAmount: z.coerce.number().min(0).default(0),
+  note: os(500),
+  lines: z.array(posLineSchema).min(1, "Add at least one item"),
+});
+
+export type PosLineInput = z.infer<typeof posLineSchema>;
+export type PosSaleInput = z.infer<typeof posSaleSchema>;

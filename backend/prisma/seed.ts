@@ -35,6 +35,7 @@ const CHART_OF_ACCOUNTS: { code: string; name: string; type: AccountType }[] = [
   { code: "4000", name: "Freight Revenue", type: "INCOME" },
   { code: "4100", name: "Demurrage Income", type: "INCOME" },
   { code: "4200", name: "Other Operating Income", type: "INCOME" },
+  { code: "4300", name: "Retail Sales Revenue", type: "INCOME" },
   { code: "4910", name: "Gain on Disposal of Assets", type: "INCOME" },
   { code: "4900", name: "Foreign Exchange Gain", type: "INCOME" },
   // ── Expenses ──
@@ -46,6 +47,7 @@ const CHART_OF_ACCOUNTS: { code: string; name: string; type: AccountType }[] = [
   { code: "5100", name: "Vehicle Maintenance & Repairs", type: "EXPENSE" },
   { code: "5110", name: "Insurance Expense", type: "EXPENSE" },
   { code: "5200", name: "Depreciation Expense — Fleet", type: "EXPENSE" },
+  { code: "5300", name: "Cost of Goods Sold", type: "EXPENSE" },
   { code: "6000", name: "Salaries & Wages", type: "EXPENSE" },
   { code: "6100", name: "Office & Administrative Expense", type: "EXPENSE" },
   { code: "6200", name: "Bad Debt Expense", type: "EXPENSE" },
