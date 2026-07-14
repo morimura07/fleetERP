@@ -14,12 +14,12 @@ Maps the implementation against the contracted scope in `ERP_PRD_v1.0.pdf` (Mori
 
 | Metric | Value |
 |--------|-------|
-| Prisma models | 70 |
-| Migrations applied | 29 |
+| Prisma models | 73 |
+| Migrations applied | 30 |
 | Admin screens | 44 |
 | RBAC permissions | 94 |
 | Roles | 5 (ADMIN, DISPATCHER, FINANCE, DRIVER, STAFF) |
-| Unit tests | 230 passing |
+| Unit tests | 237 passing |
 
 ## Phase status
 
@@ -117,7 +117,7 @@ The operations dashboard (`/dashboard`, served by `getKpiDashboard`) exposes the
 | M33 | Master Planning | ✅ | Planner-entered demand forecasts per period + corridor (loads & tonnage), one per (period, corridor). A computed capacity plan compares confirmed demand against live available-fleet capacity (excludes maintenance, honors per-forecast truck overrides) and surfaces per-corridor shortfall/surplus & utilization. |
 | M34 | Organization Admin | 🟡 | `Company` legal-entity registry with admin CRUD screen + company switcher; users assigned a home company; `dataAreaId` partitioning enforced at the query layer. **No fiscal-calendar / period-close per entity yet.** |
 | M35 | Project Oaktree | ⬜ | (unspecified in PRD detail) |
-| M36 | System Administration | ✅ | RBAC config, user management, account active/inactive. |
+| M36 | System Administration | ✅ | User management, account active/inactive, and **dynamic RBAC**: a Roles & Permissions admin screen to create custom roles, edit any role's permission grants via a resource-grouped matrix, and assign a custom role to a user. The 5 built-in roles are seeded (`isSystem`, protected from deletion) but re-permissionable. Grants live in `rbac_*` tables and hydrate an in-memory map so `can()` stays synchronous (no route changes); the JWT carries the effective role key. |
 
 ## Foundation gaps (contractual, PRD §6–§7)
 

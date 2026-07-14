@@ -616,7 +616,9 @@ model User {
   name              String
   email             String    @unique
   passwordHash      String
-  role              Role      @default(STAFF)
+  role              Role      @default(STAFF) // system role (drives ADMIN/DRIVER special behavior + JWT)
+  roleKey           String? // optional custom role (RbacRole.key); when set, its grants replace the system-role defaults for permission checks
+  customRole        RbacRole? @relation(fields: [roleKey], references: [key], onDelete: SetNull)
   dataAreaId        String    @default("HQ01") // legal entity the user belongs to (multi-company isolation, PRD §6.2)
   isActive          Boolean   @default(true)
   emailVerified     DateTime?
@@ -2949,4 +2951,48 @@ model PosSaleLine {
   @@index([saleId])
   @@index([stockItemId])
   @@map("pos_sale_lines")
+}
+
+// ───────────────────────── Dynamic RBAC (role/permission management) ─────────────────────────
+
+// The catalog of every permission key the app enforces (e.g. "order:read").
+// Seeded from the code's permission list; the admin UI reads this to know which
+// toggles to render per role.
+model RbacPermission {
+  key         String   @id // "order:read"
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles RbacRolePermission[]
+
+  @@map("rbac_permissions")
+}
+
+// A role — either one of the 5 built-in system roles (isSystem=true, mirrors the
+// Role enum by key) or a custom role created from the admin UI. Its permission
+// grants live in RbacRolePermission.
+model RbacRole {
+  key         String   @id // "ADMIN", "DISPATCHER", or a custom key like "YARD_SUPERVISOR"
+  name        String // human label
+  description String?
+  isSystem    Boolean  @default(false) // built-in; cannot be renamed-key/deleted
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions RbacRolePermission[]
+  users       User[]
+
+  @@map("rbac_roles")
+}
+
+// A single (role → permission) grant.
+model RbacRolePermission {
+  roleKey       String
+  role          RbacRole       @relation(fields: [roleKey], references: [key], onDelete: Cascade)
+  permissionKey String
+  permission    RbacPermission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+
+  @@id([roleKey, permissionKey])
+  @@index([permissionKey])
+  @@map("rbac_role_permissions")
 }

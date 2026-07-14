@@ -268,5 +268,6 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/tracking", permission: "tracking:read" },
   { prefix: "/activity", permission: "activity:read" },
   { prefix: "/users", permission: "user:manage" },
+  { prefix: "/roles", permission: "user:manage" },
   { prefix: "/companies", permission: "company:manage" },
 ];

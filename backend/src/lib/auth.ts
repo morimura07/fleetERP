@@ -16,7 +16,9 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
-  role: Role;
+  role: Role; // system role — drives ADMIN/DRIVER special behavior
+  /** Custom role key (RbacRole.key) when assigned; overrides the system role for permission checks. */
+  roleKey: string | null;
   driverId: string | null;
   /** Legal entity the user belongs to; drives multi-company data isolation. */
   dataAreaId: string;
@@ -24,11 +26,16 @@ export interface AuthUser {
   activeArea?: string;
 }
 
+/** The role key used for permission resolution: the custom role if set, else the system role. */
+export function effectiveRoleKey(user: { role: Role; roleKey: string | null }): string {
+  return user.roleKey ?? user.role;
+}
+
 const secret = () => new TextEncoder().encode(process.env.JWT_SECRET ?? "dev-secret-change-me");
 const EXPIRES = process.env.JWT_EXPIRES ?? "1d";
 
 export async function signToken(user: AuthUser): Promise<string> {
-  return new SignJWT({ email: user.email, role: user.role, driverId: user.driverId, name: user.name, dataAreaId: user.dataAreaId })
+  return new SignJWT({ email: user.email, role: user.role, roleKey: user.roleKey, driverId: user.driverId, name: user.name, dataAreaId: user.dataAreaId })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
@@ -43,6 +50,7 @@ export async function verifyToken(token: string): Promise<AuthUser> {
     email: payload.email as string,
     name: payload.name as string,
     role: payload.role as Role,
+    roleKey: (payload.roleKey as string | null) ?? null,
     driverId: (payload.driverId as string | null) ?? null,
     dataAreaId: (payload.dataAreaId as string) ?? "HQ01",
   };
@@ -57,7 +65,7 @@ export async function authenticate(email: string, password: string): Promise<Aut
   if (!user || !user.isActive) throw new AuthError("Invalid credentials", 401);
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) throw new AuthError("Invalid credentials", 401);
-  return { id: user.id, email: user.email, name: user.name, role: user.role, driverId: user.driver?.id ?? null, dataAreaId: user.dataAreaId };
+  return { id: user.id, email: user.email, name: user.name, role: user.role, roleKey: user.roleKey ?? null, driverId: user.driver?.id ?? null, dataAreaId: user.dataAreaId };
 }
 
 declare module "hono" {
@@ -87,7 +95,7 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
 /** Hono middleware factory: require a specific permission (after requireAuth). */
 export const requirePermission = (permission: Permission): MiddlewareHandler => async (c, next) => {
   const user = c.get("user");
-  if (!user || !can(user.role, permission)) {
+  if (!user || !can(effectiveRoleKey(user), permission)) {
     throw new AuthError("You do not have permission", 403);
   }
   await next();

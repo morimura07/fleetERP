@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { prisma } from "@backend/lib/prisma";
-import { authenticate, signToken, requireAuth } from "@backend/lib/auth";
+import { authenticate, signToken, requireAuth, effectiveRoleKey } from "@backend/lib/auth";
+import { permissionsFor } from "@backend/lib/rbac";
 import { forgotPasswordSchema, resetPasswordSchema } from "@backend/lib/validations";
 import { generateToken, hashPassword } from "@backend/lib/password";
 import { sendPasswordResetEmail } from "@backend/lib/mail";
@@ -27,8 +28,11 @@ auth.post("/login", async (c) => {
   return ok(c, { accessToken, user });
 });
 
-/** GET /auth/me → the current principal (bearer required). */
-auth.get("/me", requireAuth, (c) => ok(c, c.get("user")));
+/** GET /auth/me → the current principal + its effective permission keys (for the UI). */
+auth.get("/me", requireAuth, (c) => {
+  const user = c.get("user");
+  return ok(c, { ...user, permissions: permissionsFor(effectiveRoleKey(user)) });
+});
 
 /** POST /auth/forgot-password — always responds success (no email enumeration). */
 auth.post("/forgot-password", async (c) => {

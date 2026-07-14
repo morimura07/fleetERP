@@ -1261,3 +1261,32 @@ export const posSaleSchema = z.object({
 
 export type PosLineInput = z.infer<typeof posLineSchema>;
 export type PosSaleInput = z.infer<typeof posSaleSchema>;
+
+// ── Dynamic RBAC (role/permission management) ────────────────────────────────
+
+const optText = (max: number) => z.string().max(max).nullish().or(z.literal(""));
+
+export const createRoleSchema = z.object({
+  key: z.string().min(2).max(40),
+  name: z.string().min(1, "Role name is required").max(80),
+  description: optText(300),
+  permissions: z.array(z.string()).optional(),
+});
+
+export const updateRoleSchema = z.object({
+  name: z.string().min(1).max(80).optional(),
+  description: optText(300),
+});
+
+export const setPermissionsSchema = z.object({
+  permissions: z.array(z.string()),
+});
+
+export const assignRoleSchema = z.object({
+  roleKey: z.string().min(1).nullable(),
+});
+
+export type CreateRoleInput = z.infer<typeof createRoleSchema>;
+export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
+export type SetPermissionsInput = z.infer<typeof setPermissionsSchema>;
+export type AssignRoleInput = z.infer<typeof assignRoleSchema>;

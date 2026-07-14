@@ -2,6 +2,7 @@ import "../src/lib/load-env";
 import { PrismaClient, AccountType } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { invoiceOrder, postTripExpense } from "@backend/services/freight";
+import { seedRbac } from "@backend/services/rbac-admin";
 
 const prisma = new PrismaClient();
 const hash = (p: string) => bcrypt.hash(p, 12);
@@ -430,6 +431,10 @@ async function main() {
   } else {
     console.log("  Demo Phase 3: skipped (waypoints already exist)");
   }
+
+  // Dynamic RBAC: seed the permission catalog + the 5 system roles with their defaults.
+  await seedRbac();
+  console.log("  RBAC: permission catalog + 5 system roles seeded");
 
   console.log("✅ Seed complete.\n  admin@fleetflow.local / admin1234\n  dispatcher@fleetflow.local / dispatch1234\n  finance@fleetflow.local / finance1234\n  driver@fleetflow.local / driver1234\n  staff@fleetflow.local / staff1234");
 }

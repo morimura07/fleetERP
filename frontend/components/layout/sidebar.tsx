@@ -90,6 +90,7 @@ const GROUPS: NavGroup[] = [
       { href: "/companies", label: "Companies", icon: Building2, perm: "company:manage" },
       { href: "/activity", label: "Activity Log", icon: ScrollText, perm: "activity:read" },
       { href: "/users", label: "Users", icon: Settings, perm: "user:manage" },
+      { href: "/roles", label: "Roles & Permissions", icon: ShieldCheck, perm: "user:manage" },
     ],
   },
 ];

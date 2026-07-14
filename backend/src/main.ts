@@ -52,6 +52,8 @@ import { sales } from "@backend/routes/sales";
 import { projects } from "@backend/routes/projects";
 import { planning } from "@backend/routes/planning";
 import { pos } from "@backend/routes/pos";
+import { rbac } from "@backend/routes/rbac";
+import { refreshRuntime } from "@backend/services/rbac-admin";
 
 /**
  * FleetERP standalone API (Hono). Deploys independently from the web app and
@@ -66,7 +68,7 @@ app.use(
   "*",
   cors({
     origin: (process.env.CORS_ORIGIN ?? "http://localhost:3000").split(",").map((o) => o.trim()),
-    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "X-Data-Area"],
   }),
 );
@@ -132,9 +134,15 @@ app.route("/api/sales", sales);
 app.route("/api/projects", projects);
 app.route("/api/planning", planning);
 app.route("/api/pos", pos);
+app.route("/api/rbac", rbac);
 
 app.onError(onError);
 app.notFound((c) => c.json({ error: "Not found" }, 404));
+
+// Load dynamic role→permission grants from the DB into the in-memory map so
+// `can()` reflects admin edits. Best-effort: on failure, the built-in defaults
+// remain in force (the app still authorizes correctly for system roles).
+refreshRuntime().catch((e) => console.error("[rbac] hydrate on startup failed; using defaults", e));
 
 const port = Number(process.env.PORT ?? 4000);
 serve({ fetch: app.fetch, port });
