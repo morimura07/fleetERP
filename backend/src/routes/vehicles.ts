@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { vehicleSchema, paginationSchema, maintenanceSchema } from "@backend/lib/validations";
 import { buildOrderBy } from "@backend/lib/format";
-import { logActivity } from "@backend/lib/activity";
+import { logActivity, logFieldChanges } from "@backend/lib/activity";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
 import { updateWithVersion, requireVersion } from "@backend/lib/concurrency";
 import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
@@ -69,10 +69,14 @@ vehicles.patch("/:id", requireAuth, requirePermission("vehicle:write"), async (c
   const raw = await c.req.json();
   const version = requireVersion(raw);
   const body = vehicleSchema.partial().parse(raw);
-  const existing = await prisma.vehicle.findUnique({ where: { id }, select: { dataAreaId: true } });
-  assertSameArea(user, existing);
+  const before = await prisma.vehicle.findUnique({ where: { id } });
+  assertSameArea(user, before);
   const vehicle = await updateWithVersion(prisma.vehicle, id, version, user.id, body);
-  await logActivity({ userId: user.id, action: "UPDATE", target: `Vehicle:${id}`, detail: body });
+  // Field-level audit diff (PRD §7): compare only the columns the caller submitted.
+  await logFieldChanges({
+    userId: user.id, target: `Vehicle:${id}`, before, after: vehicle,
+    only: Object.keys(body),
+  });
   return ok(c, vehicle);
 });
 

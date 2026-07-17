@@ -40,7 +40,7 @@ users.get("/", requireAuth, requirePermission("user:manage"), async (c) => {
   const [items, total] = await Promise.all([
     prisma.user.findMany({
       where,
-      select: { id: true, name: true, email: true, role: true, dataAreaId: true, isActive: true, createdAt: true },
+      select: { id: true, name: true, email: true, role: true, roleKey: true, dataAreaId: true, isActive: true, createdAt: true },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,

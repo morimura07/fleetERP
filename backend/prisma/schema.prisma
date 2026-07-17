@@ -526,6 +526,66 @@ enum DamageStatus {
   SETTLED
 }
 
+// ───────────────────────── Sales & Marketing (M27) ─────────────────────────
+
+// A sales lead in the CRM pipeline (the "marketing" half of M27).
+enum LeadStage {
+  NEW
+  CONTACTED
+  QUALIFIED
+  WON // converted to a client / quote
+  LOST
+}
+
+// A freight quotation's lifecycle. ACCEPTED quotes can be converted into a
+// freight Order (M12); once converted the quote is locked as CONVERTED.
+enum QuoteStatus {
+  DRAFT
+  SENT // issued to the client, awaiting decision
+  ACCEPTED
+  REJECTED
+  EXPIRED // past validUntil with no decision
+  CONVERTED // turned into a freight Order
+}
+
+// ───────────────────────── Project Management (M29) ─────────────────────────
+
+// A project / long-haul contract grouping several freight orders, tracked
+// against a planned budget.
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+// ───────────────────────── Master Planning (M33) ─────────────────────────
+
+// A demand forecast's lifecycle. Planners draft a forecast, confirm it into the
+// plan, then archive it once the period has passed.
+enum ForecastStatus {
+  DRAFT
+  CONFIRMED
+  ARCHIVED
+}
+
+// ───────────────────────── Retail / POS (M28) ─────────────────────────
+
+// A point-of-sale transaction's lifecycle. Completing it relieves inventory and
+// posts revenue + COGS to the ledger; a completed sale can only be VOIDed.
+enum PosSaleStatus {
+  DRAFT
+  COMPLETED
+  VOID
+}
+
+enum PosPaymentMethod {
+  CASH
+  MOBILE_MONEY
+  CARD
+}
+
 // ───────────────────────── Multi-company (M34) ─────────────────────────
 
 // A legal entity / tenant. Its `code` is the `dataAreaId` used to partition every
@@ -556,7 +616,9 @@ model User {
   name              String
   email             String    @unique
   passwordHash      String
-  role              Role      @default(STAFF)
+  role              Role      @default(STAFF) // system role (drives ADMIN/DRIVER special behavior + JWT)
+  roleKey           String? // optional custom role (RbacRole.key); when set, its grants replace the system-role defaults for permission checks
+  customRole        RbacRole? @relation(fields: [roleKey], references: [key], onDelete: SetNull)
   dataAreaId        String    @default("HQ01") // legal entity the user belongs to (multi-company isolation, PRD §6.2)
   isActive          Boolean   @default(true)
   emailVerified     DateTime?
@@ -593,6 +655,7 @@ model User {
   customerInvoices CustomerInvoice[] @relation("CustomerInvoiceCreatedBy")
   moneyTransfers   MoneyTransfer[]   @relation("MoneyTransferCreatedBy")
   budgets          Budget[]          @relation("BudgetCreatedBy")
+  leads            Lead[]            @relation("LeadOwner")
 
   @@index([role])
   @@index([dataAreaId])
@@ -844,6 +907,8 @@ model Client {
 
   jobs        DeliveryJob[]
   orders      Order[]
+  quotes      SalesQuote[]
+  projects    Project[]
   version     Int           @default(0) // optimistic concurrency (PRD §7.1)
   createdById String? // audit: creator user id
   updatedById String? // audit: last-modifier user id
@@ -1075,6 +1140,8 @@ model JournalEntry {
   depreciationEntry      DepreciationEntry? @relation("DepreciationPosting")
   assetDisposal          FixedAsset?        @relation("AssetDisposalPosting")
   serviceOrder           ServiceOrder?      @relation("ServiceOrderPosting")
+  posRevenue             PosSale?           @relation("PosRevenue")
+  posCogs                PosSale?           @relation("PosCogs")
   version                Int                @default(0) // optimistic concurrency (PRD §7.1)
   updatedById            String? // audit: last-modifier user id
 
@@ -1184,15 +1251,20 @@ model Order {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  trip          Trip?
-  damageReports DamageReport[]
-  feedback      CustomerFeedback[]
-  version       Int                @default(0) // optimistic concurrency (PRD §7.1)
-  updatedById   String? // audit: last-modifier user id
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  trip               Trip?
+  damageReports      DamageReport[]
+  feedback           CustomerFeedback[]
+  convertedFromQuote SalesQuote?        @relation("QuoteConvertedOrder")
+  version            Int                @default(0) // optimistic concurrency (PRD §7.1)
+  updatedById        String? // audit: last-modifier user id
 
   @@index([status])
   @@index([clientId])
   @@index([bookingDate])
+  @@index([projectId])
   @@map("orders")
 }
 
@@ -1890,6 +1962,7 @@ model StockItem {
   poLines      PurchaseOrderLine[]
   balances     StockBalance[]
   serviceParts ServicePart[]
+  posLines     PosSaleLine[]
   version      Int                 @default(0) // optimistic concurrency (PRD §7.1)
   createdById  String? // audit
   updatedById  String? // audit
@@ -2659,4 +2732,267 @@ model CustomerFeedback {
   @@index([dataAreaId])
   @@index([customerId])
   @@map("customer_feedback")
+}
+
+// ───────────────────────── Sales & Marketing (M27) ─────────────────────────
+
+// A CRM lead — a prospective client the sales team is pursuing. Kept lightweight;
+// once WON it is typically turned into a Client + a SalesQuote.
+model Lead {
+  id             String    @id @default(cuid())
+  dataAreaId     String    @default("HQ01")
+  companyName    String
+  contactPerson  String?
+  email          String?
+  phone          String?
+  source         String? // referral / web / campaign / cold-call
+  stage          LeadStage @default(NEW)
+  estimatedValue Decimal   @default(0) @db.Decimal(18, 2)
+  currency       String    @default("USD")
+  ownerId        String? // salesperson who owns the lead
+  owner          User?     @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  notes          String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  quotes SalesQuote[]
+
+  @@index([dataAreaId])
+  @@index([dataAreaId, stage])
+  @@map("leads")
+}
+
+// A freight quotation. Header holds routing + commercial terms; line items carry
+// the priced services. On acceptance it can be converted to a freight Order.
+model SalesQuote {
+  id          String      @id @default(cuid())
+  dataAreaId  String      @default("HQ01")
+  quoteNumber String // QUO-000001, unique per company
+  clientId    String?
+  client      Client?     @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  leadId      String?
+  lead        Lead?       @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  salesperson String?
+  status      QuoteStatus @default(DRAFT)
+
+  // Routing snapshot (denormalized onto the quote; copied to the Order on convert).
+  originZone       String?
+  destinationZone  String?
+  cargoDescription String?
+
+  currency   String   @default("USD")
+  total      Decimal  @default(0) @db.Decimal(18, 2) // Σ line amounts, maintained on write
+  validUntil DateTime @db.Date
+  notes      String?
+
+  // Set when the quote is converted into a freight Order.
+  convertedOrderId String? @unique
+  convertedOrder   Order?  @relation("QuoteConvertedOrder", fields: [convertedOrderId], references: [id], onDelete: SetNull)
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lines SalesQuoteLine[]
+
+  @@unique([dataAreaId, quoteNumber])
+  @@index([dataAreaId])
+  @@index([dataAreaId, status])
+  @@index([clientId])
+  @@map("sales_quotes")
+}
+
+model SalesQuoteLine {
+  id          String     @id @default(cuid())
+  dataAreaId  String     @default("HQ01")
+  quoteId     String
+  quote       SalesQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Decimal    @default(1) @db.Decimal(12, 2)
+  unitPrice   Decimal    @default(0) @db.Decimal(18, 2)
+  amount      Decimal    @default(0) @db.Decimal(18, 2) // quantity × unitPrice
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([quoteId])
+  @@map("sales_quote_lines")
+}
+
+// ───────────────────────── Project Management (M29) ─────────────────────────
+
+// A project / contract grouping freight orders, tracked against a planned budget.
+// Actual revenue & cost are rolled up from the linked orders and their trips.
+model Project {
+  id            String        @id @default(cuid())
+  dataAreaId    String        @default("HQ01")
+  projectCode   String // PRJ-000001, unique per company
+  name          String
+  clientId      String?
+  client        Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  manager       String? // account / project manager
+  status        ProjectStatus @default(PLANNING)
+  currency      String        @default("USD")
+  budgetRevenue Decimal       @default(0) @db.Decimal(18, 2) // planned billings
+  budgetCost    Decimal       @default(0) @db.Decimal(18, 2) // planned direct cost
+  startDate     DateTime?     @db.Date
+  endDate       DateTime?     @db.Date
+  description   String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders Order[]
+
+  @@unique([dataAreaId, projectCode])
+  @@index([dataAreaId])
+  @@index([dataAreaId, status])
+  @@index([clientId])
+  @@map("projects")
+}
+
+// ───────────────────────── Master Planning (M33) ─────────────────────────
+
+// A planner-entered demand forecast for a period + corridor: the expected number
+// of loads and tonnage. The capacity plan compares the confirmed forecasts for a
+// period against live fleet/driver availability to surface a shortfall or surplus.
+// One forecast per (period, corridor) within a company.
+model DemandForecast {
+  id             String         @id @default(cuid())
+  dataAreaId     String         @default("HQ01")
+  period         String // planning bucket, e.g. "2026-08" (month) or "2026-W32" (week)
+  corridor       CorridorType   @default(DOMESTIC)
+  status         ForecastStatus @default(DRAFT)
+  forecastLoads  Int            @default(0) // expected number of shipments
+  forecastTonnes Decimal        @default(0) @db.Decimal(12, 2) // expected tonnage
+  // Optional planner override of resources dedicated to this period+corridor.
+  // When null, the live fleet/driver counts are used for the capacity comparison.
+  plannedTrucks  Int?
+  plannedDrivers Int?
+  notes          String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, period, corridor])
+  @@index([dataAreaId])
+  @@index([dataAreaId, period])
+  @@index([dataAreaId, status])
+  @@map("demand_forecasts")
+}
+
+// ───────────────────────── Retail / POS (M28) ─────────────────────────
+
+// An over-the-counter sale of stock items. On completion it relieves inventory
+// and posts Dr Cash / Cr Retail Revenue (total) and Dr COGS / Cr Inventory (cost).
+model PosSale {
+  id            String           @id @default(cuid())
+  dataAreaId    String           @default("HQ01")
+  saleNumber    String // POS-000001, unique per company
+  customerName  String? // walk-in name; null for anonymous
+  paymentMethod PosPaymentMethod @default(CASH)
+  status        PosSaleStatus    @default(DRAFT)
+  currency      String           @default("USD")
+  subtotal      Decimal          @default(0) @db.Decimal(18, 2) // Σ line totals (pre-tax)
+  taxAmount     Decimal          @default(0) @db.Decimal(18, 2)
+  total         Decimal          @default(0) @db.Decimal(18, 2) // subtotal + tax
+  cogs          Decimal          @default(0) @db.Decimal(18, 2) // Σ line cost, set on completion
+  note          String?
+  completedAt   DateTime?
+
+  // Ledger links created on completion.
+  revenueEntryId String?       @unique
+  revenueEntry   JournalEntry? @relation("PosRevenue", fields: [revenueEntryId], references: [id], onDelete: SetNull)
+  cogsEntryId    String?       @unique
+  cogsEntry      JournalEntry? @relation("PosCogs", fields: [cogsEntryId], references: [id], onDelete: SetNull)
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lines PosSaleLine[]
+
+  @@unique([dataAreaId, saleNumber])
+  @@index([dataAreaId])
+  @@index([dataAreaId, status])
+  @@map("pos_sales")
+}
+
+model PosSaleLine {
+  id          String    @id @default(cuid())
+  dataAreaId  String    @default("HQ01")
+  saleId      String
+  sale        PosSale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  quantity    Decimal   @default(1) @db.Decimal(12, 3)
+  unitPrice   Decimal   @default(0) @db.Decimal(18, 2) // sale price per unit
+  lineTotal   Decimal   @default(0) @db.Decimal(18, 2) // quantity × unitPrice
+  unitCost    Decimal   @default(0) @db.Decimal(18, 4) // avgCost snapshot at completion
+  lineCost    Decimal   @default(0) @db.Decimal(18, 2) // quantity × unitCost
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([saleId])
+  @@index([stockItemId])
+  @@map("pos_sale_lines")
+}
+
+// ───────────────────────── Dynamic RBAC (role/permission management) ─────────────────────────
+
+// The catalog of every permission key the app enforces (e.g. "order:read").
+// Seeded from the code's permission list; the admin UI reads this to know which
+// toggles to render per role.
+model RbacPermission {
+  key         String   @id // "order:read"
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles RbacRolePermission[]
+
+  @@map("rbac_permissions")
+}
+
+// A role — either one of the 5 built-in system roles (isSystem=true, mirrors the
+// Role enum by key) or a custom role created from the admin UI. Its permission
+// grants live in RbacRolePermission.
+model RbacRole {
+  key         String   @id // "ADMIN", "DISPATCHER", or a custom key like "YARD_SUPERVISOR"
+  name        String // human label
+  description String?
+  isSystem    Boolean  @default(false) // built-in; cannot be renamed-key/deleted
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions RbacRolePermission[]
+  users       User[]
+
+  @@map("rbac_roles")
+}
+
+// A single (role → permission) grant.
+model RbacRolePermission {
+  roleKey       String
+  role          RbacRole       @relation(fields: [roleKey], references: [key], onDelete: Cascade)
+  permissionKey String
+  permission    RbacPermission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+
+  @@id([roleKey, permissionKey])
+  @@index([permissionKey])
+  @@map("rbac_role_permissions")
 }

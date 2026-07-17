@@ -9,7 +9,7 @@ import {
   driverDocumentSchema,
 } from "@backend/lib/validations";
 import { buildOrderBy } from "@backend/lib/format";
-import { logActivity } from "@backend/lib/activity";
+import { logActivity, logFieldChanges } from "@backend/lib/activity";
 import { hashPassword } from "@backend/lib/password";
 import { rateLimit } from "@backend/lib/rate-limit";
 import { AuthError } from "@backend/lib/errors";
@@ -111,8 +111,8 @@ drivers.patch("/:id", requireAuth, requirePermission("driver:write"), async (c) 
   const raw = await c.req.json();
   const version = requireVersion(raw);
   const body = driverSchema.partial().parse(raw);
-  const existing = await prisma.driver.findUnique({ where: { id }, select: { dataAreaId: true } });
-  assertSameArea(user, existing);
+  const before = await prisma.driver.findUnique({ where: { id } });
+  assertSameArea(user, before);
   const driver = await updateWithVersion(prisma.driver, id, version, user.id, {
     name: body.name,
     email: body.email?.toLowerCase(),
@@ -122,7 +122,11 @@ drivers.patch("/:id", requireAuth, requirePermission("driver:write"), async (c) 
     joinedAt: body.joinedAt,
     status: body.status,
   });
-  await logActivity({ userId: user.id, action: "UPDATE", target: `Driver:${id}`, detail: body });
+  // Field-level audit diff (PRD §7): only the columns this route can touch.
+  await logFieldChanges({
+    userId: user.id, target: `Driver:${id}`, before, after: driver,
+    only: ["name", "email", "phone", "address", "contractType", "joinedAt", "status"],
+  });
   return ok(c, driver);
 });
 

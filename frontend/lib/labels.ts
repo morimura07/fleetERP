@@ -55,6 +55,12 @@ import type {
   TimesheetStatus,
   DockEventKind,
   DamageStatus,
+  LeadStage,
+  QuoteStatus,
+  ProjectStatus,
+  ForecastStatus,
+  PosSaleStatus,
+  PosPaymentMethod,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -677,6 +683,86 @@ export const DAMAGE_STATUS_VARIANT: Record<DamageStatus, BadgeVariant> = {
   APPROVED: "success",
   REJECTED: "destructive",
   SETTLED: "success",
+};
+
+export const LEAD_STAGE_LABEL: Record<LeadStage, string> = {
+  NEW: "New",
+  CONTACTED: "Contacted",
+  QUALIFIED: "Qualified",
+  WON: "Won",
+  LOST: "Lost",
+};
+
+export const LEAD_STAGE_VARIANT: Record<LeadStage, BadgeVariant> = {
+  NEW: "secondary",
+  CONTACTED: "info",
+  QUALIFIED: "warning",
+  WON: "success",
+  LOST: "destructive",
+};
+
+export const QUOTE_STATUS_LABEL: Record<QuoteStatus, string> = {
+  DRAFT: "Draft",
+  SENT: "Sent",
+  ACCEPTED: "Accepted",
+  REJECTED: "Rejected",
+  EXPIRED: "Expired",
+  CONVERTED: "Converted",
+};
+
+export const QUOTE_STATUS_VARIANT: Record<QuoteStatus, BadgeVariant> = {
+  DRAFT: "secondary",
+  SENT: "info",
+  ACCEPTED: "success",
+  REJECTED: "destructive",
+  EXPIRED: "warning",
+  CONVERTED: "default",
+};
+
+export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
+  PLANNING: "Planning",
+  ACTIVE: "Active",
+  ON_HOLD: "On hold",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+};
+
+export const PROJECT_STATUS_VARIANT: Record<ProjectStatus, BadgeVariant> = {
+  PLANNING: "secondary",
+  ACTIVE: "info",
+  ON_HOLD: "warning",
+  COMPLETED: "success",
+  CANCELLED: "destructive",
+};
+
+export const FORECAST_STATUS_LABEL: Record<ForecastStatus, string> = {
+  DRAFT: "Draft",
+  CONFIRMED: "Confirmed",
+  ARCHIVED: "Archived",
+};
+
+export const FORECAST_STATUS_VARIANT: Record<ForecastStatus, BadgeVariant> = {
+  DRAFT: "secondary",
+  CONFIRMED: "success",
+  ARCHIVED: "default",
+};
+
+export const POS_STATUS_LABEL: Record<PosSaleStatus, string> = {
+  DRAFT: "Draft",
+  COMPLETED: "Completed",
+  VOID: "Void",
+};
+
+export const POS_STATUS_VARIANT: Record<PosSaleStatus, BadgeVariant> = {
+  DRAFT: "secondary",
+  COMPLETED: "success",
+  VOID: "destructive",
+};
+
+export const POS_PAYMENT_LABEL: Record<PosPaymentMethod, string> = {
+  CASH: "Cash",
+  MOBILE_MONEY: "Mobile money",
+  CARD: "Card",
 };
 
 // ── Fixed-choice option lists for fields the client spec enumerates but the

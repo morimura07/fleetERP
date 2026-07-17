@@ -15,8 +15,9 @@ import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 import { ROLE_LABEL } from "@frontend/lib/labels";
 import type { Role } from "@frontend/lib/enums";
 
-interface User { id: string; name: string; email: string; role: Role; dataAreaId: string; isActive: boolean; }
+interface User { id: string; name: string; email: string; role: Role; roleKey: string | null; dataAreaId: string; isActive: boolean; }
 type Company = { code: string; name: string };
+type RoleOption = { key: string; name: string; isSystem: boolean };
 type UserForm = {
   name: string; email: string; password: string; role: Role; dataAreaId: string;
   phone?: string; jobTitle?: string; assignedBranch?: string; costCenter?: string;
@@ -28,20 +29,40 @@ export default function UsersPage() {
   const [open, setOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [assignFor, setAssignFor] = useState<User | null>(null);
   const { register, handleSubmit, setValue, watch, reset, getValues, formState: { isSubmitting } } =
     useForm<UserForm>({ defaultValues: { role: "STAFF", dataAreaId: "HQ01" } });
 
   useEffect(() => {
     apiFetch<Company[]>("/api/lookups/companies").then(setCompanies).catch(() => {});
+    apiFetch<RoleOption[]>("/api/rbac/roles").then(setRoles).catch(() => {});
   }, []);
+
+  const customRoles = roles.filter((r) => !r.isSystem);
+  const roleName = (key: string | null) => key ? (roles.find((r) => r.key === key)?.name ?? key) : null;
 
   const columns: Column<User>[] = [
     { key: "name", header: "Name" },
     { key: "email", header: "Email" },
-    { key: "role", header: "Role", render: (r) => <Badge>{ROLE_LABEL[r.role]}</Badge> },
+    { key: "role", header: "Role", render: (r) => (
+      r.roleKey
+        ? <Badge variant="outline">{roleName(r.roleKey)}</Badge>
+        : <Badge>{ROLE_LABEL[r.role]}</Badge>
+    ) },
     { key: "dataAreaId", header: "Company", render: (r) => <span className="font-mono text-xs">{r.dataAreaId}</span> },
     { key: "isActive", header: "Status", render: (r) => r.isActive ? <Badge variant="success">Active</Badge> : <Badge variant="secondary">Inactive</Badge> },
   ];
+
+  async function assignRole(user: User, roleKey: string | null) {
+    try {
+      await apiFetch(`/api/rbac/users/${user.id}/role`, { method: "POST", body: JSON.stringify({ roleKey }) });
+      toast({ title: roleKey ? `Assigned ${roleName(roleKey)}` : "Reverted to system role", variant: "success" });
+      setAssignFor(null); setRefreshKey((k) => k + 1);
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof ApiError ? e.message : "Failed", variant: "destructive" });
+    }
+  }
 
   async function onSubmit(data: UserForm) {
     try {
@@ -61,7 +82,32 @@ export default function UsersPage() {
       <DataTable<User>
         endpoint="/api/users" columns={columns} searchPlaceholder="Search by name or email" refreshKey={refreshKey}
         toolbar={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" />Add User</Button>}
+        rowActions={(r) => <Button variant="outline" size="sm" onClick={() => setAssignFor(r)}>Role</Button>}
       />
+
+      {/* Assign a custom role (or revert to the system role) */}
+      <Dialog open={!!assignFor} onOpenChange={(o) => !o && setAssignFor(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Assign Role — {assignFor?.name}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              System role: <Badge>{assignFor ? ROLE_LABEL[assignFor.role] : ""}</Badge>
+              {assignFor?.roleKey && <> · currently overridden by <Badge variant="outline">{roleName(assignFor.roleKey)}</Badge></>}
+            </p>
+            <div className="space-y-1.5">
+              <Label>Custom Role</Label>
+              <Select value={assignFor?.roleKey ?? "none"} onValueChange={(v) => assignFor && assignRole(assignFor, v === "none" ? null : v)}>
+                <SelectTrigger><SelectValue placeholder="Pick a custom role" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Use system role ({assignFor ? ROLE_LABEL[assignFor.role] : ""}) —</SelectItem>
+                  {customRoles.map((r) => <SelectItem key={r.key} value={r.key}>{r.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">A custom role replaces the system role's permissions. ADMIN/DRIVER special behaviors still follow the system role.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Add User</DialogTitle></DialogHeader>

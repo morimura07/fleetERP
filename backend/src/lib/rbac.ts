@@ -84,6 +84,15 @@ export type Permission =
   | "consolidation:read" // subsidiary→parent mapping & rollup (M5)
   | "consolidation:run"
   | "compliance:read" // vehicle & driver document-expiry dashboard (M11)
+  | "sales:read" // sales & marketing: leads, quotes (M27)
+  | "sales:write"
+  | "sales:convert" // convert an accepted quote into a freight order
+  | "project:read" // project / contract P&L (M29)
+  | "project:write"
+  | "planning:read" // master planning: demand forecasts & capacity plan (M33)
+  | "planning:write"
+  | "pos:read" // retail / point-of-sale (M28)
+  | "pos:write"
   | "kpi:read" // operational KPI capture: dock events, damage reports, feedback (Tier C)
   | "kpi:write"
   | "waypoint:read" // GPS waypoint registry (M30 Common)
@@ -94,7 +103,7 @@ export type Permission =
   | "user:manage"
   | "company:manage"; // legal-entity / company registry (M34)
 
-const ALL: Permission[] = [
+export const ALL: Permission[] = [
   "dashboard:view",
   "driver:read",
   "driver:write",
@@ -171,6 +180,15 @@ const ALL: Permission[] = [
   "consolidation:read",
   "consolidation:run",
   "compliance:read",
+  "sales:read",
+  "sales:write",
+  "sales:convert",
+  "project:read",
+  "project:write",
+  "planning:read",
+  "planning:write",
+  "pos:read",
+  "pos:write",
   "kpi:read",
   "kpi:write",
   "waypoint:read",
@@ -182,7 +200,13 @@ const ALL: Permission[] = [
   "company:manage",
 ];
 
-const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
+/**
+ * The built-in defaults for the 5 system roles. This is the seed source of truth
+ * for the `rbac_*` tables; at runtime the effective grants are read from
+ * `runtimePermissions`, which is hydrated from the DB (so admins can change them)
+ * and falls back to these defaults until hydration runs.
+ */
+export const DEFAULT_ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ADMIN: ALL,
   DISPATCHER: [
     "dashboard:view",
@@ -225,6 +249,15 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "attendance:write",
     "fx:read",
     "compliance:read",
+    "sales:read",
+    "sales:write",
+    "sales:convert",
+    "project:read",
+    "project:write",
+    "planning:read",
+    "planning:write",
+    "pos:read",
+    "pos:write",
     "kpi:read",
     "kpi:write",
     "waypoint:read",
@@ -294,6 +327,11 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "consolidation:read",
     "consolidation:run",
     "compliance:read",
+    "sales:read",
+    "project:read",
+    "project:write",
+    "planning:read",
+    "pos:read",
     "kpi:read",
     "waypoint:read",
     "tracking:read",
@@ -335,19 +373,62 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "fx:read",
     "consolidation:read",
     "compliance:read",
+    "sales:read",
+    "project:read",
+    "planning:read",
+    "pos:read",
     "kpi:read",
     "waypoint:read",
     "tracking:read",
   ],
 };
 
-export function can(role: Role | undefined | null, permission: Permission): boolean {
-  if (!role) return false;
-  return ROLE_PERMISSIONS[role].includes(permission);
+/**
+ * Effective role → permission grants, keyed by role *key* (system role name like
+ * "ADMIN", or a custom role's key). Seeded from the defaults and overwritten by
+ * `hydrateRbac()` from the DB, so admin edits take effect without a code change.
+ * Kept as a synchronous in-memory map so `can()` stays sync — no route touches.
+ */
+const runtimePermissions = new Map<string, Set<string>>(
+  Object.entries(DEFAULT_ROLE_PERMISSIONS).map(([role, perms]) => [role, new Set<string>(perms)]),
+);
+
+/** Replace the entire runtime grant map from DB rows (called at startup / after edits). */
+export function hydrateRbac(roleGrants: { roleKey: string; permissions: string[] }[]) {
+  runtimePermissions.clear();
+  for (const { roleKey, permissions } of roleGrants) {
+    runtimePermissions.set(roleKey, new Set(permissions));
+  }
 }
 
-export function permissionsFor(role: Role): Permission[] {
-  return ROLE_PERMISSIONS[role];
+/** Update (or add) a single role's grants in the runtime map. */
+export function setRuntimeRole(roleKey: string, permissions: string[]) {
+  runtimePermissions.set(roleKey, new Set(permissions));
+}
+
+/** Remove a role from the runtime map (custom-role deletion). */
+export function removeRuntimeRole(roleKey: string) {
+  runtimePermissions.delete(roleKey);
+}
+
+/**
+ * Does a user with this role key have the permission? `roleKey` is the custom
+ * role key when the user has one, else the system role name. Falls back to the
+ * built-in defaults if the key isn't in the runtime map (e.g. before hydration).
+ */
+export function can(roleKey: string | undefined | null, permission: Permission): boolean {
+  if (!roleKey) return false;
+  const grants = runtimePermissions.get(roleKey);
+  if (grants) return grants.has(permission);
+  // Fallback: unknown key that matches a system role default.
+  const def = DEFAULT_ROLE_PERMISSIONS[roleKey as Role];
+  return def ? def.includes(permission) : false;
+}
+
+export function permissionsFor(roleKey: string): Permission[] {
+  const grants = runtimePermissions.get(roleKey);
+  if (grants) return [...grants] as Permission[];
+  return DEFAULT_ROLE_PERMISSIONS[roleKey as Role] ?? [];
 }
 
 /** Route prefixes each role is allowed to enter (used by middleware). */

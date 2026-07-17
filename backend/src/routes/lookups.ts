@@ -220,6 +220,64 @@ lookups.get("/kpi-form", requireAuth, requirePermission("kpi:read"), async (c) =
   return ok(c, { vehicles, trips, orders, customers });
 });
 
+/** Clients, open leads, and salespeople for the sales quote/lead forms (M27). */
+lookups.get("/sales-form", requireAuth, requirePermission("sales:read"), async (c) => {
+  const user = c.get("user");
+  const [clients, leads, salespeople] = await Promise.all([
+    prisma.client.findMany({
+      where: { ...areaScope(user), status: "ACTIVE" },
+      select: { id: true, companyName: true },
+      orderBy: { companyName: "asc" },
+    }),
+    prisma.lead.findMany({
+      where: { ...areaScope(user), stage: { notIn: ["WON", "LOST"] } },
+      select: { id: true, companyName: true },
+      orderBy: { companyName: "asc" },
+    }),
+    prisma.user.findMany({
+      where: { ...areaScope(user), isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+  return ok(c, { clients, leads, salespeople });
+});
+
+/** Clients + recent orders (with their current project link) for project forms (M29). */
+lookups.get("/project-form", requireAuth, requirePermission("project:read"), async (c) => {
+  const user = c.get("user");
+  const [clients, orders] = await Promise.all([
+    prisma.client.findMany({
+      where: { ...areaScope(user), status: "ACTIVE" },
+      select: { id: true, companyName: true },
+      orderBy: { companyName: "asc" },
+    }),
+    prisma.order.findMany({
+      where: { ...areaScope(user) },
+      select: { id: true, orderCode: true, projectId: true },
+      orderBy: { bookingDate: "desc" },
+      take: 300,
+    }),
+  ]);
+  return ok(c, { clients, orders });
+});
+
+/** In-stock items (with on-hand qty & average cost) for the POS sale form (M28). */
+lookups.get("/pos-form", requireAuth, requirePermission("pos:read"), async (c) => {
+  const user = c.get("user");
+  const items = await prisma.stockItem.findMany({
+    where: { ...areaScope(user) },
+    select: { id: true, code: true, name: true, unit: true, quantityOnHand: true, avgCost: true },
+    orderBy: { name: "asc" },
+  });
+  return ok(c, {
+    items: items.map((p) => ({
+      id: p.id, code: p.code, name: p.name, unit: p.unit,
+      quantityOnHand: p.quantityOnHand.toString(), avgCost: p.avgCost.toString(),
+    })),
+  });
+});
+
 /** Jobs still needing a dispatch, for the dispatch board. */
 lookups.get("/undispatched", requireAuth, requirePermission("dispatch:read"), async (c) => {
   const rows = await prisma.deliveryJob.findMany({

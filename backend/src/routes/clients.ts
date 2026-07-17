@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { clientSchema, paginationSchema } from "@backend/lib/validations";
 import { buildOrderBy } from "@backend/lib/format";
-import { logActivity } from "@backend/lib/activity";
+import { logActivity, logFieldChanges } from "@backend/lib/activity";
 import { updateWithVersion, requireVersion } from "@backend/lib/concurrency";
 import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
@@ -62,10 +62,14 @@ clients.patch("/:id", requireAuth, requirePermission("client:write"), async (c) 
   const raw = await c.req.json();
   const version = requireVersion(raw);
   const body = clientSchema.partial().parse(raw);
-  const existing = await prisma.client.findUnique({ where: { id }, select: { dataAreaId: true } });
-  assertSameArea(user, existing);
+  const before = await prisma.client.findUnique({ where: { id } });
+  assertSameArea(user, before);
   const client = await updateWithVersion(prisma.client, id, version, user.id, body);
-  await logActivity({ userId: user.id, action: "UPDATE", target: `Client:${id}`, detail: body });
+  // Field-level audit diff (PRD §7): compare only the columns the caller submitted.
+  await logFieldChanges({
+    userId: user.id, target: `Client:${id}`, before, after: client,
+    only: Object.keys(body),
+  });
   return ok(c, client);
 });
 

@@ -1,0 +1,67 @@
+import { describe, it, expect } from "vitest";
+import { projectPnL, orderActuals, canTransition, PROJECT_TRANSITIONS } from "@backend/services/projects";
+
+describe("project P&L", () => {
+  it("computes budget & actual profit, margin and variances", () => {
+    // budget: rev 100k / cost 70k → profit 30k. actual: rev 90k / cost 75k.
+    const p = projectPnL(100000, 70000, 90000, 75000);
+    expect(p.budgetProfit.toFixed(2)).toBe("30000.00");
+    expect(p.actualProfit.toFixed(2)).toBe("15000.00");
+    expect(p.marginPct.toFixed(2)).toBe("16.67"); // 15000/90000*100
+    expect(p.costVariance.toFixed(2)).toBe("5000.00"); // over budget
+    expect(p.revenueVariance.toFixed(2)).toBe("-10000.00"); // under budget
+  });
+
+  it("margin is 0 when there is no actual revenue", () => {
+    const p = projectPnL(50000, 40000, 0, 12000);
+    expect(p.marginPct.toFixed(2)).toBe("0.00");
+    expect(p.actualProfit.toFixed(2)).toBe("-12000.00");
+  });
+
+  it("a fresh project (no actuals) mirrors the budget as the plan", () => {
+    const p = projectPnL(80000, 60000, 0, 0);
+    expect(p.budgetProfit.toFixed(2)).toBe("20000.00");
+    expect(p.actualProfit.toFixed(2)).toBe("0.00");
+    expect(p.costVariance.toFixed(2)).toBe("-60000.00");
+  });
+});
+
+describe("order actuals rollup", () => {
+  it("revenue = freight + demurrage; cost = trip base costs + expenses", () => {
+    const a = orderActuals({
+      freightAmount: 5000, demurrageAmount: 200,
+      trip: { driverWages: 800, tollPermitCost: 150, miscExpense: 50, expenses: [{ amount: 300 }, { amount: 100 }] },
+    });
+    expect(a.revenue.toFixed(2)).toBe("5200.00");
+    expect(a.cost.toFixed(2)).toBe("1400.00"); // 800+150+50+300+100
+  });
+
+  it("an order with no trip has revenue but zero cost", () => {
+    const a = orderActuals({ freightAmount: 3000, demurrageAmount: 0, trip: null });
+    expect(a.revenue.toFixed(2)).toBe("3000.00");
+    expect(a.cost.toFixed(2)).toBe("0.00");
+  });
+});
+
+describe("project status transitions", () => {
+  it("allows the normal lifecycle", () => {
+    expect(canTransition("PLANNING", "ACTIVE")).toBe(true);
+    expect(canTransition("ACTIVE", "ON_HOLD")).toBe(true);
+    expect(canTransition("ON_HOLD", "ACTIVE")).toBe(true);
+    expect(canTransition("ACTIVE", "COMPLETED")).toBe(true);
+  });
+  it("allows cancelling from any live state", () => {
+    expect(canTransition("PLANNING", "CANCELLED")).toBe(true);
+    expect(canTransition("ACTIVE", "CANCELLED")).toBe(true);
+    expect(canTransition("ON_HOLD", "CANCELLED")).toBe(true);
+  });
+  it("forbids reviving a completed or cancelled project", () => {
+    expect(canTransition("COMPLETED", "ACTIVE")).toBe(false);
+    expect(canTransition("CANCELLED", "PLANNING")).toBe(false);
+    expect(PROJECT_TRANSITIONS.COMPLETED).toEqual([]);
+    expect(PROJECT_TRANSITIONS.CANCELLED).toEqual([]);
+  });
+  it("forbids jumping PLANNING straight to COMPLETED", () => {
+    expect(canTransition("PLANNING", "COMPLETED")).toBe(false);
+  });
+});
