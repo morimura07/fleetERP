@@ -24,15 +24,26 @@ export async function serverApi<T = unknown>(path: string, init?: RequestInit): 
   // No token at all → the session is missing/incomplete; send to login.
   if (!token) redirect("/login?reason=session");
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
-    // Server-rendered list pages should always reflect current data.
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init?.headers,
+      },
+      // Server-rendered list pages should always reflect current data.
+      cache: "no-store",
+    });
+  } catch (cause) {
+    // A connection-level failure (API down, wrong host/port, DNS, firewall).
+    // Node's bare "fetch failed" is undiagnosable in production logs, so name
+    // the URL we actually tried and which env var controls it.
+    throw new ServerApiError(
+      `Cannot reach the API at ${API_BASE}${path} — check that the backend is running and that API_URL points to it (cause: ${(cause as Error)?.message ?? "unknown"})`,
+      503,
+    );
+  }
 
   // Expired/invalid token → don't crash the page; bounce to login to re-auth.
   if (res.status === 401) redirect("/login?reason=expired");
