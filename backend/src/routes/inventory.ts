@@ -3,6 +3,7 @@ import { Prisma, StockCategory } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { stockItemSchema, stockMovementSchema, paginationSchema } from "@backend/lib/validations";
 import { receiveStock, issueStock, itemValue } from "@backend/services/inventory";
+import { getCostVarianceReport } from "@backend/services/cost-variance";
 import { logActivity } from "@backend/lib/activity";
 import { updateWithVersion, requireVersion } from "@backend/lib/concurrency";
 import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
@@ -54,6 +55,11 @@ inventory.get("/valuation", requireAuth, requirePermission("inventory:read"), as
   });
   const total = rows.reduce((s, r) => s.plus(itemValue(r)), new Prisma.Decimal(0));
   return ok(c, { totalValue: total.toFixed(2), itemCount: rows.length });
+});
+
+/** Standard-cost variance report (M13): actual (moving-avg) vs standard cost. */
+inventory.get("/cost-variance", requireAuth, requirePermission("inventory:read"), async (c) => {
+  return ok(c, await getCostVarianceReport(areaForWrite(c.get("user"))));
 });
 
 inventory.post("/", requireAuth, requirePermission("inventory:write"), async (c) => {

@@ -19,7 +19,7 @@ Maps the implementation against the contracted scope in `ERP_PRD_v1.0.pdf` (Mori
 | Admin screens | 44 |
 | RBAC permissions | 96 |
 | Roles | 5 (ADMIN, DISPATCHER, FINANCE, DRIVER, STAFF) |
-| Unit tests | 247 passing |
+| Unit tests | 255 passing |
 
 ## Phase status
 
@@ -43,7 +43,7 @@ Maps the implementation against the contracted scope in `ERP_PRD_v1.0.pdf` (Mori
 | M3 | Budgeting | ✅ | CapEx/OpEx lines per cost center; STRICT_BLOCK / WARNING_ONLY / OVERRIDE; consumed wired into trip-expense & AP posting (account-level). |
 | M4 | Cash & Bank | ✅ | Bank / mobile-money / cash accounts; driver disbursements with PENDING→SUCCESS\|FAILED\|TIMEOUT lifecycle, ledgered on settle. **Live M-Pesa/Airtel & bank-feed APIs are stubs.** |
 | M5 | Consolidations | ✅ | Subsidiary→parent account mapping, rate-type rollup, unmapped/missing-rate flags. |
-| M6 | Cost Accounting | 🟡 | Per-trip P&L (`computeTripPnL`) + fuel efficiency per vehicle; per-contract/project P&L via Projects (M29); **per-corridor profitability** (revenue/cost/margin by Northern/Central/Domestic route, `getCorridorProfitability`, Corridor P&L screen). **Standard-cost / variance accounting not built.** |
+| M6 | Cost Accounting | ✅ | Per-trip P&L (`computeTripPnL`) + fuel efficiency per vehicle; per-contract/project P&L via Projects (M29); per-corridor profitability (`getCorridorProfitability`, Corridor P&L screen); standard-cost variance via M13 (`getCostVarianceReport`). |
 | M7 | Credit & Collections | ✅ | Aging buckets (`agingBucket`) + collections workspace. Full dunning ladder (NONE→REMINDER→…→LEGAL), dispute lifecycle (OPEN→UNDER_INVESTIGATION→RESOLVED/WRITTEN_OFF), promise-to-pay, contact log, and bad-debt write-off (posts Dr 6200 / Cr 1100). |
 | M8 | General Ledger | ✅ | Double-entry, immutable POSTED + contra-reversal, dimensions, per-posting FX rate. Period-end multi-currency revaluation restates open foreign-currency AP/AR to the period-end rate and posts the net unrealized FX gain/loss (Dr/Cr 4900/6900) — preview then post from the Exchange Rates screen. |
 | M9 | Payroll | ✅ | Monthly pay runs (DRAFT→APPROVED→POSTED) with country statutory computation (PAYE bands, NSSF, SHIF) and ledger posting. Approved timesheet overtime (M26) is added to gross as taxable earnings. |
@@ -60,7 +60,7 @@ Maps the implementation against the contracted scope in `ERP_PRD_v1.0.pdf` (Mori
 
 | # | Module | Status | Notes |
 |---|--------|--------|-------|
-| M13 | Cost Management | 🟡 | Moving-average inventory valuation drives cost; per-trip P&L (M6). **Standard-cost / variance accounting not built.** |
+| M13 | Cost Management | ✅ | Moving-average inventory valuation drives cost; per-trip P&L (M6). **Standard-cost variance**: set a standard cost per stock item and the Cost Variance report (`getCostVarianceReport`) shows actual (moving-average) vs standard — per-unit and on-hand value variance — plus realized purchase price variance from receipts. |
 | M14 | Inventory | ✅ | Stock items (spare parts/fuel/tyres/…), moving-average cost, receipts/issues/adjustments with ledger posting (Dr expense / Cr inventory). Issues feed vehicle service orders (M22). |
 | M15 | Procurement | ✅ | Purchase orders (DRAFT→APPROVED→PARTIAL→RECEIVED→CLOSED), goods receipts, 3-way PO↔receipt↔invoice matching with variance flags. |
 | M16 | Product Information | 🟡 | Stock-item master with category/unit; **no full product-catalog / attribute mgmt.** |
