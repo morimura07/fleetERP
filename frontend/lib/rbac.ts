@@ -255,6 +255,7 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/attendance", permission: "attendance:read" },
   { prefix: "/fx", permission: "fx:read" },
   { prefix: "/consolidation", permission: "consolidation:read" },
+  { prefix: "/corridor-pnl", permission: "dashboard:view" },
   { prefix: "/compliance", permission: "compliance:read" },
   { prefix: "/leads", permission: "sales:read" },
   { prefix: "/quotes", permission: "sales:read" },
