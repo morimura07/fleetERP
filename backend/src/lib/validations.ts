@@ -1301,3 +1301,27 @@ export const setPeriodSchema = z.object({
 });
 
 export type SetPeriodInput = z.infer<typeof setPeriodSchema>;
+
+// ── Product Information / attribute catalog (M16) ────────────────────────────
+
+const stockCategoryEnum = z.enum(["SPARE_PART", "FUEL", "TYRE", "LUBRICANT", "CONSUMABLE", "OTHER"]);
+
+export const productAttributeSchema = z.object({
+  key: z.string().min(1).max(40),
+  label: z.string().min(1, "Label is required").max(80),
+  dataType: z.enum(["TEXT", "NUMBER", "BOOLEAN", "LIST"]).default("TEXT"),
+  unit: optText(20),
+  options: optText(500),
+  category: stockCategoryEnum.optional().nullable(),
+  sortOrder: z.coerce.number().int().min(0).default(0),
+});
+
+export const setItemAttributesSchema = z.object({
+  values: z.array(z.object({
+    attributeId: z.string().min(1),
+    value: z.string().max(500).nullable(),
+  })),
+});
+
+export type ProductAttributeInput = z.infer<typeof productAttributeSchema>;
+export type SetItemAttributesInput = z.infer<typeof setItemAttributesSchema>;

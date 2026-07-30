@@ -1963,7 +1963,8 @@ model StockItem {
   balances     StockBalance[]
   serviceParts ServicePart[]
   posLines     PosSaleLine[]
-  version      Int                 @default(0) // optimistic concurrency (PRD §7.1)
+  attributes   StockItemAttribute[]
+  version      Int                  @default(0) // optimistic concurrency (PRD §7.1)
   createdById  String? // audit
   updatedById  String? // audit
 
@@ -3024,4 +3025,53 @@ model FiscalPeriod {
   @@index([dataAreaId])
   @@index([dataAreaId, status])
   @@map("fiscal_periods")
+}
+
+// ───────────────────────── Product Information / attribute catalog (M16) ─────────────────────────
+
+enum AttributeDataType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  LIST // a fixed choice from `options`
+}
+
+// A definable product/stock attribute (e.g. "Viscosity", "Thread size"). Applies
+// to one stock category or to all (category = null). Gives the parts catalog
+// structured specs beyond the fixed columns.
+model ProductAttribute {
+  id         String            @id @default(cuid())
+  dataAreaId String            @default("HQ01")
+  key        String // machine key, unique per company (e.g. "viscosity")
+  label      String // human label
+  dataType   AttributeDataType @default(TEXT)
+  unit       String? // e.g. "cSt", "mm", "V"
+  options    String? // LIST: comma-separated choices
+  category   StockCategory? // applies to this category only; null = all
+  sortOrder  Int               @default(0)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  values StockItemAttribute[]
+
+  @@unique([dataAreaId, key])
+  @@index([dataAreaId])
+  @@map("product_attributes")
+}
+
+// A stock item's value for one attribute.
+model StockItemAttribute {
+  id          String           @id @default(cuid())
+  dataAreaId  String           @default("HQ01")
+  stockItemId String
+  stockItem   StockItem        @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  attributeId String
+  attribute   ProductAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  value       String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([stockItemId, attributeId])
+  @@index([attributeId])
+  @@map("stock_item_attributes")
 }

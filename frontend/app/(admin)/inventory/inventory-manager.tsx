@@ -1,8 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { Plus, ArrowDownToLine, ArrowUpFromLine, Tags } from "lucide-react";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
@@ -37,6 +37,7 @@ export function InventoryManager() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [itemOpen, setItemOpen] = useState(false);
   const [move, setMove] = useState<{ item: StockItem; type: "RECEIPT" | "ISSUE" } | null>(null);
+  const [specsFor, setSpecsFor] = useState<StockItem | null>(null);
 
   const form = useForm<StockItemInput>({ resolver: zodResolver(stockItemSchema) });
 
@@ -92,9 +93,14 @@ export function InventoryManager() {
             <Button variant="outline" size="sm" onClick={() => setMove({ item: r, type: "ISSUE" })}>
               <ArrowUpFromLine className="h-3.5 w-3.5" />Issue
             </Button>
+            <Button variant="ghost" size="sm" onClick={() => setSpecsFor(r)}>
+              <Tags className="h-3.5 w-3.5" />Specs
+            </Button>
           </div>
         )}
       />
+
+      {specsFor && <SpecsDialog item={specsFor} onClose={() => setSpecsFor(null)} />}
 
       {/* New item dialog */}
       <Dialog open={itemOpen} onOpenChange={setItemOpen}>
@@ -248,6 +254,82 @@ function MovementDialog({
             {type === "RECEIPT" ? "Receive" : "Issue"}
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Product attributes / specs editor (M16) ──
+
+interface ItemAttribute {
+  attributeId: string;
+  key: string;
+  label: string;
+  dataType: "TEXT" | "NUMBER" | "BOOLEAN" | "LIST";
+  unit: string | null;
+  options: string[] | null;
+  value: string | null;
+}
+
+function SpecsDialog({ item, onClose }: { item: { id: string; name: string }; onClose: () => void }) {
+  const { toast } = useToast();
+  const [rows, setRows] = useState<ItemAttribute[] | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    apiFetch<ItemAttribute[]>(`/api/inventory/${item.id}/attributes`)
+      .then((r) => { setRows(r); setDraft(Object.fromEntries(r.map((a) => [a.attributeId, a.value ?? ""]))); })
+      .catch((e) => { toast({ title: "Error", description: e instanceof ApiError ? e.message : "Failed to load", variant: "destructive" }); onClose(); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
+
+  async function save() {
+    setBusy(true);
+    try {
+      await apiFetch(`/api/inventory/${item.id}/attributes`, {
+        method: "PUT",
+        body: JSON.stringify({ values: Object.entries(draft).map(([attributeId, value]) => ({ attributeId, value: value || null })) }),
+      });
+      toast({ title: "Specs saved", variant: "success" });
+      onClose();
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof ApiError ? e.message : "Failed", variant: "destructive" });
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Specs — {item.name}</DialogTitle></DialogHeader>
+        {!rows ? <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
+          : rows.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">No attributes apply to this item&apos;s category. Define attributes under Product Attributes first.</p>
+          ) : (
+            <div className="space-y-3">
+              {rows.map((a) => (
+                <div key={a.attributeId} className="grid grid-cols-[10rem_1fr] items-center gap-3">
+                  <Label className="text-sm">{a.label}{a.unit ? <span className="ml-1 text-xs text-muted-foreground">({a.unit})</span> : null}</Label>
+                  {a.dataType === "BOOLEAN" ? (
+                    <Select value={draft[a.attributeId] || "none"} onValueChange={(v) => setDraft((d) => ({ ...d, [a.attributeId]: v === "none" ? "" : v }))}>
+                      <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent><SelectItem value="none">—</SelectItem><SelectItem value="Yes">Yes</SelectItem><SelectItem value="No">No</SelectItem></SelectContent>
+                    </Select>
+                  ) : a.dataType === "LIST" && a.options ? (
+                    <Select value={draft[a.attributeId] || "none"} onValueChange={(v) => setDraft((d) => ({ ...d, [a.attributeId]: v === "none" ? "" : v }))}>
+                      <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent><SelectItem value="none">—</SelectItem>{a.options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                    </Select>
+                  ) : (
+                    <Input type={a.dataType === "NUMBER" ? "number" : "text"} value={draft[a.attributeId] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [a.attributeId]: e.target.value }))} />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        {rows && rows.length > 0 && (
+          <DialogFooter><Button onClick={save} disabled={busy}>Save Specs</Button></DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

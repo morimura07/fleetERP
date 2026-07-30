@@ -114,3 +114,4 @@ export type ForecastStatus = "DRAFT" | "CONFIRMED" | "ARCHIVED";
 export type PosSaleStatus = "DRAFT" | "COMPLETED" | "VOID";
 export type PosPaymentMethod = "CASH" | "MOBILE_MONEY" | "CARD";
 export type PeriodStatus = "OPEN" | "CLOSED";
+export type AttributeDataType = "TEXT" | "NUMBER" | "BOOLEAN" | "LIST";

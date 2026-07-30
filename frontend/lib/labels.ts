@@ -62,6 +62,7 @@ import type {
   PosSaleStatus,
   PosPaymentMethod,
   PeriodStatus,
+  AttributeDataType,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -774,6 +775,13 @@ export const PERIOD_STATUS_LABEL: Record<PeriodStatus, string> = {
 export const PERIOD_STATUS_VARIANT: Record<PeriodStatus, BadgeVariant> = {
   OPEN: "success",
   CLOSED: "secondary",
+};
+
+export const ATTRIBUTE_TYPE_LABEL: Record<AttributeDataType, string> = {
+  TEXT: "Text",
+  NUMBER: "Number",
+  BOOLEAN: "Yes / No",
+  LIST: "List (choice)",
 };
 
 // ── Fixed-choice option lists for fields the client spec enumerates but the
