@@ -53,6 +53,7 @@ import { projects } from "@backend/routes/projects";
 import { planning } from "@backend/routes/planning";
 import { pos } from "@backend/routes/pos";
 import { rbac } from "@backend/routes/rbac";
+import { fiscalPeriods } from "@backend/routes/fiscal-periods";
 import { refreshRuntime } from "@backend/services/rbac-admin";
 
 /**
@@ -135,6 +136,7 @@ app.route("/api/projects", projects);
 app.route("/api/planning", planning);
 app.route("/api/pos", pos);
 app.route("/api/rbac", rbac);
+app.route("/api/fiscal-periods", fiscalPeriods);
 
 app.onError(onError);
 app.notFound((c) => c.json({ error: "Not found" }, 404));

@@ -1290,3 +1290,14 @@ export type CreateRoleInput = z.infer<typeof createRoleSchema>;
 export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
 export type SetPermissionsInput = z.infer<typeof setPermissionsSchema>;
 export type AssignRoleInput = z.infer<typeof assignRoleSchema>;
+
+// ── Fiscal calendar / period-close (M34) ─────────────────────────────────────
+
+export const setPeriodSchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  month: z.coerce.number().int().min(1).max(12),
+  status: z.enum(["OPEN", "CLOSED"]),
+  note: os(300),
+});
+
+export type SetPeriodInput = z.infer<typeof setPeriodSchema>;

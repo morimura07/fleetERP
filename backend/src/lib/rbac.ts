@@ -83,6 +83,8 @@ export type Permission =
   | "fx:write"
   | "consolidation:read" // subsidiary→parent mapping & rollup (M5)
   | "consolidation:run"
+  | "period:read" // fiscal calendar / period-close (M34)
+  | "period:manage"
   | "compliance:read" // vehicle & driver document-expiry dashboard (M11)
   | "sales:read" // sales & marketing: leads, quotes (M27)
   | "sales:write"
@@ -179,6 +181,8 @@ export const ALL: Permission[] = [
   "fx:write",
   "consolidation:read",
   "consolidation:run",
+  "period:read",
+  "period:manage",
   "compliance:read",
   "sales:read",
   "sales:write",
@@ -326,6 +330,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "fx:write",
     "consolidation:read",
     "consolidation:run",
+    "period:read",
+    "period:manage",
     "compliance:read",
     "sales:read",
     "project:read",
@@ -372,6 +378,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "expense:read",
     "fx:read",
     "consolidation:read",
+    "period:read",
     "compliance:read",
     "sales:read",
     "project:read",

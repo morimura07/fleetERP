@@ -2996,3 +2996,32 @@ model RbacRolePermission {
   @@index([permissionKey])
   @@map("rbac_role_permissions")
 }
+
+// ───────────────────────── Fiscal calendar / period-close (M34) ─────────────────────────
+
+enum PeriodStatus {
+  OPEN
+  CLOSED
+}
+
+// An accounting period (a calendar month) per legal entity. When CLOSED, the
+// ledger refuses any new posting whose posting date falls in that month, which
+// prevents back-dated edits to a signed-off month. A period with no row is OPEN
+// by default, so enforcement only begins once a month is explicitly closed.
+model FiscalPeriod {
+  id         String       @id @default(cuid())
+  dataAreaId String       @default("HQ01")
+  year       Int
+  month      Int // 1–12
+  status     PeriodStatus @default(OPEN)
+  closedAt   DateTime?
+  closedById String?
+  note       String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([dataAreaId, year, month])
+  @@index([dataAreaId])
+  @@index([dataAreaId, status])
+  @@map("fiscal_periods")
+}
