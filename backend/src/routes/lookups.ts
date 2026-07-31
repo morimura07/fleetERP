@@ -148,6 +148,17 @@ lookups.get("/asset-form", requireAuth, requirePermission("asset:read"), async (
   return ok(c, { employees });
 });
 
+/** Active units of measure for inventory/quantity forms (grouped by dimension). */
+lookups.get("/units", requireAuth, requirePermission("inventory:read"), async (c) => {
+  const user = c.get("user");
+  const units = await prisma.unitOfMeasure.findMany({
+    where: { ...areaScope(user), isActive: true },
+    select: { id: true, code: true, name: true, dimension: true, symbol: true },
+    orderBy: [{ dimension: "asc" }, { code: "asc" }],
+  });
+  return ok(c, units);
+});
+
 /** Active employees for HR create forms (contracts, leave, documents). */
 lookups.get("/hr-form", requireAuth, requirePermission("hr:read"), async (c) => {
   const user = c.get("user");

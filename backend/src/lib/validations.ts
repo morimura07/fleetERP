@@ -1355,3 +1355,22 @@ export const setItemAttributesSchema = z.object({
 
 export type ProductAttributeInput = z.infer<typeof productAttributeSchema>;
 export type SetItemAttributesInput = z.infer<typeof setItemAttributesSchema>;
+
+// ── Units of measure (M30 Common) ──
+export const unitOfMeasureSchema = z.object({
+  code: z.string().min(1, "Code is required").max(12),
+  name: z.string().min(1, "Name is required").max(60),
+  dimension: z.enum(["WEIGHT", "VOLUME", "LENGTH", "AREA", "COUNT", "TIME"]).default("COUNT"),
+  symbol: optText(12),
+  factorToBase: z.coerce.number().positive("Factor must be greater than 0").default(1),
+  isBase: z.coerce.boolean().default(false),
+});
+
+export const uomConvertSchema = z.object({
+  qty: z.coerce.number(),
+  from: z.string().min(1).max(12),
+  to: z.string().min(1).max(12),
+});
+
+export type UnitOfMeasureInput = z.infer<typeof unitOfMeasureSchema>;
+export type UomConvertInput = z.infer<typeof uomConvertSchema>;

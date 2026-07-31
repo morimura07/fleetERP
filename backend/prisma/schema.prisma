@@ -1884,6 +1884,37 @@ model GpsWaypoint {
   @@map("gps_waypoints")
 }
 
+// Units-of-measure registry (M30 Common). A per-company catalog of the units the
+// business trades in — weight, volume, distance, count … Each unit records how
+// many of its dimension's base unit it equals (`factorToBase`), which lets the
+// system convert a quantity between any two units of the same dimension.
+enum UomDimension {
+  WEIGHT
+  VOLUME
+  LENGTH
+  AREA
+  COUNT
+  TIME
+}
+
+model UnitOfMeasure {
+  id           String       @id @default(cuid())
+  dataAreaId   String       @default("HQ01") // legal entity (multi-company isolation)
+  code         String // KG, TON, L, M3 … unique per company
+  name         String // Kilogram, Metric Tonne …
+  dimension    UomDimension @default(COUNT)
+  symbol       String? // display symbol: kg, t, L
+  factorToBase Decimal      @default(1) @db.Decimal(20, 8) // value of 1 unit expressed in the dimension's base unit
+  isBase       Boolean      @default(false) // the canonical base unit of its dimension (factorToBase = 1)
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([dataAreaId, code])
+  @@index([dataAreaId])
+  @@map("units_of_measure")
+}
+
 // Last-known position of a vehicle. One row per vehicle, updated by the tracking
 // feed. `source` stays STUB until a telematics provider is wired up (PRD §5).
 model VehiclePosition {

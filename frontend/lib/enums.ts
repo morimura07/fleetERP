@@ -115,3 +115,4 @@ export type PosSaleStatus = "DRAFT" | "COMPLETED" | "VOID";
 export type PosPaymentMethod = "CASH" | "MOBILE_MONEY" | "CARD";
 export type PeriodStatus = "OPEN" | "CLOSED";
 export type AttributeDataType = "TEXT" | "NUMBER" | "BOOLEAN" | "LIST";
+export type UomDimension = "WEIGHT" | "VOLUME" | "LENGTH" | "AREA" | "COUNT" | "TIME";

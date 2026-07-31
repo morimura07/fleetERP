@@ -14,12 +14,12 @@ Maps the implementation against the contracted scope in `ERP_PRD_v1.0.pdf` (Mori
 
 | Metric | Value |
 |--------|-------|
-| Prisma models | 77 |
-| Migrations applied | 34 |
-| Admin screens | 46 |
+| Prisma models | 78 |
+| Migrations applied | 35 |
+| Admin screens | 47 |
 | RBAC permissions | 96 |
 | Roles | 5 (ADMIN, DISPATCHER, FINANCE, DRIVER, STAFF) |
-| Unit tests | 260 passing |
+| Unit tests | 266 passing |
 
 ## Phase status
 
@@ -111,7 +111,7 @@ The operations dashboard (`/dashboard`, served by `getKpiDashboard`) exposes the
 
 | # | Module | Status | Notes |
 |---|--------|--------|-------|
-| M30 | Common (GPS waypoints, UoM) | 🟡 | GPS waypoint registry (named checkpoints/borders/weighbridges + lat/long) built. **Units-of-measure registry not yet.** |
+| M30 | Common (GPS waypoints, UoM) | ✅ | GPS waypoint registry (named checkpoints/borders/weighbridges + lat/long) built. **Units-of-measure registry** now live: per-company catalog (`UnitOfMeasure`) across weight/volume/distance/count dimensions, each with a factor to its dimension's base unit; a **quantity converter** converts between any two units of the same dimension (cross-dimension refused). Ships 9 starter units seeded. |
 | M31 | Audit Workbench | ✅ | `ActivityLog` records every write. Field-level old→new diff (§7) is captured via `diffFields`/`logFieldChanges` (`backend/src/lib/activity.ts`) — only changed columns, normalized (Date→ISO, Decimal→string) — and rendered as a before→after diff in the Activity Log screen. Wired into the master-data update routes (clients, drivers, vehicles); the same helper drops into any other update route. |
 | M32 | Demo / Sandbox | ✅ | Isolated sandbox partition: `Company.isSandbox` flags a throwaway demo area (own `dataAreaId`, never touches real entities). Admin screen provisions, shows headline counts, and **resets to a clean demo baseline** — reset is hard-guarded to refuse any non-sandbox company. Active-sandbox badge on the company switcher. |
 | M33 | Master Planning | ✅ | Planner-entered demand forecasts per period + corridor (loads & tonnage), one per (period, corridor). A computed capacity plan compares confirmed demand against live available-fleet capacity (excludes maintenance, honors per-forecast truck overrides) and surfaces per-corridor shortfall/surplus & utilization. |
