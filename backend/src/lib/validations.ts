@@ -38,6 +38,8 @@ export const resetPasswordSchema = z
 
 // ───────── Driver ─────────
 const os = (max: number) => z.string().max(max).optional().or(z.literal(""));
+// Like `os` but also accepts null (forms send null for empty optional fields).
+const optText = (max: number) => z.string().max(max).nullish().or(z.literal(""));
 
 export const driverSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -938,9 +940,23 @@ export const fixedAssetSchema = z.object({
   assetAccountCode: z.string().max(20).default("1500"),
   accumDepCode: z.string().max(20).default("1510"),
   expenseCode: z.string().max(20).default("5200"),
+  warrantyProvider: optText(120),
+  warrantyExpiresAt: z.coerce.date().optional().nullable(),
 }).refine((a) => a.residualValue < a.acquisitionCost, {
   message: "Residual value must be less than acquisition cost",
   path: ["residualValue"],
+});
+
+export const assetAssignSchema = z.object({
+  employeeId: optText(40),
+  custodian: z.string().min(1, "Custodian is required").max(120),
+  location: optText(120),
+  assignedAt: z.coerce.date(),
+  note: optText(300),
+});
+
+export const assetReturnSchema = z.object({
+  returnedAt: z.coerce.date(),
 });
 
 export const depreciationRunSchema = z.object({
@@ -953,6 +969,8 @@ export const assetDisposalSchema = z.object({
 });
 
 export type FixedAssetInput = z.infer<typeof fixedAssetSchema>;
+export type AssetAssignInput = z.infer<typeof assetAssignSchema>;
+export type AssetReturnInput = z.infer<typeof assetReturnSchema>;
 export type DepreciationRunInput = z.infer<typeof depreciationRunSchema>;
 export type AssetDisposalInput = z.infer<typeof assetDisposalSchema>;
 
@@ -1263,8 +1281,6 @@ export type PosLineInput = z.infer<typeof posLineSchema>;
 export type PosSaleInput = z.infer<typeof posSaleSchema>;
 
 // ── Dynamic RBAC (role/permission management) ────────────────────────────────
-
-const optText = (max: number) => z.string().max(max).nullish().or(z.literal(""));
 
 export const createRoleSchema = z.object({
   key: z.string().min(2).max(40),

@@ -137,6 +137,17 @@ lookups.get("/trip-form", requireAuth, requirePermission("trip:read"), async (c)
   return ok(c, { orders, drivers, vehicles });
 });
 
+/** Active employees for the asset-custody assign dialog (asset permission). */
+lookups.get("/asset-form", requireAuth, requirePermission("asset:read"), async (c) => {
+  const user = c.get("user");
+  const employees = await prisma.employee.findMany({
+    where: { ...areaScope(user), status: { not: "TERMINATED" } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+  return ok(c, { employees });
+});
+
 /** Active employees for HR create forms (contracts, leave, documents). */
 lookups.get("/hr-form", requireAuth, requirePermission("hr:read"), async (c) => {
   const user = c.get("user");

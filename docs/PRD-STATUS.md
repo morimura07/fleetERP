@@ -14,12 +14,12 @@ Maps the implementation against the contracted scope in `ERP_PRD_v1.0.pdf` (Mori
 
 | Metric | Value |
 |--------|-------|
-| Prisma models | 76 |
-| Migrations applied | 32 |
+| Prisma models | 77 |
+| Migrations applied | 33 |
 | Admin screens | 45 |
 | RBAC permissions | 96 |
 | Roles | 5 (ADMIN, DISPATCHER, FINANCE, DRIVER, STAFF) |
-| Unit tests | 255 passing |
+| Unit tests | 260 passing |
 
 ## Phase status
 
@@ -71,7 +71,7 @@ Maps the implementation against the contracted scope in `ERP_PRD_v1.0.pdf` (Mori
 
 | # | Module | Status | Notes |
 |---|--------|--------|-------|
-| M19 | Asset Management | 🟡 | Covered by Fixed Assets (M20) register + Fleet (M11) maintenance. **No custody/assignment or warranty-schedule tracking.** |
+| M19 | Asset Management | ✅ | Fixed Assets (M20) register + Fleet (M11) maintenance, plus **custody & warranty**: assign an asset to a custodian (employee or department/site) with full assignment history (`AssetAssignment` — one open holder at a time), and a warranty schedule (`warrantyExpiresAt`) surfaced on the register with CURRENT / EXPIRING_SOON / EXPIRED badges (30-day window). |
 | M20 | Fixed Assets | ✅ | Asset register (vehicle/equipment/…), straight-line depreciation runs posting Dr Depreciation Expense / Cr Accumulated Depreciation, and disposal with gain/loss (4910/6910). |
 | M21 | Production Control | ⬜ | (not applicable to a logistics operation) |
 | M22 | Service Management | ✅ | Workshop service orders (OPEN→IN_PROGRESS→COMPLETED→POSTED); parts issued from Inventory (M14), labor lines; external-garage labor accrues to the ledger, internal labor is a memo cost. |
