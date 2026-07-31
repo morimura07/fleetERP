@@ -90,10 +90,10 @@ export default function UsersPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>Assign Role — {assignFor?.name}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground">
               System role: <Badge>{assignFor ? ROLE_LABEL[assignFor.role] : ""}</Badge>
               {assignFor?.roleKey && <> · currently overridden by <Badge variant="outline">{roleName(assignFor.roleKey)}</Badge></>}
-            </p>
+            </div>
             <div className="space-y-1.5">
               <Label>Custom Role</Label>
               <Select value={assignFor?.roleKey ?? "none"} onValueChange={(v) => assignFor && assignRole(assignFor, v === "none" ? null : v)}>
