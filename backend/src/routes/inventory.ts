@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { Prisma, StockCategory } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
-import { stockItemSchema, stockMovementSchema, paginationSchema } from "@backend/lib/validations";
+import { stockItemSchema, stockMovementSchema, paginationSchema, setItemAttributesSchema } from "@backend/lib/validations";
 import { receiveStock, issueStock, itemValue } from "@backend/services/inventory";
+import { getCostVarianceReport } from "@backend/services/cost-variance";
+import { getItemAttributes, setItemAttributes } from "@backend/services/product-attributes";
 import { logActivity } from "@backend/lib/activity";
 import { updateWithVersion, requireVersion } from "@backend/lib/concurrency";
 import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
@@ -54,6 +56,11 @@ inventory.get("/valuation", requireAuth, requirePermission("inventory:read"), as
   });
   const total = rows.reduce((s, r) => s.plus(itemValue(r)), new Prisma.Decimal(0));
   return ok(c, { totalValue: total.toFixed(2), itemCount: rows.length });
+});
+
+/** Standard-cost variance report (M13): actual (moving-avg) vs standard cost. */
+inventory.get("/cost-variance", requireAuth, requirePermission("inventory:read"), async (c) => {
+  return ok(c, await getCostVarianceReport(areaForWrite(c.get("user"))));
 });
 
 inventory.post("/", requireAuth, requirePermission("inventory:write"), async (c) => {
@@ -147,4 +154,22 @@ inventory.post("/:id/movements", requireAuth, requirePermission("inventory:write
   });
   await logActivity({ userId: user.id, action: "ISSUE", target: `StockItem:${id}`, detail: { movementId: mv.id } });
   return created(c, mv);
+});
+
+// ── Product attributes / specs (M16) ──
+
+/** The attributes applicable to this item (by category) with its current values. */
+inventory.get("/:id/attributes", requireAuth, requirePermission("inventory:read"), async (c) => {
+  const user = c.get("user");
+  return ok(c, await getItemAttributes(areaForWrite(user), c.req.param("id")));
+});
+
+/** Set this item's attribute values (empty value clears one). */
+inventory.put("/:id/attributes", requireAuth, requirePermission("inventory:write"), async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+  const body = setItemAttributesSchema.parse(await c.req.json());
+  const result = await setItemAttributes(areaForWrite(user), id, body.values);
+  await logActivity({ userId: user.id, action: "SET_ATTRIBUTES", target: `StockItem:${id}` });
+  return ok(c, result);
 });

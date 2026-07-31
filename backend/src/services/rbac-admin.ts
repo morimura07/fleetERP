@@ -43,6 +43,14 @@ export async function seedRbac() {
         data: perms.map((permissionKey) => ({ roleKey: role, permissionKey })),
         skipDuplicates: true,
       });
+    } else if (role === "ADMIN") {
+      // ADMIN is omnipotent by definition — additively ensure it holds every
+      // permission even on a re-seed after new permissions are added to the app.
+      // (skipDuplicates keeps this from clobbering or duplicating existing grants.)
+      await prisma.rbacRolePermission.createMany({
+        data: perms.map((permissionKey) => ({ roleKey: role, permissionKey })),
+        skipDuplicates: true,
+      });
     }
   }
   await refreshRuntime();

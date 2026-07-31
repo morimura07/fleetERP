@@ -432,6 +432,29 @@ async function main() {
     console.log("  Demo Phase 3: skipped (waypoints already exist)");
   }
 
+  // M30 Common — units-of-measure registry. Idempotent (upsert on code) so a
+  // re-seed never duplicates. Factors are expressed in each dimension's base
+  // unit (KG for weight, L for volume, KM for distance, PC for count).
+  const STARTER_UNITS: { code: string; name: string; dimension: "WEIGHT" | "VOLUME" | "LENGTH" | "COUNT"; symbol: string; factorToBase: number; isBase?: boolean }[] = [
+    { code: "KG", name: "Kilogram", dimension: "WEIGHT", symbol: "kg", factorToBase: 1, isBase: true },
+    { code: "TON", name: "Metric Tonne", dimension: "WEIGHT", symbol: "t", factorToBase: 1000 },
+    { code: "G", name: "Gram", dimension: "WEIGHT", symbol: "g", factorToBase: 0.001 },
+    { code: "L", name: "Litre", dimension: "VOLUME", symbol: "L", factorToBase: 1, isBase: true },
+    { code: "M3", name: "Cubic Metre", dimension: "VOLUME", symbol: "m³", factorToBase: 1000 },
+    { code: "KM", name: "Kilometre", dimension: "LENGTH", symbol: "km", factorToBase: 1, isBase: true },
+    { code: "M", name: "Metre", dimension: "LENGTH", symbol: "m", factorToBase: 0.001 },
+    { code: "PC", name: "Piece", dimension: "COUNT", symbol: "pc", factorToBase: 1, isBase: true },
+    { code: "PLT", name: "Pallet", dimension: "COUNT", symbol: "plt", factorToBase: 1 },
+  ];
+  for (const u of STARTER_UNITS) {
+    await prisma.unitOfMeasure.upsert({
+      where: { dataAreaId_code: { dataAreaId: DATA_AREA, code: u.code } },
+      update: {},
+      create: { dataAreaId: DATA_AREA, code: u.code, name: u.name, dimension: u.dimension, symbol: u.symbol, factorToBase: u.factorToBase, isBase: !!u.isBase },
+    });
+  }
+  console.log(`  Units of measure: ${STARTER_UNITS.length} starter units (${DATA_AREA})`);
+
   // Dynamic RBAC: seed the permission catalog + the 5 system roles with their defaults.
   await seedRbac();
   console.log("  RBAC: permission catalog + 5 system roles seeded");

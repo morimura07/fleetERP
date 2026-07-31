@@ -84,6 +84,8 @@ export type Permission =
   | "fx:write"
   | "consolidation:read"
   | "consolidation:run"
+  | "period:read"
+  | "period:manage"
   | "compliance:read"
   | "sales:read"
   | "sales:write"
@@ -136,6 +138,7 @@ const ALL: Permission[] = [
   "attendance:read", "attendance:write", "attendance:approve",
   "fx:read", "fx:write",
   "consolidation:read", "consolidation:run",
+  "period:read", "period:manage",
   "compliance:read",
   "sales:read", "sales:write", "sales:convert",
   "project:read", "project:write",
@@ -190,6 +193,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "attendance:read", "attendance:write", "attendance:approve",
     "fx:read", "fx:write",
     "consolidation:read", "consolidation:run",
+    "period:read", "period:manage",
     "compliance:read", "sales:read", "project:read", "project:write", "planning:read", "pos:read", "kpi:read", "waypoint:read", "tracking:read",
     "report:read", "activity:read", "export:run",
   ],
@@ -201,6 +205,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "order:read", "trip:read", "vendor:read", "payable:read",
     "customer:read", "receivable:read", "tax:read", "collection:read",
     "bank:read", "budget:read", "inventory:read", "warehouse:read", "procurement:read", "payroll:read", "expense:read", "fx:read", "consolidation:read",
+    "period:read",
     "compliance:read", "sales:read", "project:read", "planning:read", "pos:read", "kpi:read", "waypoint:read", "tracking:read",
   ],
 };
@@ -245,6 +250,9 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/bank", permission: "bank:read" },
   { prefix: "/budgets", permission: "budget:read" },
   { prefix: "/inventory", permission: "inventory:read" },
+  { prefix: "/product-attributes", permission: "inventory:read" },
+  { prefix: "/units", permission: "inventory:read" },
+  { prefix: "/cost-variance", permission: "inventory:read" },
   { prefix: "/warehouses", permission: "warehouse:read" },
   { prefix: "/procurement", permission: "procurement:read" },
   { prefix: "/payroll", permission: "payroll:read" },
@@ -255,6 +263,8 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/attendance", permission: "attendance:read" },
   { prefix: "/fx", permission: "fx:read" },
   { prefix: "/consolidation", permission: "consolidation:read" },
+  { prefix: "/periods", permission: "period:read" },
+  { prefix: "/corridor-pnl", permission: "dashboard:view" },
   { prefix: "/compliance", permission: "compliance:read" },
   { prefix: "/leads", permission: "sales:read" },
   { prefix: "/quotes", permission: "sales:read" },
@@ -270,4 +280,5 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/users", permission: "user:manage" },
   { prefix: "/roles", permission: "user:manage" },
   { prefix: "/companies", permission: "company:manage" },
+  { prefix: "/sandbox", permission: "company:manage" },
 ];

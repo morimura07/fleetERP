@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, CalendarClock, PackageX, BookText } from "lucide-react";
+import { Plus, CalendarClock, PackageX, BookText, Users } from "lucide-react";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
@@ -9,13 +9,14 @@ import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
 import { useToast } from "@frontend/components/ui/toast";
-import { ASSET_CATEGORY_LABEL, ASSET_STATUS_LABEL, ASSET_STATUS_VARIANT } from "@frontend/lib/labels";
+import { ASSET_CATEGORY_LABEL, ASSET_STATUS_LABEL, ASSET_STATUS_VARIANT, DOC_BUCKET_LABEL, DOC_BUCKET_VARIANT } from "@frontend/lib/labels";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 import type { AssetCategory, AssetStatus } from "@frontend/lib/enums";
 
 interface AssetRow {
   id: string; code: string; name: string; category: AssetCategory; status: AssetStatus;
   acquisitionCost: string; accumulatedDepreciation: string; bookValue: string;
+  custodian: string | null; warrantyStatus: string;
 }
 
 const money = (v: string) => `USD ${parseFloat(v).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
@@ -26,11 +27,13 @@ type AssetForm = {
   code: string; name: string; category: AssetCategory;
   acquisitionCost: string; residualValue: string; usefulLifeMonths: string;
   acquisitionDate: string; inServiceDate: string;
+  warrantyProvider: string; warrantyExpiresAt: string;
 };
 const emptyForm = (): AssetForm => ({
   code: "", name: "", category: "EQUIPMENT",
   acquisitionCost: "", residualValue: "0", usefulLifeMonths: "60",
   acquisitionDate: today(), inServiceDate: today(),
+  warrantyProvider: "", warrantyExpiresAt: "",
 });
 
 export function AssetsManager() {
@@ -39,6 +42,7 @@ export function AssetsManager() {
   const [createOpen, setCreateOpen] = useState(false);
   const [runOpen, setRunOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [custodyFor, setCustodyFor] = useState<AssetRow | null>(null);
 
   const [form, setForm] = useState<AssetForm>(emptyForm());
   const [period, setPeriod] = useState(thisMonth());
@@ -59,6 +63,8 @@ export function AssetsManager() {
           acquisitionCost: Number(form.acquisitionCost), residualValue: Number(form.residualValue),
           usefulLifeMonths: Number(form.usefulLifeMonths),
           acquisitionDate: form.acquisitionDate, inServiceDate: form.inServiceDate,
+          warrantyProvider: form.warrantyProvider || null,
+          warrantyExpiresAt: form.warrantyExpiresAt || null,
         }),
       });
       toast({ title: "Asset registered", variant: "success" });
@@ -99,6 +105,8 @@ export function AssetsManager() {
     { key: "acquisitionCost", header: "Cost", render: (r) => <span className="tabular-nums">{money(r.acquisitionCost)}</span> },
     { key: "accumulatedDepreciation", header: "Accum. Dep.", render: (r) => <span className="tabular-nums text-muted-foreground">{money(r.accumulatedDepreciation)}</span> },
     { key: "bookValue", header: "Book Value", render: (r) => <span className="tabular-nums font-medium">{money(r.bookValue)}</span> },
+    { key: "custodian", header: "Custodian", render: (r) => r.custodian ?? <span className="text-muted-foreground">Unassigned</span> },
+    { key: "warrantyStatus", header: "Warranty", render: (r) => r.warrantyStatus === "MISSING" ? <span className="text-muted-foreground">—</span> : <Badge variant={DOC_BUCKET_VARIANT[r.warrantyStatus]}>{DOC_BUCKET_LABEL[r.warrantyStatus]}</Badge> },
     { key: "status", header: "Status", render: (r) => <Badge variant={ASSET_STATUS_VARIANT[r.status]}>{ASSET_STATUS_LABEL[r.status]}</Badge> },
   ];
 
@@ -117,8 +125,15 @@ export function AssetsManager() {
             <Button onClick={() => { setForm(emptyForm()); setCreateOpen(true); }}><Plus className="h-4 w-4" />New Asset</Button>
           </>
         }
-        rowActions={(r) => <Button variant="outline" size="sm" onClick={() => setDetailId(r.id)}>Open</Button>}
+        rowActions={(r) => (
+          <div className="flex justify-end gap-1.5">
+            <Button variant="outline" size="sm" onClick={() => setCustodyFor(r)}><Users className="h-3.5 w-3.5" />Custody</Button>
+            <Button variant="outline" size="sm" onClick={() => setDetailId(r.id)}>Open</Button>
+          </div>
+        )}
       />
+
+      {custodyFor && <CustodyDialog asset={custodyFor} onClose={() => setCustodyFor(null)} onChanged={refresh} />}
 
       {/* Register asset */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -139,6 +154,8 @@ export function AssetsManager() {
             <div className="space-y-1.5"><Label>Useful life (months)</Label><Input type="number" value={form.usefulLifeMonths} onChange={(e) => setF({ usefulLifeMonths: e.target.value })} /></div>
             <div className="space-y-1.5"><Label>Acquisition date</Label><Input type="date" value={form.acquisitionDate} onChange={(e) => setF({ acquisitionDate: e.target.value })} /></div>
             <div className="space-y-1.5"><Label>In-service date</Label><Input type="date" value={form.inServiceDate} onChange={(e) => setF({ inServiceDate: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Warranty provider <span className="text-muted-foreground">(optional)</span></Label><Input placeholder="Isuzu East Africa" value={form.warrantyProvider} onChange={(e) => setF({ warrantyProvider: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label>Warranty expires <span className="text-muted-foreground">(optional)</span></Label><Input type="date" value={form.warrantyExpiresAt} onChange={(e) => setF({ warrantyExpiresAt: e.target.value })} /></div>
             {monthlyPreview && (
               <p className="md:col-span-2 text-sm text-muted-foreground">
                 Straight-line monthly depreciation: <span className="font-semibold text-foreground tabular-nums">{money(monthlyPreview)}</span>
@@ -300,6 +317,115 @@ function AssetDetail({ id, onClose, onChange }: { id: string; onClose: () => voi
           </DialogContent>
         </Dialog>
       )}
+    </Dialog>
+  );
+}
+
+// ── Asset custody dialog (M19): current holder, assign/return, history ──
+
+interface CustodyData {
+  current: { custodian: string; location: string | null; employeeName: string | null; assignedAt: string } | null;
+  history: { custodian: string; location: string | null; employeeName: string | null; assignedAt: string; returnedAt: string | null; note: string | null }[];
+}
+
+function CustodyDialog({ asset, onClose, onChanged }: { asset: { id: string; code: string; name: string }; onClose: () => void; onChanged: () => void }) {
+  const { toast } = useToast();
+  const [data, setData] = useState<CustodyData | null>(null);
+  const [employees, setEmployees] = useState<{ id: string; name: string }[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  // Assign form.
+  const [employeeId, setEmployeeId] = useState("");
+  const [custodian, setCustodian] = useState("");
+  const [location, setLocation] = useState("");
+  const [assignedAt, setAssignedAt] = useState(new Date().toISOString().slice(0, 10));
+
+  const load = async () => setData(await apiFetch<CustodyData>(`/api/assets/${asset.id}/custody`));
+  useEffect(() => {
+    load().catch((e) => { toast({ title: "Error", description: e instanceof ApiError ? e.message : "Failed", variant: "destructive" }); onClose(); });
+    apiFetch<{ employees: { id: string; name: string }[] }>("/api/lookups/asset-form").then((r) => setEmployees(r.employees)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asset.id]);
+
+  async function assign() {
+    setBusy(true);
+    try {
+      const label = custodian.trim() || (employeeId ? employees.find((e) => e.id === employeeId)?.name ?? "" : "");
+      if (!label) throw new ApiError("Pick an employee or type a custodian", 422);
+      await apiFetch(`/api/assets/${asset.id}/assign`, {
+        method: "POST",
+        body: JSON.stringify({ employeeId: employeeId || null, custodian: label, location: location || null, assignedAt }),
+      });
+      toast({ title: "Asset assigned", variant: "success" });
+      setCustodian(""); setLocation(""); setEmployeeId("");
+      await load(); onChanged();
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof ApiError ? e.message : "Failed", variant: "destructive" });
+    } finally { setBusy(false); }
+  }
+
+  async function doReturn() {
+    setBusy(true);
+    try {
+      await apiFetch(`/api/assets/${asset.id}/return`, { method: "POST", body: JSON.stringify({ returnedAt: new Date().toISOString().slice(0, 10) }) });
+      toast({ title: "Asset returned", variant: "success" });
+      await load(); onChanged();
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof ApiError ? e.message : "Failed", variant: "destructive" });
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader><DialogTitle>Custody — {asset.code} · {asset.name}</DialogTitle></DialogHeader>
+        {!data ? <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div> : (
+          <div className="space-y-4">
+            {/* Current holder */}
+            <div className="rounded-lg border border-border bg-card/50 px-3 py-2 text-sm">
+              {data.current ? (
+                <div className="flex items-center justify-between">
+                  <span>Currently held by <b>{data.current.custodian}</b>{data.current.location ? ` · ${data.current.location}` : ""} <span className="text-xs text-muted-foreground">since {data.current.assignedAt}</span></span>
+                  <Button variant="ghost" size="sm" disabled={busy} onClick={doReturn}>Return</Button>
+                </div>
+              ) : <span className="text-muted-foreground">Not currently assigned.</span>}
+            </div>
+
+            {/* Assign form */}
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Assign to</Label>
+              <div className="grid gap-2 md:grid-cols-2">
+                <Select value={employeeId || "none"} onValueChange={(v) => { setEmployeeId(v === "none" ? "" : v); }}>
+                  <SelectTrigger><SelectValue placeholder="Employee (optional)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— None —</SelectItem>
+                    {employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Input placeholder="or custodian / department" value={custodian} onChange={(e) => setCustodian(e.target.value)} />
+                <Input placeholder="Location (optional)" value={location} onChange={(e) => setLocation(e.target.value)} />
+                <Input type="date" value={assignedAt} onChange={(e) => setAssignedAt(e.target.value)} />
+              </div>
+              <Button size="sm" disabled={busy} onClick={assign}>Assign</Button>
+            </div>
+
+            {/* History */}
+            {data.history.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">History</Label>
+                <div className="max-h-48 space-y-1 overflow-y-auto text-sm">
+                  {data.history.map((h, i) => (
+                    <div key={i} className="flex items-center justify-between rounded-md border border-border px-3 py-1.5">
+                      <span>{h.custodian}{h.location ? ` · ${h.location}` : ""}</span>
+                      <span className="text-xs text-muted-foreground">{h.assignedAt} → {h.returnedAt ?? "present"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
     </Dialog>
   );
 }

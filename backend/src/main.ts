@@ -53,6 +53,10 @@ import { projects } from "@backend/routes/projects";
 import { planning } from "@backend/routes/planning";
 import { pos } from "@backend/routes/pos";
 import { rbac } from "@backend/routes/rbac";
+import { fiscalPeriods } from "@backend/routes/fiscal-periods";
+import { productAttributes } from "@backend/routes/product-attributes";
+import { units } from "@backend/routes/uom";
+import { sandbox } from "@backend/routes/sandbox";
 import { refreshRuntime } from "@backend/services/rbac-admin";
 
 /**
@@ -135,6 +139,10 @@ app.route("/api/projects", projects);
 app.route("/api/planning", planning);
 app.route("/api/pos", pos);
 app.route("/api/rbac", rbac);
+app.route("/api/fiscal-periods", fiscalPeriods);
+app.route("/api/product-attributes", productAttributes);
+app.route("/api/units", units);
+app.route("/api/sandbox", sandbox);
 
 app.onError(onError);
 app.notFound((c) => c.json({ error: "Not found" }, 404));

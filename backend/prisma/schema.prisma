@@ -599,6 +599,7 @@ model Company {
   baseCurrency String   @default("USD")
   country      String   @default("TZ") // ISO country
   isActive     Boolean  @default(true)
+  isSandbox    Boolean  @default(false) // demo/sandbox partition — safe to reset (M32)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -1883,6 +1884,37 @@ model GpsWaypoint {
   @@map("gps_waypoints")
 }
 
+// Units-of-measure registry (M30 Common). A per-company catalog of the units the
+// business trades in — weight, volume, distance, count … Each unit records how
+// many of its dimension's base unit it equals (`factorToBase`), which lets the
+// system convert a quantity between any two units of the same dimension.
+enum UomDimension {
+  WEIGHT
+  VOLUME
+  LENGTH
+  AREA
+  COUNT
+  TIME
+}
+
+model UnitOfMeasure {
+  id           String       @id @default(cuid())
+  dataAreaId   String       @default("HQ01") // legal entity (multi-company isolation)
+  code         String // KG, TON, L, M3 … unique per company
+  name         String // Kilogram, Metric Tonne …
+  dimension    UomDimension @default(COUNT)
+  symbol       String? // display symbol: kg, t, L
+  factorToBase Decimal      @default(1) @db.Decimal(20, 8) // value of 1 unit expressed in the dimension's base unit
+  isBase       Boolean      @default(false) // the canonical base unit of its dimension (factorToBase = 1)
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([dataAreaId, code])
+  @@index([dataAreaId])
+  @@map("units_of_measure")
+}
+
 // Last-known position of a vehicle. One row per vehicle, updated by the tracking
 // feed. `source` stays STUB until a telematics provider is wired up (PRD §5).
 model VehiclePosition {
@@ -1963,7 +1995,8 @@ model StockItem {
   balances     StockBalance[]
   serviceParts ServicePart[]
   posLines     PosSaleLine[]
-  version      Int                 @default(0) // optimistic concurrency (PRD §7.1)
+  attributes   StockItemAttribute[]
+  version      Int                  @default(0) // optimistic concurrency (PRD §7.1)
   createdById  String? // audit
   updatedById  String? // audit
 
@@ -2193,15 +2226,16 @@ model Employee {
   driverId           String? @unique
   driver             Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
-  payslips      Payslip[]
-  contracts     EmploymentContract[]
-  leaveRequests LeaveRequest[]
-  leaveBalances LeaveBalance[]
-  documents     EmployeeDocument[]
-  timeEntries   TimeEntry[]
-  timesheets    Timesheet[]
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
+  payslips         Payslip[]
+  contracts        EmploymentContract[]
+  leaveRequests    LeaveRequest[]
+  leaveBalances    LeaveBalance[]
+  documents        EmployeeDocument[]
+  timeEntries      TimeEntry[]
+  timesheets       Timesheet[]
+  assetAssignments AssetAssignment[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
   version     Int     @default(0) // optimistic concurrency (PRD §7.1)
   createdById String?
@@ -2350,7 +2384,12 @@ model FixedAsset {
   disposalEntryId  String?       @unique
   disposalEntry    JournalEntry? @relation("AssetDisposalPosting", fields: [disposalEntryId], references: [id], onDelete: SetNull)
 
-  entries DepreciationEntry[]
+  // Warranty schedule (M19).
+  warrantyProvider  String?
+  warrantyExpiresAt DateTime? @db.Date
+
+  entries     DepreciationEntry[]
+  assignments AssetAssignment[]
 
   version     Int      @default(0)
   createdById String?
@@ -2995,4 +3034,109 @@ model RbacRolePermission {
   @@id([roleKey, permissionKey])
   @@index([permissionKey])
   @@map("rbac_role_permissions")
+}
+
+// ───────────────────────── Fiscal calendar / period-close (M34) ─────────────────────────
+
+enum PeriodStatus {
+  OPEN
+  CLOSED
+}
+
+// An accounting period (a calendar month) per legal entity. When CLOSED, the
+// ledger refuses any new posting whose posting date falls in that month, which
+// prevents back-dated edits to a signed-off month. A period with no row is OPEN
+// by default, so enforcement only begins once a month is explicitly closed.
+model FiscalPeriod {
+  id         String       @id @default(cuid())
+  dataAreaId String       @default("HQ01")
+  year       Int
+  month      Int // 1–12
+  status     PeriodStatus @default(OPEN)
+  closedAt   DateTime?
+  closedById String?
+  note       String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([dataAreaId, year, month])
+  @@index([dataAreaId])
+  @@index([dataAreaId, status])
+  @@map("fiscal_periods")
+}
+
+// ───────────────────────── Product Information / attribute catalog (M16) ─────────────────────────
+
+enum AttributeDataType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  LIST // a fixed choice from `options`
+}
+
+// A definable product/stock attribute (e.g. "Viscosity", "Thread size"). Applies
+// to one stock category or to all (category = null). Gives the parts catalog
+// structured specs beyond the fixed columns.
+model ProductAttribute {
+  id         String            @id @default(cuid())
+  dataAreaId String            @default("HQ01")
+  key        String // machine key, unique per company (e.g. "viscosity")
+  label      String // human label
+  dataType   AttributeDataType @default(TEXT)
+  unit       String? // e.g. "cSt", "mm", "V"
+  options    String? // LIST: comma-separated choices
+  category   StockCategory? // applies to this category only; null = all
+  sortOrder  Int               @default(0)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  values StockItemAttribute[]
+
+  @@unique([dataAreaId, key])
+  @@index([dataAreaId])
+  @@map("product_attributes")
+}
+
+// A stock item's value for one attribute.
+model StockItemAttribute {
+  id          String           @id @default(cuid())
+  dataAreaId  String           @default("HQ01")
+  stockItemId String
+  stockItem   StockItem        @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  attributeId String
+  attribute   ProductAttribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  value       String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([stockItemId, attributeId])
+  @@index([attributeId])
+  @@map("stock_item_attributes")
+}
+
+// ───────────────────────── Asset custody / assignment (M19) ─────────────────────────
+
+// Who holds a fixed asset over time. The open assignment (returnedAt = null) is
+// the current custodian; assigning a new one closes the previous. A custodian is
+// an employee (FK) and/or a free-text label/location (a department or site).
+model AssetAssignment {
+  id          String     @id @default(cuid())
+  dataAreaId  String     @default("HQ01")
+  assetId     String
+  asset       FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  employeeId  String?
+  employee    Employee?  @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  custodian   String // holder label (employee name snapshot, department, or site)
+  location    String?
+  assignedAt  DateTime   @db.Date
+  returnedAt  DateTime?  @db.Date
+  note        String?
+  createdById String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([dataAreaId])
+  @@index([assetId])
+  @@index([assetId, returnedAt])
+  @@map("asset_assignments")
 }

@@ -83,7 +83,7 @@ lookups.get("/warehouse-form", requireAuth, requirePermission("warehouse:read"),
 lookups.get("/companies", requireAuth, requirePermission("user:manage"), async (c) => {
   const rows = await prisma.company.findMany({
     where: { isActive: true },
-    select: { code: true, name: true, baseCurrency: true },
+    select: { code: true, name: true, baseCurrency: true, isSandbox: true },
     orderBy: { code: "asc" },
   });
   return ok(c, rows);
@@ -135,6 +135,28 @@ lookups.get("/trip-form", requireAuth, requirePermission("trip:read"), async (c)
     }),
   ]);
   return ok(c, { orders, drivers, vehicles });
+});
+
+/** Active employees for the asset-custody assign dialog (asset permission). */
+lookups.get("/asset-form", requireAuth, requirePermission("asset:read"), async (c) => {
+  const user = c.get("user");
+  const employees = await prisma.employee.findMany({
+    where: { ...areaScope(user), status: { not: "TERMINATED" } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+  return ok(c, { employees });
+});
+
+/** Active units of measure for inventory/quantity forms (grouped by dimension). */
+lookups.get("/units", requireAuth, requirePermission("inventory:read"), async (c) => {
+  const user = c.get("user");
+  const units = await prisma.unitOfMeasure.findMany({
+    where: { ...areaScope(user), isActive: true },
+    select: { id: true, code: true, name: true, dimension: true, symbol: true },
+    orderBy: [{ dimension: "asc" }, { code: "asc" }],
+  });
+  return ok(c, units);
 });
 
 /** Active employees for HR create forms (contracts, leave, documents). */

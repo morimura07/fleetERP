@@ -38,6 +38,8 @@ export const resetPasswordSchema = z
 
 // ───────── Driver ─────────
 const os = (max: number) => z.string().max(max).optional().or(z.literal(""));
+// Like `os` but also accepts null (forms send null for empty optional fields).
+const optText = (max: number) => z.string().max(max).nullish().or(z.literal(""));
 
 export const driverSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -938,9 +940,23 @@ export const fixedAssetSchema = z.object({
   assetAccountCode: z.string().max(20).default("1500"),
   accumDepCode: z.string().max(20).default("1510"),
   expenseCode: z.string().max(20).default("5200"),
+  warrantyProvider: optText(120),
+  warrantyExpiresAt: z.coerce.date().optional().nullable(),
 }).refine((a) => a.residualValue < a.acquisitionCost, {
   message: "Residual value must be less than acquisition cost",
   path: ["residualValue"],
+});
+
+export const assetAssignSchema = z.object({
+  employeeId: optText(40),
+  custodian: z.string().min(1, "Custodian is required").max(120),
+  location: optText(120),
+  assignedAt: z.coerce.date(),
+  note: optText(300),
+});
+
+export const assetReturnSchema = z.object({
+  returnedAt: z.coerce.date(),
 });
 
 export const depreciationRunSchema = z.object({
@@ -953,6 +969,22 @@ export const assetDisposalSchema = z.object({
 });
 
 export type FixedAssetInput = z.infer<typeof fixedAssetSchema>;
+export type AssetAssignInput = z.infer<typeof assetAssignSchema>;
+export type AssetReturnInput = z.infer<typeof assetReturnSchema>;
+
+// ── Demo / sandbox partition (M32) ───────────────────────────────────────────
+
+export const provisionSandboxSchema = z.object({
+  code: z.string().min(2).max(10),
+  name: z.string().min(1, "Name is required").max(80),
+});
+
+export const resetSandboxSchema = z.object({
+  code: z.string().min(2).max(10),
+});
+
+export type ProvisionSandboxInput = z.infer<typeof provisionSandboxSchema>;
+export type ResetSandboxInput = z.infer<typeof resetSandboxSchema>;
 export type DepreciationRunInput = z.infer<typeof depreciationRunSchema>;
 export type AssetDisposalInput = z.infer<typeof assetDisposalSchema>;
 
@@ -1264,8 +1296,6 @@ export type PosSaleInput = z.infer<typeof posSaleSchema>;
 
 // ── Dynamic RBAC (role/permission management) ────────────────────────────────
 
-const optText = (max: number) => z.string().max(max).nullish().or(z.literal(""));
-
 export const createRoleSchema = z.object({
   key: z.string().min(2).max(40),
   name: z.string().min(1, "Role name is required").max(80),
@@ -1290,3 +1320,57 @@ export type CreateRoleInput = z.infer<typeof createRoleSchema>;
 export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
 export type SetPermissionsInput = z.infer<typeof setPermissionsSchema>;
 export type AssignRoleInput = z.infer<typeof assignRoleSchema>;
+
+// ── Fiscal calendar / period-close (M34) ─────────────────────────────────────
+
+export const setPeriodSchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  month: z.coerce.number().int().min(1).max(12),
+  status: z.enum(["OPEN", "CLOSED"]),
+  note: os(300),
+});
+
+export type SetPeriodInput = z.infer<typeof setPeriodSchema>;
+
+// ── Product Information / attribute catalog (M16) ────────────────────────────
+
+const stockCategoryEnum = z.enum(["SPARE_PART", "FUEL", "TYRE", "LUBRICANT", "CONSUMABLE", "OTHER"]);
+
+export const productAttributeSchema = z.object({
+  key: z.string().min(1).max(40),
+  label: z.string().min(1, "Label is required").max(80),
+  dataType: z.enum(["TEXT", "NUMBER", "BOOLEAN", "LIST"]).default("TEXT"),
+  unit: optText(20),
+  options: optText(500),
+  category: stockCategoryEnum.optional().nullable(),
+  sortOrder: z.coerce.number().int().min(0).default(0),
+});
+
+export const setItemAttributesSchema = z.object({
+  values: z.array(z.object({
+    attributeId: z.string().min(1),
+    value: z.string().max(500).nullable(),
+  })),
+});
+
+export type ProductAttributeInput = z.infer<typeof productAttributeSchema>;
+export type SetItemAttributesInput = z.infer<typeof setItemAttributesSchema>;
+
+// ── Units of measure (M30 Common) ──
+export const unitOfMeasureSchema = z.object({
+  code: z.string().min(1, "Code is required").max(12),
+  name: z.string().min(1, "Name is required").max(60),
+  dimension: z.enum(["WEIGHT", "VOLUME", "LENGTH", "AREA", "COUNT", "TIME"]).default("COUNT"),
+  symbol: optText(12),
+  factorToBase: z.coerce.number().positive("Factor must be greater than 0").default(1),
+  isBase: z.coerce.boolean().default(false),
+});
+
+export const uomConvertSchema = z.object({
+  qty: z.coerce.number(),
+  from: z.string().min(1).max(12),
+  to: z.string().min(1).max(12),
+});
+
+export type UnitOfMeasureInput = z.infer<typeof unitOfMeasureSchema>;
+export type UomConvertInput = z.infer<typeof uomConvertSchema>;

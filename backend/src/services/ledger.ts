@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { AuthError } from "@backend/lib/errors";
+import { assertPeriodOpen } from "@backend/services/fiscal-periods";
 
 /**
  * Double-entry ledger core.
@@ -124,6 +125,9 @@ export async function createJournalEntry(
     if (accounts.length !== accountIds.length) {
       throw new AuthError("Contains a missing or inactive account", 404);
     }
+
+    // Period-close guard (M34): refuse a posting dated in a closed accounting month.
+    await assertPeriodOpen(tx, input.dataAreaId, input.postingDate);
 
     const voucherNumber = await nextVoucherNumber(tx, input.dataAreaId);
 
