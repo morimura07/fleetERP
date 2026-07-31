@@ -105,7 +105,7 @@ export function BudgetsManager() {
                   <div key={l.id} className="grid grid-cols-12 items-center gap-3 text-sm">
                     <div className="col-span-3">
                       <p className="font-medium">{l.costCenter}</p>
-                      <p className="text-xs text-muted-foreground"><Badge variant="secondary" className="mr-1">{BUDGET_KIND_LABEL[l.kind as BudgetKind]}</Badge><span className="font-mono">{l.accountCode}</span></p>
+                      <div className="text-xs text-muted-foreground"><Badge variant="secondary" className="mr-1">{BUDGET_KIND_LABEL[l.kind as BudgetKind]}</Badge><span className="font-mono">{l.accountCode}</span></div>
                     </div>
                     <div className="col-span-5"><UtilBar pct={l.utilizationPct} /></div>
                     <div className="col-span-4 text-right tabular-nums">
