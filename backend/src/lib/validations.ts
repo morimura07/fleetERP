@@ -971,6 +971,20 @@ export const assetDisposalSchema = z.object({
 export type FixedAssetInput = z.infer<typeof fixedAssetSchema>;
 export type AssetAssignInput = z.infer<typeof assetAssignSchema>;
 export type AssetReturnInput = z.infer<typeof assetReturnSchema>;
+
+// ── Demo / sandbox partition (M32) ───────────────────────────────────────────
+
+export const provisionSandboxSchema = z.object({
+  code: z.string().min(2).max(10),
+  name: z.string().min(1, "Name is required").max(80),
+});
+
+export const resetSandboxSchema = z.object({
+  code: z.string().min(2).max(10),
+});
+
+export type ProvisionSandboxInput = z.infer<typeof provisionSandboxSchema>;
+export type ResetSandboxInput = z.infer<typeof resetSandboxSchema>;
 export type DepreciationRunInput = z.infer<typeof depreciationRunSchema>;
 export type AssetDisposalInput = z.infer<typeof assetDisposalSchema>;
 

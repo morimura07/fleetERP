@@ -7,7 +7,7 @@ import {
   ClipboardList, Route, BookOpen, BookText,
   ReceiptText, HandCoins, Store, Contact,
   Percent, AlarmClock,
-  Landmark, PiggyBank, Combine, Coins, TrendingUp, CalendarCheck,
+  Landmark, PiggyBank, Combine, Coins, TrendingUp, CalendarCheck, FlaskConical,
   ShieldCheck, MapPin, Boxes, ShoppingCart, BadgeDollarSign, Warehouse, Receipt, Scale, Tags,
   Building, Wrench, UserCog, Clock,
   Anchor, PackageX, MessageSquareHeart,
@@ -92,6 +92,7 @@ const GROUPS: NavGroup[] = [
     label: "System",
     items: [
       { href: "/companies", label: "Companies", icon: Building2, perm: "company:manage" },
+      { href: "/sandbox", label: "Demo Sandbox", icon: FlaskConical, perm: "company:manage" },
       { href: "/activity", label: "Activity Log", icon: ScrollText, perm: "activity:read" },
       { href: "/users", label: "Users", icon: Settings, perm: "user:manage" },
       { href: "/roles", label: "Roles & Permissions", icon: ShieldCheck, perm: "user:manage" },

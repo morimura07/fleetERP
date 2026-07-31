@@ -55,6 +55,7 @@ import { pos } from "@backend/routes/pos";
 import { rbac } from "@backend/routes/rbac";
 import { fiscalPeriods } from "@backend/routes/fiscal-periods";
 import { productAttributes } from "@backend/routes/product-attributes";
+import { sandbox } from "@backend/routes/sandbox";
 import { refreshRuntime } from "@backend/services/rbac-admin";
 
 /**
@@ -139,6 +140,7 @@ app.route("/api/pos", pos);
 app.route("/api/rbac", rbac);
 app.route("/api/fiscal-periods", fiscalPeriods);
 app.route("/api/product-attributes", productAttributes);
+app.route("/api/sandbox", sandbox);
 
 app.onError(onError);
 app.notFound((c) => c.json({ error: "Not found" }, 404));

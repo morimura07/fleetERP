@@ -83,7 +83,7 @@ lookups.get("/warehouse-form", requireAuth, requirePermission("warehouse:read"),
 lookups.get("/companies", requireAuth, requirePermission("user:manage"), async (c) => {
   const rows = await prisma.company.findMany({
     where: { isActive: true },
-    select: { code: true, name: true, baseCurrency: true },
+    select: { code: true, name: true, baseCurrency: true, isSandbox: true },
     orderBy: { code: "asc" },
   });
   return ok(c, rows);

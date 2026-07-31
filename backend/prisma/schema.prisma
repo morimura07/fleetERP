@@ -599,6 +599,7 @@ model Company {
   baseCurrency String   @default("USD")
   country      String   @default("TZ") // ISO country
   isActive     Boolean  @default(true)
+  isSandbox    Boolean  @default(false) // demo/sandbox partition — safe to reset (M32)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

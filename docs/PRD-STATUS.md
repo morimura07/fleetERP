@@ -15,8 +15,8 @@ Maps the implementation against the contracted scope in `ERP_PRD_v1.0.pdf` (Mori
 | Metric | Value |
 |--------|-------|
 | Prisma models | 77 |
-| Migrations applied | 33 |
-| Admin screens | 45 |
+| Migrations applied | 34 |
+| Admin screens | 46 |
 | RBAC permissions | 96 |
 | Roles | 5 (ADMIN, DISPATCHER, FINANCE, DRIVER, STAFF) |
 | Unit tests | 260 passing |
@@ -113,7 +113,7 @@ The operations dashboard (`/dashboard`, served by `getKpiDashboard`) exposes the
 |---|--------|--------|-------|
 | M30 | Common (GPS waypoints, UoM) | 🟡 | GPS waypoint registry (named checkpoints/borders/weighbridges + lat/long) built. **Units-of-measure registry not yet.** |
 | M31 | Audit Workbench | ✅ | `ActivityLog` records every write. Field-level old→new diff (§7) is captured via `diffFields`/`logFieldChanges` (`backend/src/lib/activity.ts`) — only changed columns, normalized (Date→ISO, Decimal→string) — and rendered as a before→after diff in the Activity Log screen. Wired into the master-data update routes (clients, drivers, vehicles); the same helper drops into any other update route. |
-| M32 | Demo / Sandbox | 🟡 | Seed data exists; **no isolated sandbox partition.** |
+| M32 | Demo / Sandbox | ✅ | Isolated sandbox partition: `Company.isSandbox` flags a throwaway demo area (own `dataAreaId`, never touches real entities). Admin screen provisions, shows headline counts, and **resets to a clean demo baseline** — reset is hard-guarded to refuse any non-sandbox company. Active-sandbox badge on the company switcher. |
 | M33 | Master Planning | ✅ | Planner-entered demand forecasts per period + corridor (loads & tonnage), one per (period, corridor). A computed capacity plan compares confirmed demand against live available-fleet capacity (excludes maintenance, honors per-forecast truck overrides) and surfaces per-corridor shortfall/surplus & utilization. |
 | M34 | Organization Admin | ✅ | `Company` legal-entity registry with admin CRUD screen + company switcher; users assigned a home company; `dataAreaId` partitioning enforced at the query layer. **Fiscal calendar / period-close** per entity: close a month (`FiscalPeriod`, Accounting Periods screen) and the ledger refuses any new posting dated in it — enforced in `createJournalEntry`, so all posting types (invoices, POS, payroll, revaluation…) respect it. |
 | M35 | Project Oaktree | ⬜ | (unspecified in PRD detail) |
