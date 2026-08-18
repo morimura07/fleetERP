@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
+import { CurrencySelect } from "@frontend/components/ui/currency-select";
 import { Badge } from "@frontend/components/ui/badge";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
@@ -107,7 +108,7 @@ export function AccountsManager() {
                   <SelectContent>{POSTING_TYPES.map((p) => <SelectItem key={p} value={p}>{POSTING_TYPE_LABEL[p]}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5"><Label>Currency (blank = base)</Label><Input maxLength={3} {...form.register("currency")} /></div>
+              <div className="space-y-1.5"><Label>Currency (blank = base)</Label><CurrencySelect value={form.watch("currency")} onChange={(v) => form.setValue("currency", v)} /></div>
               <div className="space-y-1.5"><Label>Default Tax Code</Label><Input {...form.register("defaultTaxCode")} /></div>
               <label className="col-span-2 flex items-center gap-2 text-sm text-muted-foreground">
                 <input type="checkbox" {...form.register("reconciliation")} /> Reconciliation (control) account — blocks manual postings

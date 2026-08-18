@@ -19,6 +19,7 @@ import { useToast } from "@frontend/components/ui/toast";
 import { orderSchema, type OrderInput } from "@frontend/lib/validations";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_VARIANT, CORRIDOR_LABEL, EQUIPMENT_TYPE_LABEL, PAYMENT_TERM_LABEL, INCOTERMS_OPTIONS } from "@frontend/lib/labels";
 import { OptionSelect } from "@frontend/components/ui/option-select";
+import { CurrencySelect } from "@frontend/components/ui/currency-select";
 import { formatDate } from "@frontend/lib/utils";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 import type { OrderStatus, CorridorType, EquipmentType, PaymentTerm } from "@frontend/lib/enums";
@@ -137,7 +138,7 @@ export function OrdersManager({ clients }: { clients: Client[] }) {
                 {form.formState.errors.freightAmount && <p className="text-xs text-destructive">{form.formState.errors.freightAmount.message}</p>}
               </div>
               <div className="space-y-1.5"><Label>Demurrage</Label><Input inputMode="decimal" {...form.register("demurrageAmount")} /></div>
-              <div className="space-y-1.5"><Label>Currency</Label><Input maxLength={3} {...form.register("currency")} /></div>
+              <div className="space-y-1.5"><Label>Currency</Label><CurrencySelect value={form.watch("currency")} onChange={(v) => form.setValue("currency", v)} /></div>
               <div className="space-y-1.5"><Label>Booking Date</Label><Input type="date" {...form.register("bookingDate", { valueAsDate: true })} /></div>
             </div>
 

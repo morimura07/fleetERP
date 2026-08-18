@@ -1,0 +1,2688 @@
+> Mori:
+Hello sir
+
+> Mori:
+Nice talking to you
+
+> Mori:
+After 5 hours, I will text you/
+
+> Priyam Gupta:
+Ok
+
+> Priyam Gupta:
+Hi
+
+> Priyam Gupta:
+Can you give me an estimate?
+
+> Mori:
+Hello bro
+
+> Mori:
+How are you doing?
+
+> Priyam Gupta:
+Good
+
+> Mori:
+Let's discuss about project at here
+
+> Mori:
+So, could you tell me your estimated timeline and budget?
+
+> Priyam Gupta:
+1 month and 2k USD
+
+> Mori:
+Okay, I agree with that
+
+> Priyam Gupta:
+for both frontend and backend
+
+> Priyam Gupta:
+right?
+
+> Mori:
+Yeah, this is our first work. so I would love to help you
+
+> Mori:
+How much you can pay as upfront?
+
+> Priyam Gupta:
+can you elaborate me on this? how much you want at what time period
+
+> Mori:
+I can develop your project during 1 month.
+
+I would like to request an upfront payment before I begin work to assure of your enthusiasm for the task.
+The amount does not need to be large. It will be sufficient if I can verify the sincerity of work.
+
+> Mori:
+Because of it's our first membership
+
+> Mori:
+So, I would love to start work after then receive upfront.
+
+> Priyam Gupta:
+ok so 10% of total amount is ok?
+
+> Mori:
+Okay
+
+> Mori:
+It's enough
+
+> Priyam Gupta:
+and for the rest payment i will give after completion 50%
+
+> Mori:
+Okay. I got it.
+
+> Priyam Gupta:
+and give me one more month since in africa work is slow.. not like japan
+
+> Priyam Gupta:
+to do the rest payment after implementation
+
+> Mori:
+Okay, understood.
+
+> Mori:
+I agree it.
+
+> Priyam Gupta:
+alright
+
+> Mori:
+When I can start work?
+
+> Priyam Gupta:
+from today itself
+
+> Priyam Gupta:
+https://app.nshineerp.com/
+Email: omar@ascomark.co.tz
+Password: Omar@2026
+
+> Priyam Gupta:
+here is the app I showed you
+
+> Mori:
+Ok, thanks for sharing.
+
+> Mori:
+I can start work from tomorrow. here is deep night.
+
+> Priyam Gupta:
+so now, what I want you to do is create a requirement doc
+
+> Priyam Gupta:
+I was just kidding no need to start today
+
+> Mori:
+Ok
+
+> Mori:
+I will prepare it.
+
+> Mori:
+Could you tell me how can you pay for upfront?
+
+> Mori:
+Could you tell me your payment method?
+
+> Priyam Gupta:
+so create a requirement doc, share to me , I will show it to a few membors they will add/remove stuff, then it will be your final document
+
+> Priyam Gupta:
+what payment methods you expect?
+
+> Mori:
+Flexible. However, I prefer crypto or wise payment.
+
+> Priyam Gupta:
+ok, I can ask
+
+> Mori:
+Wise and crypto are very comfortable for me, and easy
+
+> Priyam Gupta:
+if you can do paypal it will be good, anyways
+
+> Priyam Gupta:
+ok so in order to confirm the project for you, share me a few things
+
+> Priyam Gupta:
+firstly if possible share me any project that you have done like the one I showed
+
+> Priyam Gupta:
+second document which I told you to make
+
+> Priyam Gupta:
+third is tech stack :- I need react for frontend, nest js for backend, clerk for authentication , resend for emails
+
+> Priyam Gupta:
+basically
+
+> Priyam Gupta:
+and I need a scalable and secure application, it should not be slow if users increase
+
+> Priyam Gupta:
+it should be multi tenant bounded application
+
+> Mori:
+How about wise payment?
+
+> Priyam Gupta:
+moreover prisma + postgres for database and S3 storage to store pictures and files
+
+> Priyam Gupta:
+I will find a way out for payments dont worry
+
+> Mori:
+I already shared my previous works as portfolio site.
+As you can see from my portfolio, lots of wesbites  were developed by next.js and nest.js (GraphQL).  For database, I used PostgreSQL.
+
+> Mori:
+I can do it. dont worry about my skills.
+
+> Mori:
+React. nest.js, zero auth... anyway.. these are my main skills.
+
+> Priyam Gupta:
+I know but to tell the non tech people I want
+
+> Priyam Gupta:
+they only understand it that way you know
+
+> Mori:
+Okay
+
+> Mori:
+First, I developed my portfolio site using Next.js.
+
+> Mori:
+Okay?
+
+> Priyam Gupta:
+can you share be your clients projects which are running?
+
+> Mori:
+My portfolio contains AI chatbot features and Context filtering features..
+
+> Mori:
+Okay
+
+> Mori:
+https://bizcredential.expert
+
+> Mori:
+Check my website
+
+> Mori:
+You can check my previous projects
+
+> Priyam Gupta:
+ok
+
+> Mori:
+Do you have any req for the project?
+
+> Priyam Gupta:
+No it's ok
+
+> Priyam Gupta:
+Prepare the doc, and notify me once done
+
+> Mori:
+Please pay upfront. and then I can start work
+
+> Priyam Gupta:
+Um, you will have to prepare the document first for me to show
+
+> Priyam Gupta:
+Otherwise if you don't want to you can wait and i can ask someone else to prepare it
+
+> Priyam Gupta:
+For yoh
+
+> Priyam Gupta:
+Then we can pay you to start the work
+
+> Mori:
+Okay, it's good for me. Here is deep night. and I am little tired.
+
+So Please prepare docs by another  one.  
+
+and then provide to me.
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+Thank you
+
+> Mori:
+Hi bro
+
+> Mori:
+Did you have a good weekend?
+
+> Priyam Gupta:
+Hi, yes, how about you?
+
+> Priyam Gupta:
+Regarding the project, I have assigned a guy to make the doc for you
+
+> Priyam Gupta:
+You know in Africa, everything works slowly so he is taking some time
+
+> Mori:
+I am doing great
+
+> Mori:
+Ok, I got it.
+
+> Mori:
+Hi bro
+
+> Mori:
+How about your weekend?
+
+> Priyam Gupta:
+Good
+
+> Mori:
+Could you tell me current PRD status?
+
+> Mori:
+I would like to start work from Monday.
+
+> Priyam Gupta:
+sorry to make you wait
+
+> Priyam Gupta:
+just recieved
+
+> Mori:
+Okay, thank you
+
+> Mori:
+It's okay
+
+> Priyam Gupta:
+please review and ask if you have any doubt
+
+> Mori:
+I will review this docs
+
+> Mori:
+Okay
+
+> Priyam Gupta:
+okay alright
+
+> Mori:
+Hi bro
+
+> Mori:
+How are you doing?
+
+> Mori:
+I can start work from today
+
+> Mori:
+If you dont mind, please provide me login info for access website that you provided before
+
+> Mori:
+And also If you have old version source codes in github, please invite me to your github or github link.
+
+> Priyam Gupta:
+Um, I don't have any source code
+
+> Priyam Gupta:
+Can we discuss once before starting the work on google meet
+
+> Mori:
+Okay, I got it.
+
+> Mori:
+Okay, I am available.
+
+> Mori:
+Let me know when you are available
+
+> Priyam Gupta:
+lets have meeting tommorrow at 10:30 AM IST
+
+> Mori:
+Okay, I got it
+
+> Mori:
+Hello bro
+
+> Mori:
+I have some issue at that time.
+
+> Mori:
+How about meeting 8:30 AM IST?
+
+> Priyam Gupta:
+8:30 is too early in Tanzania
+
+> Priyam Gupta:
+Can you tell when you will be available afterwards
+
+> Mori:
+Hello bro
+
+> Mori:
+How are you?
+
+> Mori:
+I am available meeting now
+
+> Priyam Gupta:
+Ok, wait for 5 min
+
+> Mori:
+got it
+
+> Priyam Gupta:
+https://meet.google.com/soa-haww-rax
+
+> Priyam Gupta:
+please, join, there will be few other members except us so please clear your doubts
+
+> Mori:
+Okay, I am joining now
+
+> Mori:
+Thank you for your time bro.
+
+> Priyam Gupta:
+Shall I create the github repo Or you will be creating?
+
+> Priyam Gupta:
+https://pointy-impatiens-303.notion.site/ERP-Implementation-guide-37438b7e844f80e89b95f621ce49a16a
+
+> Priyam Gupta:
+you can start by implementing this a foundation
+
+> Priyam Gupta:
+also, you are free to use next.js if you want to
+
+> Priyam Gupta:
+but backend will be nest js + prisma + postgres + clerk
+
+> Mori:
+Okay, I will create a new repo for this project.
+
+> Mori:
+Okay, I got it.
+
+> Priyam Gupta:
+Please add me as collaborator in that
+
+> Priyam Gupta:
+And please share your crypto Or wise payments details
+
+> Mori:
+Okay, If you can pay as crypto, I love it
+
+> Mori:
+0x2e8327b8e66bd70b494fb1a1965603dbbdc89433
+
+> Mori:
+This is my wallet address
+
+> Mori:
+And also, for the inviting github, please provide me your github username or github mail address
+
+> Priyam Gupta:
+Priyamgupta525@gmail.com
+
+> Priyam Gupta:
+You can invite me on this email
+
+> Mori:
+Ok, got it
+
+> Mori:
+I sent invitation to your email
+
+> Priyam Gupta:
+Yes, accepted it
+
+> Priyam Gupta:
+Please keep the name as fleetERP
+
+> Mori:
+Okay, got it
+
+> Mori:
+Changed name
+
+> Priyam Gupta:
+Ok, when will be starting the work?
+
+> Mori:
+I can start from tomorrow, and also I can work on EST timezone.
+Is this okay?
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+I am going to use NeonDB for the PostgreSQL database setting
+
+> Mori:
+Are you okay?
+
+> Priyam Gupta:
+Ok cool
+
+> Priyam Gupta:
+It will be postgres
+
+> Mori:
+yeah, it's popular database
+
+> Priyam Gupta:
+Moreover please dont make neon specific code
+
+> Priyam Gupta:
+It should work on any postgres database
+
+> Priyam Gupta:
+We will be using aws postgres afterwards
+
+> Mori:
+Yeah, I got it
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+Neon DB require only API Key.
+
+> Mori:
+And then You can manage DB at online without PgSql in your local pc.
+
+> Priyam Gupta:
+Yes I know I have used neondb
+
+> Mori:
+ok
+
+> Priyam Gupta:
+We are trying to pay you
+
+> Priyam Gupta:
+Please check
+
+> Priyam Gupta:
+Please check if you received
+
+> Priyam Gupta:
+We did test payment
+
+> Mori:
+HI
+
+> Mori:
+Please send me screenshot for checking
+
+> Mori:
+In the future, when you send me funds, I would appreciate it if you could share a simple invoice and screenshot so that I can verify the source.
+
+> Priyam Gupta:
+I am not paying so can't send you screenshot
+
+> Priyam Gupta:
+Please verify if you received the money
+
+> Priyam Gupta:
+🖼 Photo
+
+> Mori:
+Crypto?
+
+> Mori:
+Let me know token types and transaction hash code
+
+> Priyam Gupta:
+Yes sent by crypto
+
+> Priyam Gupta:
+This is the only information I have
+
+> Mori:
+So, you sent as bitcoin?
+
+> Priyam Gupta:
+Yes
+
+> Mori:
+Let me know correct amount
+
+> Priyam Gupta:
+0.1 BTC
+
+> Priyam Gupta:
+Sorry 0.001
+
+> Mori:
+HI bro
+
+> Priyam Gupta:
+Hello
+
+> Mori:
+I provided you BNB wallet address
+
+> Mori:
+BNB address is different with bitcoin wallet address because of it's not same network
+
+> Mori:
+understand?
+
+> Priyam Gupta:
+Can i call you?
+
+> Mori:
+You didnt sent money to me
+
+> Mori:
+No, I dont need.
+
+> Mori:
+I will provide you my bitcoin address
+
+> Mori:
+I checked your screenshot
+
+> Mori:
+wallet address was wrong
+
+> Mori:
+You cant withdraw
+
+> Priyam Gupta:
+Man what
+
+> Mori:
+because of wallet address is different
+
+> Priyam Gupta:
+That means my money is lost?
+
+> Mori:
+No
+
+> Mori:
+You can cancel
+
+> Priyam Gupta:
+I did it in morning
+
+> Priyam Gupta:
+Is it possible?
+
+> Mori:
+You should have informed me before making the payment.
+
+You must tell me which network you are using and which token you are paying with so that I can provide the corresponding wallet address.
+
+> Mori:
+It seems you don't know much about Crypto.
+
+> Priyam Gupta:
+Bro i am old guy I don't know that much
+
+> Mori:
+Ask via Chatgpt or Grokai.
+
+> Priyam Gupta:
+Can I just send you in some normal human way
+
+> Priyam Gupta:
+Paypal something?
+
+> Priyam Gupta:
+Can you arrange it
+
+> Mori:
+let me know what crypto tokens do you have?
+
+> Mori:
+We can use wise
+
+> Mori:
+You can create a Wise account and then pay to my wise email
+
+> Mori:
+Actually, Crypto is the simplest.
+
+> Priyam Gupta:
+Please sent by BTC address
+
+> Mori:
+I will explain this in detail.
+
+The wallet address I previously provided to you is an EThereum address.
+
+However, you attempted to pay me in Bitcoin.
+
+Since the addresses are different, your funds will likely be refunded.
+
+Alternatively, you may request a refund from the platform.
+
+If you wish to proceed with the payment to me in Bitcoin, you will need my Bitcoin address.
+
+I will provide you my Bitcoin address.
+
+> Mori:
+3QKgs9fKNARSut8Nso7dW5LaBPqqmjSyXY
+
+> Mori:
+This is my bitcoin wallet address
+
+> Mori:
+Please send btc to this address.
+
+> Mori:
+If the payment success, please share screenshot
+
+> Priyam Gupta:
+Thanks
+
+> Mori:
+Hello
+
+> Mori:
+How are you doing?
+
+> Priyam Gupta:
+Good
+
+> Priyam Gupta:
+How about you
+
+> Mori:
+I am doing great
+
+> Mori:
+thanks for asking
+
+> Mori:
+I just wanna know about the issue in payment.
+Do you have any issue in crypto?
+
+> Priyam Gupta:
+No, actually we are trying to pay you in Bitcoin
+
+> Priyam Gupta:
+It's taking some time
+
+> Mori:
+Okay
+
+> Mori:
+Got it.
+
+> Priyam Gupta:
+By tuesday, it should be done
+
+> Mori:
+If you done it, please provide me screenshot.
+
+> Priyam Gupta:
+Kk
+
+> Mori:
+I think it is too late if it is by Tuesday.
+This is Upfront. But It's okay. I can wait it.
+
+> Priyam Gupta:
+Sorry, but we are trying actually
+
+> Priyam Gupta:
+None of us have crypto wallet we are arranging
+
+> Priyam Gupta:
+That's why its taking time
+
+> Mori:
+Okay, I understand.
+
+> Mori:
+Thanks for letting me.
+
+> Mori:
+I got it.
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+Hello bro
+
+> Mori:
+Did you have a good weekend?
+
+> Priyam Gupta:
+Yes
+
+> Mori:
+I would like to ask about the payment
+
+> Mori:
+And then I can keep my work.
+
+> Mori:
+This is the first promise and trust between your team and me.
+
+> Priyam Gupta:
+It will be done today
+
+> Mori:
+Okay
+
+> Priyam Gupta:
+🖼 Photo
+
+> Priyam Gupta:
+🖼 Photo
+
+> Priyam Gupta:
+please check
+
+> Mori:
+HI bro
+
+> Mori:
+I haven't received it yet.
+
+> Mori:
+Please give me Transaction ID
+
+> Mori:
+I think that it's pending status
+
+> Mori:
+If the withdrawal was successful, you would have received an email stating that the transfer was successful.
+If possible, please contact the Unocoin team.
+
+> Priyam Gupta:
+Let me check
+
+> Mori:
+The deposit has not been made yet.
+Was the withdraw successful on your end?
+
+> Mori:
+Hi bro
+
+> Mori:
+Did you checked it?
+
+> Priyam Gupta:
+Yes, I have put message
+
+> Priyam Gupta:
+Not replied yet
+
+> Mori:
+I think that it's too long bro. So please contact with the Unocoin support team.
+
+> Mori:
+Judging by the fact that no transaction has occurred yet, it appears the Withdraw failed.
+Alternatively, it is suspected that there is an issue with Unocoin.
+
+Please contact the Unocoin team.
+
+> Priyam Gupta:
+Oh ok
+
+> Priyam Gupta:
+Hi
+
+> Priyam Gupta:
+I asked unocoin
+
+> Priyam Gupta:
+They are saying that we can't transfer crypto internationally due to some indian regulation
+
+> Priyam Gupta:
+Thats why you didn't received it
+
+> Priyam Gupta:
+🖼 Photo
+
+> Priyam Gupta:
+Wise is showing only these options
+
+> Priyam Gupta:
+Could you just give me your or your any friend or anyone else's paypal
+
+> Priyam Gupta:
+It will be one click for me in that
+
+> Mori:
+Okay, I understood
+
+> Mori:
+🖼 Please click anything.
+
+And then If you are available, Please send me via WISE. 
+
+Paypal fee is too expensive.
+
+> Mori:
+If you are available, Please give me via WISE.
+
+> Mori:
+If wise payment success, Please provide me screenshot.
+And also If you are available, please provide me simple INVOICE for checking transaction
+
+> Priyam Gupta:
+It's asking for document also
+
+> Mori:
+You can use WISE app on Mobile phone.
+
+> Mori:
+Recently, I received some money via WISE from other clients
+
+> Mori:
+There is no any blocker.
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+🖼 Photo
+
+> Mori:
+I fully understand that you are facing some difficulties as this is first payment.
+However, if this payment is successful, we will be able to decide on a payment method, and such complex issues will not arise in the future.
+I am grateful for your efforts.
+
+> Priyam Gupta:
+🖼 Photo
+
+> Priyam Gupta:
+Mobile app also has same issue
+
+> Priyam Gupta:
+Paypal is the only solution
+
+> Mori:
+Is bank transfer possible?
+
+> Mori:
+I prefer JPY. But USD is good. Are you available Bank transfer?
+
+> Priyam Gupta:
+Will try now
+
+> Mori:
+Okay
+
+> Mori:
+Hi bro
+
+> Mori:
+How are you doing today?
+
+> Mori:
+Is this okay?
+
+> Priyam Gupta:
+Not actually
+
+> Priyam Gupta:
+Paypal is final option
+
+> Priyam Gupta:
+Will bare the charge half half
+
+> Mori:
+Okay bro. I understood
+
+> Mori:
+I will share paypal mail address
+
+> Priyam Gupta:
+Ok thanku
+
+> Mori:
+thephongvo10@gmail.com
+
+This is my friend's paypal.
+
+> Mori:
+Thank you in advance🙏
+
+> Priyam Gupta:
+Ok, now if this won't work Mr omar will come to Japan to give you the money
+
+> Mori:
+Yes, anyway, thank you.
+I have experience making payments using this PayPal.
+
+Please send it here.
+It is my friend's PayPal.
+
+Osmar coming to Japan just for $200??
+Haha. I really appreciate you thinking of me that deeply.
+
+> Priyam Gupta:
+He is very fond of you, he want to have blockchain work that's why 😅
+
+> Priyam Gupta:
+Anyways ,will transfer and let you know
+
+> Mori:
+Okay, thank you
+
+> Mori:
+I believe that this time will be good.
+If payment successful, Please provide me screenshot. will wait your good news.
+
+> Mori:
+Hello bro
+
+> Mori:
+How are you doing today?
+
+> Priyam Gupta:
+Good
+
+> Mori:
+How about paypal payment?
+
+> Priyam Gupta:
+Now you don't worry about it
+
+> Priyam Gupta:
+I told you it will be done
+
+> Priyam Gupta:
+I mean payment will be done
+
+> Mori:
+Okay, bro.
+Currently I am waiting
+
+> Priyam Gupta:
+Ok, you may start working again if you like to
+
+> Priyam Gupta:
+The issue will be sorted out by paypal now don't worry
+
+> Mori:
+Of course, I am ready to start work.
+
+> Mori:
+Okay bro. Wait you
+
+> Priyam Gupta:
+Ok
+
+> Priyam Gupta:
+🖼 Photo
+
+> Priyam Gupta:
+🖼 Photo
+
+> Priyam Gupta:
+Payment is done
+
+> Mori:
+Okay, I will check it.
+
+> Mori:
+Okay, I checked 190.90 USD
+
+> Priyam Gupta:
+Ok, will adjust it on next payment
+
+> Priyam Gupta:
+Please fast track the work now
+
+> Mori:
+Okay, Currently I am working for your project
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+Thank you
+
+> Mori:
+🖼 Hi bro!
+
+From today, I couldnt see this website, it's blank. 
+
+Server is dead?
+
+> Priyam Gupta:
+Should not be
+
+> Priyam Gupta:
+Try again after some time
+
+> Mori:
+Okay, I logged in successful
+
+> Mori:
+Based on my complete understanding of the ERP documentation, I intend to accelerate development speed and shorten the project development period.
+
+To this end, I plan to share a detailed provisional PRD (Project Requirement documentation) with the team soon.
+
+I would appreciate it if the team could confirm this.
+
+> Priyam Gupta:
+Yes
+
+> Priyam Gupta:
+And please keep continuing basic work
+
+> Priyam Gupta:
+Like journal ledger systems
+
+> Priyam Gupta:
+Basic auth
+
+> Priyam Gupta:
+Don't wait for prd because no matter what these will be there
+
+> Priyam Gupta:
+*prd confirmation
+
+> Mori:
+I will prepare clear PRD. Dont worry. I keep continuing work.
+
+> Mori:
+Hi, bro
+
+> Mori:
+How are you doing today?
+
+> Mori:
+I completed PRD.
+
+> Mori:
+Could you plz check it?
+
+> Mori:
+📎 ERP_PRD_v1.0.pdf
+
+> Priyam Gupta:
+What is this duration?
+
+> Priyam Gupta:
+You will take 1 year to complete
+
+> Mori:
+It is true that the deadline is long, but I intend to complete the MVP within a month.
+
+> Mori:
+now I am developing step1.
+
+> Priyam Gupta:
+And then what will be the total cost of that? 2000 usd right?
+
+> Priyam Gupta:
+For the full project
+
+> Mori:
+oh, yeah
+
+> Mori:
+We are currently in step1 and aim to complete the MVP within a month.
+
+> Mori:
+The $2,000 covers the cost of developing the MVP within that one-month timeframe.
+
+> Priyam Gupta:
+And after that? I mean after mvp?
+
+> Mori:
+Once the MVP is complete, the foundation for the project's further development will be in place.
+
+> Mori:
+Based on this, we will address any necessary modifications or specification changes that arise during actual operation.
+
+> Mori:
+After the MVP step, I will flexibly adjust cost estimates according to your requirements.
+
+> Priyam Gupta:
+Ok
+
+> Priyam Gupta:
+Let me tell you what is needed for mvp
+
+> Priyam Gupta:
+I need odoo accounting module
+
+> Priyam Gupta:
+And trips and order management
+
+> Priyam Gupta:
+With rbac
+
+> Mori:
+got it.
+
+> Mori:
+First, I will implement the essential features for the MVP.
+
+> Mori:
+I believe the best development approach is to complete the project by expanding its functionality during actual using.
+
+> Mori:
+At first, I gonna odoo accounting module, tirps and order management with rbac
+
+> Mori:
+are you okay?
+
+> Priyam Gupta:
+Yes
+
+> Mori:
+cool...
+
+> Mori:
+as soon as, I`ll update progress for MVP...
+
+> Priyam Gupta:
+ok finish journal ledger system first
+
+> Mori:
+got it
+
+> Mori:
+At first, I`ll do it...
+
+> Mori:
+Hi, Gupta..
+
+> Mori:
+How are you doing today?
+
+> Mori:
+here's the latest status 👇
+
+> Mori:
+✅ Done this cycle
+
+> Mori:
+🎨 Redesigned modern UI — elevated to a sophisticated dark "operations console" look matching the reference design you approved. Refined colors, cards, tables, forms, and navigation, with consistent spacing across all elements.
+
+> Mori:
+⏳ Custom loading animation — a unique branded "orbit" loader + skeleton placeholders show during page/data loading, so the app feels fast and polished.
+
+> Mori:
+🧱 Core ERP foundation (earlier cycles): accounting (ledger + chart of accounts), cross-border orders & trips with per-trip P&L, executive dashboard, and role-based access (incl. Finance Controller).
+
+> Mori:
+📸 Attached: Dashboard + Orders screenshots so you can see the current look.
+
+> Mori:
+▶️ Next up
+• Payment/cash recording (full receivables/payables)
+• Multi-company data separation
+• Any UI tweaks from your feedback
+
+> Mori:
+Please check the screenshots and let me know your thoughts 🙏
+
+
+> Priyam Gupta:
+?
+
+> Mori:
+oh, sorry
+
+> Mori:
+I see it
+
+> Mori:
+Umm, at first, I deploy this site for you
+
+> Mori:
+then plz check current progress with site URL...
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+thx..
+
+> Mori:
+I gonna deploying site...
+
+> Mori:
+after completed it, I`ll report you..
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+thx
+
+> Mori:
+but I have one problem for deploying..
+
+> Priyam Gupta:
+What problem
+
+> Mori:
+in current project, use Next.js as frontend, Nest.js as backend..
+
+> Mori:
+in Vercel, I can deploying frontend with Next.js
+
+> Mori:
+but cant backend with Nest.js
+
+> Mori:
+Vercel dont support Nest.js deploying.
+
+> Mori:
+so I need hosting server for backend...
+
+> Priyam Gupta:
+Hmm, got it got it
+
+> Priyam Gupta:
+So what are you planning to do
+
+> Mori:
+If you provide hosting server like VPS and so on, I deploying project it..
+
+> Mori:
+VPS is good for testing..
+
+> Priyam Gupta:
+Ok, I can provide you a vpc
+
+> Priyam Gupta:
+Vps I mean
+
+> Mori:
+okay,
+
+> Mori:
+thx
+
+> Mori:
+no problem..
+
+> Priyam Gupta:
+What region you need and what ram and cpu you need
+
+> Mori:
+If you rprovide VPS, I`ll deploying project...
+
+> Mori:
+region is not problem, any country...
+
+> Mori:
+but Japan VPS speed is fast..
+
+> Mori:
+RAM : 4GB ~ 8GB
+
+> Mori:
+CPU: 8 core...
+
+> Priyam Gupta:
+You need that much for demo?
+
+> Priyam Gupta:
+I think 1-2gb ram one will so the job
+
+> Mori:
+ofc, for testing, 1~2 GB is good...
+
+> Priyam Gupta:
+Ok, let me provision it and share ssh keys with you
+
+> Mori:
+As development continues and features expand, RAM may become insufficient.
+
+> Mori:
+thx..
+
+> Priyam Gupta:
+165.22.20.55 ip
+
+> Priyam Gupta:
+📎 mori-fleetERP
+
+> Priyam Gupta:
+key
+
+> Priyam Gupta:
+root is the username
+
+> Priyam Gupta:
+its a ubuntu machine
+
+> Mori:
+Thank you for your support.
+
+> Mori:
+I checked all info.
+
+> Mori:
+asap I`ll deploy this project...
+
+> Mori:
+Hi, bro
+
+> Mori:
+This VPS`s RAM and CPU is not enough for deploying
+
+> Mori:
+I have some error and speed is very slow
+
+> Mori:
+I think that increase RAM and CPU of this VPS.
+
+> Priyam Gupta:
+What error are you getting
+
+> Priyam Gupta:
+If you are getting issue during building
+
+> Priyam Gupta:
+Then please upload the build directly
+
+> Priyam Gupta:
+If still not resolved I will increase tomorrow
+
+> Mori:
+in VPS, when project is running, CPU is 100%, dont running any program...
+
+> Mori:
+This is not build error...
+
+> Mori:
+I appreciate it if you increase it for deploying...
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+Hi, bro
+
+> Mori:
+Let me know when increase VPS performance
+
+> Mori:
+I will proceed with the deployment promptly once the VPS capacity has been increased.
+
+> Priyam Gupta:
+I will let you know, I am bit busy , I will upgrade and let you know
+
+> Mori:
+got it...
+
+> Mori:
+If you have free time, plz upgrade and let me know..
+
+> Mori:
+thanks
+
+> Priyam Gupta:
+I have upscaled the vps
+
+> Priyam Gupta:
+Pls calibrate in ubuntu and deploy
+
+> Mori:
+Okay.
+
+> Mori:
+Thanks
+
+> Mori:
+I`ll check and deploy VPS.
+
+> Mori:
+I checked VPS but cant access VPS now
+
+> Mori:
+Could you plz check VPS status(running or active)?
+
+> Priyam Gupta:
+Looks active here
+
+> Priyam Gupta:
+Let me tell my team to check it
+
+> Mori:
+got it.
+
+> Mori:
+I`ll wait your check...
+
+> Priyam Gupta:
+please check now
+
+> Mori:
+got it
+
+> Mori:
+🖼 Photo
+
+> Mori:
+now I cant access VPS
+
+> Priyam Gupta:
+oh
+
+> Priyam Gupta:
+wait a min now let me try
+
+> Mori:
+got it
+
+> Mori:
+IP maybe change IP or not allowed 22 port
+
+> Priyam Gupta:
+165.22.20.55
+
+> Priyam Gupta:
+this is the public ip
+
+> Priyam Gupta:
+same as yours
+
+> Mori:
+yeah.
+
+> Mori:
+I used this IP.
+
+> Mori:
+what site did you buy this VPS?
+
+> Priyam Gupta:
+digital ocean
+
+> Mori:
+yeah
+
+> Mori:
+How about port 22?
+
+> Mori:
+allowed?
+
+> Mori:
+now can you login this site?
+
+> Priyam Gupta:
+I am not able to ssh either
+
+> Priyam Gupta:
+everything looks fine
+
+> Mori:
+🖼 Photo
+
+> Mori:
+now VPS is offline
+
+> Mori:
+I cant access it
+
+> Mori:
+I can check VPS if you share login info of VPS site.
+
+> Priyam Gupta:
+no no , we will handle
+
+> Priyam Gupta:
+we have devops team even though its a bit lazy
+
+> Mori:
+okay
+
+> Priyam Gupta:
+if this doesnt work let me provision you a aws vps
+
+> Mori:
+okay..
+
+> Mori:
+good idea!!!
+
+> Mori:
+anyway, plz provide VPS asap
+
+> Priyam Gupta:
+ok, please continue the work, dont hang it because of this
+
+> Priyam Gupta:
+we will sort out
+
+> Priyam Gupta:
+🖼 Photo
+
+> Priyam Gupta:
+I am able to connect now
+
+> Mori:
+Okay
+
+> Mori:
+I can access.
+
+> Mori:
+I`ll deploy project, and go on project step by step
+
+> Mori:
+If I have progress, I`ll report you
+
+> Mori:
+Hi, bro
+
+> Mori:
+there?
+
+> Mori:
+plz check following URL
+
+> Mori:
+http://165.22.20.55/dashboard
+
+> Mori:
+I completed deploying
+
+> Mori:
+Administrator admin@fleetflow.local admin1234
+Operations Planner dispatcher@fleetflow.local dispatch1234
+Finance Controller finance@fleetflow.local finance1234
+Driver driver@fleetflow.local driver1234
+Staff staff@fleetflow.local staff1234
+
+> Mori:
+this is login info
+
+> Mori:
+What's ready (Phase 1–3):
+✅ Accounting — Ledger, AP/AR, Budgets, Cash & Bank, Tax, Multi-currency
+✅ Operations — Orders, Trips, Dispatch, Trip P&L
+✅ Fleet — Vehicles, Drivers, Compliance & Fuel tracking
+✅ Dashboard, Reports, Role-based access, PDF/CSV export
+
+> Mori:
+I am developing next Phase now
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+Hi, bro
+
+> Mori:
+there?
+
+> Mori:
+I completed Inventory functions of Phase4
+
+> Mori:
+plz check this.
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+okay..
+
+> Mori:
+did you check Phase3?
+
+> Priyam Gupta:
+I have checked it
+
+> Priyam Gupta:
+Looks okay to me
+
+> Priyam Gupta:
+Waiting for others to check
+
+> Mori:
+Okay, thanks
+
+> Mori:
+I will update progress with waiting your other check...
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+bro, are you so busy these days?
+
+> Mori:
+I think your communication speed is bit low
+
+> Mori:
+I appreciate it if you can reply my msg asap...
+
+> Mori:
+as possible, I want real time chatting
+
+> Mori:
+I also intend to accelerate the development timeline as much as possible.
+In this situation, we will be chatting more frequently so that I can receive your reviews and feedback.
+Therefore, I would appreciate it if you could pay closer attention to our chats.
+
+
+> Mori:
+I cant use bash without password.
+
+> Priyam Gupta:
+Ssh -I key.pem root@ip
+
+> Priyam Gupta:
+Try this
+
+> Mori:
+got it
+
+> Mori:
+🖼 same
+
+> Priyam Gupta:
+Checking
+
+> Priyam Gupta:
+🖼 Photo
+
+> Priyam Gupta:
+looks like you updated public key
+
+> Priyam Gupta:
+thats why it was not working , pls check now
+
+> Mori:
+okay
+
+> Mori:
+login is success
+
+> Priyam Gupta:
+ok
+
+> Mori:
+I`ll check this error and fix it asap
+
+> Priyam Gupta:
+ok , and also i am trying to create a driver
+
+> Priyam Gupta:
+it looks like success but it didnt worked
+
+> Priyam Gupta:
+please check that
+
+> Mori:
+driver?
+
+> Mori:
+what mean?
+
+> Mori:
+🖼 plz check it
+
+> Priyam Gupta:
+Yes
+
+> Priyam Gupta:
+In the ui
+
+> Priyam Gupta:
+I went to driver
+
+> Priyam Gupta:
+New driver and created one
+
+> Priyam Gupta:
+It didn't worked
+
+> Mori:
+oh, got it
+
+> Mori:
+let me check
+
+> Mori:
+Could you plz share detail error with the letter + screenshot if you can?
+
+> Priyam Gupta:
+You can trying creating one
+
+> Mori:
+plz explain more detail about error.
+
+> Mori:
+with screenshot
+
+> Mori:
+then I`ll modify it perfectly
+
+> Priyam Gupta:
+ok , i will send
+
+> Mori:
+Hi Gupta, Phase 4 is done 
+
+📦 Inventory
+🛒 Procurement 
+💵 Payroll 
+🏬 Warehouse 
+🧾 Expense claims with receipts
+
+Also: 🟢 green/white theme + switch, and fixed the driver list.
+
+> Mori:
+🖼 Photo
+
+> Priyam Gupta:
+Ok now it's looking good
+
+> Priyam Gupta:
+Hope you are making the application multi tenant in  single db
+
+> Priyam Gupta:
+Because there will be multiple companies
+
+> Priyam Gupta:
+One company should not access other company data
+
+> Mori:
+okay
+
+> Mori:
+got it
+
+> Mori:
+✅ Done — the app is fully multi-tenant on a single DB. Each company has its own isolated data (drivers, vehicles, clients, jobs, finance).
+
+> Mori:
+Added a Companies admin screen to create tenants, per-user company assignment, and a company switcher for admins. Users in one company can't see another's data.
+
+> Priyam Gupta:
+ok
+
+
+> Mori:
+Hi, Gupta
+
+> Mori:
+Today is the Monday you promised, yet the payment has not been processed; I find this regrettable.
+Had you shared the current situation with me, I would not be as worried as I am now.
+Please provide an update on the situation as soon as possible.
+
+> Priyam Gupta:
+Hi, I have checked with him
+
+> Priyam Gupta:
+There was a holiday due to some situation in tanzania
+
+> Mori:
+Oh, I see...
+
+> Mori:
+then when can you pay it for me?
+
+> Mori:
+now I have emergency problem with it...
+
+> Mori:
+I`ll wait your progress...
+
+> Priyam Gupta:
+Today or tomorrow
+
+> Priyam Gupta:
+Will try today at best
+
+> Mori:
+got it
+
+> Mori:
+I would appreciate it if payment could be made today.
+
+> Mori:
+thx
+
+> Mori:
+I`ll wait your result..
+
+> Mori:
+Hello,Gupta
+I was expecting payment yesterday, but it was not received.
+Today is the final day of the deadline you promised.
+I hope you will honor your commitment and make the payment today.
+A delay of more than a week is something neither of us wants, and it could impact future development, so I ask that you settle the payment promptly.
+
+> Priyam Gupta:
+Yes, it will be sent to your friends account today
+
+> Mori:
+got it
+
+> Mori:
+I trust you
+
+> Mori:
+Hi, Gupta
+
+> Mori:
+How about payment?
+
+> Priyam Gupta:
+Hi, I was just about to inform you
+
+> Priyam Gupta:
+Money has been transferred to our account
+
+> Priyam Gupta:
+However since the transaction is bigger than 500 dollar, it has told to do a kyc
+
+> Priyam Gupta:
+As soon as it is completed your payment will be transferred
+
+> Mori:
+oh, I see
+
+> Mori:
+if you confirm payment, plz notice me with screenshot.
+
+> Mori:
+then I`ll confirm it
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+Hi, bro
+
+> Mori:
+there?
+
+> Mori:
+How about KYC?
+
+> Mori:
+Payment is emergency for me now..
+
+> Priyam Gupta:
+It's showing in process right now
+
+> Mori:
+oh, no
+
+> Mori:
+I see
+
+> Mori:
+Is this your first time doing KYC?
+
+> Mori:
+If KYC is pass, can I received payment right now?
+
+> Mori:
+or after KYC is pass, Do you have to resend payment to me?
+
+> Priyam Gupta:
+As soon as kyc is passed you will recieve the payment
+
+> Priyam Gupta:
+Btw, looks like you are facing some financial issue? Due to month end?
+
+> Mori:
+As I mentioned before, I am currently facing financial difficulties.
+I need to help a friend who have sick mother, and I also have a family to support.
+It is truly upsetting that the payment is currently delayed.
+In addition, as you said, It is end of month now.
+so payment is emergency for me.
+
+> Priyam Gupta:
+I understand, I have put a word with the team
+
+> Priyam Gupta:
+We can't do anything for the paypal kyc verification
+
+> Mori:
+thank you
+
+> Mori:
+When do you think this problem can be resolved?
+
+> Priyam Gupta:
+Today is second day and it was written than it will be done in 2 days
+
+> Mori:
+got it
+
+> Mori:
+I hope the payment is made tomorrow at least
+Please do your utmost in this regard as well
+
+> Mori:
+Hi, Gupta
+
+> Mori:
+I think today is end
+
+> Mori:
+How about payment?
+
+> Priyam Gupta:
+Checking
+
+> Mori:
+Could you share current situation with screenshot, please?
+
+> Mori:
+and plz report to support team to ask reason of long pending time.
+
+> Mori:
+Hi, bro
+
+> Mori:
+no progress?
+
+> Mori:
+plz share current situation asap
+
+> Priyam Gupta:
+Yes checking with them
+
+> Priyam Gupta:
+It's very bad time for you looks like
+
+> Priyam Gupta:
+Everything is getting delayed
+
+> Mori:
+got it
+
+> Mori:
+as you can see, current situation is critical for me
+
+> Mori:
+You are the only one who can help me in the current situation.
+I hope you will make an active effort to ensure the payment is made quickly.
+
+> Mori:
+What measures can be taken to expedite the process and resolve the current delay?
+I do not believe the issue can be resolved simply by waiting as we are doing now.
+Aren`t there any alternative payment methods or other ways to settle the payment quickly?
+
+> Mori:
+Did you send msg to support team?
+
+> Priyam Gupta:
+We can send 500 dollars without kyc
+
+> Mori:
+okay
+
+> Mori:
+that`s sounds good
+
+> Mori:
+can you send $500 right now?
+
+> Mori:
+if it`s available, at first, plz send it.
+
+
+> Priyam Gupta:
+Ok
+
+> Mori:
+plz do this now
+
+> Mori:
+I`ll wait
+
+> Priyam Gupta:
+We are proceeding
+
+> Mori:
+okay
+
+> Mori:
+thank you
+
+> Mori:
+after complete, plz let me know
+
+> Mori:
+Hi, Gupta
+
+> Mori:
+Have a good weekend!!!
+
+> Mori:
+I think that you can understand my situation.
+
+> Mori:
+when it completed?
+
+> Mori:
+Does this payment usually take this long?
+You stated that immediate payment was possible; could you explain the reason for the current delay?
+Are you perhaps not interested in making this payment?
+
+> Priyam Gupta:
+if we didnt had no interest in making the payment why we would we messing around with paypal
+
+> Mori:
+I only said that because I was frustrated.
+But why is a payment that doesn't even require KYC being delayed?
+Does this payment really have to take two days?
+
+> Mori:
+You claim that the payment is currently being processed, yet in reality, no payment has actually been made.
+I have been chatting with you for over ten days regarding this payment, but it remains "in progress"; despite various excuses, the actual payment has not taken place.
+Is this considered normal?
+
+> Mori:
+What is the reason why the payment has not actually been made yet?
+Should I continue to wait here?
+I cannot understand the current situation.
+
+> Mori:
+Please share a screenshot to prove that you are actually making the payments.
+Please demonstrate that you are indeed processing both non-KYC and KYC payments and that they are currently delayed.
+I would like you to show—through actions rather than words—that you are committed to making these payments.
+I have no doubt that you place the utmost importance on trust.
+
+> Priyam Gupta:
+🖼 Photo
+
+> Priyam Gupta:
+It's been done
+
+> Priyam Gupta:
+Please check
+
+> Mori:
+got it
+
+> Mori:
+thank you
+
+> Mori:
+I`ll check
+
+> Mori:
+you sent $800 for me?
+
+> Mori:
+right?
+
+> Mori:
+so you can use another payment for me now.
+
+> Priyam Gupta:
+Ok so you don't want payment right now and want to settle all on final payment?
+
+> Priyam Gupta:
+How we will do that bro
+
+> Priyam Gupta:
+As I told we are also in similar situation as you
+
+> Priyam Gupta:
+Now how we will transfer another 800 dollars into paypal
+
+> Mori:
+what mean?
+
+> Mori:
+you mean that you can send another 800$ for me immediatly?
+
+> Mori:
+I want it
+
+> Priyam Gupta:
+Let me make it very clear
+
+You are asking to use the refunded funds for final payment (which is stuck)
+
+And transfer another 800 into paypal to give to you
+
+I want to say we don't have another 800 usd to transfer to paypal
+
+> Mori:
+what is the best way to get payment for me asap?
+
+> Priyam Gupta:
+Wait for refund only
+
+> Priyam Gupta:
+And pray it comes on time
+
+> Priyam Gupta:
+Otherwise you can take some financial help from your friends and family meanwhile the cancellation refund is processed
+
+> Priyam Gupta:
+You know it's a peculiar situation
+
+> Priyam Gupta:
+None of us wanted this to happen
+
+> Priyam Gupta:
+We transferred payment on Saturday, now unknowingly your friend deleted his paypal
+
+> Priyam Gupta:
+Can't do anything with it but issue arised, now we will have to bear
+
+> Priyam Gupta:
+Anyways what is the status of phase 6
+
+> Priyam Gupta:
+Going to start code review now
+
+> Mori:
+It is almost finished.
+
+> Mori:
+okay
+
+> Mori:
+you mean that if refund require one month, I cant get payment after month, right?
+
+> Mori:
+if I completed project, when can I get payment? after one month?
+
+> Mori:
+You mentioned the risks associated with PayPal refunds, but I have already accepted those risks and waited over two weeks for payment.
+Now, do I have to wait another month or more to get paid?
+How long must I wait for the final payment after completing the project?
+
+> Mori:
+Under the current circumstances, you are the only one who can make the payment to me.
+If I had a friend or another option available, I wouldn't have even asked you for the payment.
+
+> Priyam Gupta:
+In that case we will release your final payment first
+
+> Priyam Gupta:
+And release this one after it's refunded
+
+> Priyam Gupta:
+You are asking me the same question over and over again like it's blocked by our fault
+
+> Priyam Gupta:
+As I told you "as soon as paypal refund is released you will get the payment"
+
+> Mori:
+got it
+At the very least, when can I expect to receive payment?
+
+> Mori:
+I see
+
+> Mori:
+sorry, It`s our fault, you and me...
+
+> Priyam Gupta:
+I think I have explained myself very clearly
+
+> Mori:
+you mean that without refund payment, I cant payment, right?
+
+> Mori:
+???
+
+> Priyam Gupta:
+If you completed it we will do full payment
+
+> Priyam Gupta:
+After amendments are done
+
+> Priyam Gupta:
+But you can say it will be 3-4 weeks after completetion
+
+> Priyam Gupta:
+Since the app is big and will take time to test
+
+> Mori:
+you said that
+
+> Priyam Gupta:
+Yes
+
+> Priyam Gupta:
+What is wrong in that?
+
+> Mori:
+but this is?
+
+> Priyam Gupta:
+Man 🤦‍♂️
+
+> Mori:
+I proposed paying 50% upfront and the remainder upon completion.
+
+> Mori:
+right?
+
+> Priyam Gupta:
+Yes so it's paid to you
+
+> Priyam Gupta:
+It's transferred to the account
+
+> Priyam Gupta:
+You can take it
+
+> Priyam Gupta:
+Now the account is deactivated was not in our scope
+
+> Priyam Gupta:
+So we cancelled the payment asked for a refund
+
+> Priyam Gupta:
+As soon as it comes it will be transferred to you
+
+> Priyam Gupta:
+Understand?
+
+> Mori:
+got it
+
+> Mori:
+However, what concerns me is the time it takes to process the refund.
+If it takes around three days as you mentioned, that is not a problem; however, a delay of more than a month would be unacceptable to us.
+My concern is not that you won't pay, but rather the delay in payment.
+
+> Priyam Gupta:
+You tell me what I can do
+
+> Priyam Gupta:
+I will do that
+
+> Priyam Gupta:
+And if you prepare a guide it will be very favourable for me
+
+> Priyam Gupta:
+Since the presentation is with the customer for whom we created this project
+
+> Mori:
+I am not asking for payment upon the completion of the current project.
+Stop saying the same thing and proceed with the payment before the meeting.
+As for the guidelines, we will prepare and send them to you in detail.
+Payment must be made prior to the meeting, not requested during it.
+We have already stated our position on this matter—and you agreed to it—so let us not discuss it any further.
+
+> Priyam Gupta:
+Ok, pls send the guide
+
+> Mori:
+I am making guide more detail now
+
+> Mori:
+How do you intend to handle the payment?
+
+> Priyam Gupta:
+I guess no option
+
+> Priyam Gupta:
+I am going to arrange it so that we can have a meeting
+
+> Priyam Gupta:
+To not lose that customer And if lose the customer I made this project for, if that happens this project is in vain for me , but you have left me with no option
+
+> Priyam Gupta:
+Please try to arrange me a guide atleast
+
+> Mori:
+this is your saying.
+
+> Priyam Gupta:
+For meeting I meant
+
+> Priyam Gupta:
+At least provide me a guide
+
+> Priyam Gupta:
+So I can present
+
+> Mori:
+Please adhere to the development procedures.
+I want to present a flawless project to the current client.
+To achieve this, payment must be made first, followed by revisions based on the review guidelines, and then a meeting.
+It was agreed to hold the meeting after payment is made.
+
+> Mori:
+you mean that you gonna present instead for me, right?
+
+> Mori:
+The present will be start after payment.
+
+> Priyam Gupta:
+No but client don't understand anything
+
+> Priyam Gupta:
+If he wants to see the system I have to show him
+
+> Priyam Gupta:
+Not exactly, I was asking you to show me the system so I can present to the client afterwards
+
+> Priyam Gupta:
+But as now that's not possible please provide a guide that I can use in order to present
+
+> Mori:
+got it
+
+> Mori:
+The payment I am currently requesting is not for the project upon its completion, but rather for the phased development.
+What is the reason for the inability to make the payment at this time?
+
+> Mori:
+anyway, plz make payment for me.
+
+> Mori:
+for meeting and present.
+
+> Priyam Gupta:
+As you know, you wonderful friend deactivated his paypal in which we transferred the payment
+
+> Priyam Gupta:
+Which screenshot was already shared to you
+
+> Mori:
+The payment has already been cancelled, and the refund is being processed.
+
+> Priyam Gupta:
+Now it's stuck for us as well, which risk was mentioned to you while applying for cancellation
+
+> Priyam Gupta:
+I can share you support ticket we have raised for the delay in amount transfer after return
+
+> Priyam Gupta:
+Which you accepted aswell btw, but now you are asking to transfer the payment regardless of refund, now that's the thing, let us internally sort that out
+
+> Priyam Gupta:
+That is the matter
+
+> Mori:
+Canceling the payment is essential when the account to which the funds were transferred has been deleted.
+
+> Mori:
+please proceed with the relevant payment according to the established procedure.
+I look forward to a positive outcome.
+
+> Priyam Gupta:
+Yes we are working on it
+
+> Priyam Gupta:
+Yes it's a procedure but it has given an option to create the account and accept payment and you have choose the first option
+
+> Priyam Gupta:
+Which is now stuck for no reason and paypal isn't helping out, please provide me a guide
+
+> Mori:
+An account that has already been deleted cannot be recreated, and the process of creating one takes over a month.
+I have already addressed this issue; why are you asking for this method now?
+Are you trying to delay the payment again?
+
+> Mori:
+Let’s be clear about one thing.
+Are you currently unable to make the payment to us because you are worried that the refund might not be processed correctly?
+
+> Priyam Gupta:
+No now nothing can work
+
+> Priyam Gupta:
+It's already cancelled and under processing
+
+> Priyam Gupta:
+Now for us we have to wait for it to credit, and also give the current payment to you
+
+> Priyam Gupta:
+As you said you want it regardless of refund
+
+> Priyam Gupta:
+You asked me about the reason so explained it
+
+> Mori:
+I see...
+
+> Mori:
+so are you available to make payment for me regardless of refund?
+
+> Priyam Gupta:
+What can I do, I have to pay you from my pocket now
+
+> Priyam Gupta:
+You have left me with no option
+
+> Mori:
+You must choose a different payment without refund.
+
+> Priyam Gupta:
+Yes that is what I am doing
+
+> Mori:
+okay, that is what I want from you.
+
+> Priyam Gupta:
+I told you, that a meeting today is very important for us
+
+> Priyam Gupta:
+you could have let me know yesterday, now at the time of meeting you are telling to reschedule
+
+> Priyam Gupta:
+This behavior is intolerable for us as we might lose our biggest client because of you
+
+> Priyam Gupta:
+You said you will do meeting after the payment is done
+
+> Priyam Gupta:
+Didn't expected this from you
+
+> Mori:
+got it
+
+> Mori:
+How about having the meeting in 30 minutes?
+
+> Priyam Gupta:
+Now I have said the meeting can't take place today
+
+> Priyam Gupta:
+As everyone was waiting
+
+> Priyam Gupta:
+Need to do it Tomorrow
+
+> Mori:
+so sorry. bro
+
+> Priyam Gupta:
+That's very unprofessional behavior btw, if you didn't wanted to meet you could have let me know yesterday
+
+> Mori:
+are you available tmr this time(10:30 IST)?
+
+> Priyam Gupta:
+Cancelling when everyone is there on the meeting and waiting for you
+
+> Priyam Gupta:
+I will check and let you know
+
+> Mori:
+I was a bit worried because I hadn't heard from you since yesterday evening.
+In any case, I am truly sorry for today meeting...
+
+> Mori:
+I`ll wait
+
+> Mori:
+For future meetings, it would be appreciated if you could share the meeting time and link in advance.
+
+> Priyam Gupta:
+Time was and will be shared with you
+
+> Priyam Gupta:
+I will send link today
+
+> Priyam Gupta:
+https://meet.google.com/dfs-ydqc-qbf
+
+> Priyam Gupta:
+10:30 AM IST
+
+> Priyam Gupta:
+Reminder:- meeting starts in 5 min
+
+> Priyam Gupta:
+Meeting started
+
+> Priyam Gupta:
+Hello?
+
+> Priyam Gupta:
+Hi bro
+
+> Priyam Gupta:
+You are not there?
+
+> Priyam Gupta:
+Why are you ignoring the messages?
+
+> Priyam Gupta:
+It looks like you are online but not willing to reply
+
+> Priyam Gupta:
+I want to tell one thing to you, as much you will be delaying the meeting is as much as final procedure and final payment be delayed
+
+> Priyam Gupta:
+We have already cleared your payment which was the reason for incorporation
+
+> Priyam Gupta:
+However I can't understand the reason for incorporation now rather than being disrespectful
+
+> Mori:
+I apologize for the delay in my response.
+I was unable to check messages as it is currently the holiday period. 
+Regarding the meeting schedule, I think it is appropriate to set a time that is convenient for both parties. 
+I will adjust the schedule accordingly.
+
+> Priyam Gupta:
+Bro, you could have let me know this
+
+> Mori:
+I am sorry
+
+> Priyam Gupta:
+You know how worried my day was
+
+> Mori:
+🙏
+
+> Priyam Gupta:
+From today morning I juggling from your dm to telling the client to spare some more time
+
+> Mori:
+I understand
+
+> Priyam Gupta:
+Please let me know a suitable in which you will be available
+
+> Priyam Gupta:
+If possible we can have meeting after 20 min also, if you are available
+
+> Mori:
+How about next Monday at 11 am. India time?
+
+> Priyam Gupta:
+Next Monday is too late
+
+> Priyam Gupta:
+As you know it's been past 3 days
+
+> Priyam Gupta:
+actually 2 weeks from the time of presentation
+
+> Priyam Gupta:
+If you are available for sometime tomorrow
+
+> Priyam Gupta:
+?
+
+> Mori:
+Okay
+
+> Mori:
+I available in tomorrow
+
+> Mori:
+Tomorrow 11 am india time
+
+> Mori:
+okay?
+
+> Priyam Gupta:
+Ok thanks, very appreciated
+
+> Mori:
+You are welcome
+
+> Priyam Gupta:
+Please dont abandon us tomorrow, it's a very humble request
+
+> Priyam Gupta:
+It will be very big problem for us
+
+> Mori:
+Don't worry about that
+
+> Priyam Gupta:
+Thanks again
+
+> Priyam Gupta:
+Hopefully we will have a successful meeting tomorrow
+
+> Priyam Gupta:
+Reminder :- meeting in 1.5 hour
+
+> Mori:
+Okay
+
+> Mori:
+I know
+
+> Mori:
+Can you send me google meeting link?
+
+> Priyam Gupta:
+https://meet.google.com/mzx-hixw-huu
+
+> Priyam Gupta:
+Starts in 40 min
+
+> Mori:
+I will join the meeting at that time
+
+> Priyam Gupta:
+Please join

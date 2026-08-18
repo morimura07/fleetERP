@@ -59,23 +59,41 @@ const CHART_OF_ACCOUNTS: { code: string; name: string; type: AccountType }[] = [
 async function main() {
   console.log("Seeding FleetFlow...");
 
+  // ── Organization / tenant (parent company) ──
+  // Every legal entity hangs off a parent. A second parent here would be fully
+  // invisible to this one — that is the tenant boundary.
+  const org = await prisma.organization.upsert({
+    where: { code: "DEFAULT" },
+    update: {},
+    create: { code: "DEFAULT", name: "Default Organization" },
+  });
+
   // ── Companies / legal entities (M34) ──
   await prisma.company.upsert({
     where: { code: "HQ01" },
     update: {},
-    create: { code: "HQ01", name: "Head Office", baseCurrency: "USD", country: "TZ" },
+    create: { organizationId: org.id, code: "HQ01", name: "Head Office", baseCurrency: "USD", country: "TZ" },
   });
   await prisma.company.upsert({
     where: { code: "KE01" },
     update: {},
-    create: { code: "KE01", name: "Kenya Operations", baseCurrency: "USD", country: "KE" },
+    create: { organizationId: org.id, code: "KE01", name: "Kenya Operations", baseCurrency: "USD", country: "KE" },
   });
-  console.log("  Companies: HQ01, KE01");
+  console.log(`  Organization: ${org.code} → Companies: HQ01, KE01`);
 
   // ── Users (one per role) ──
   const [adminPw, dispatcherPw, financePw, staffPw, driverPw] = await Promise.all([
     hash("admin1234"), hash("dispatch1234"), hash("finance1234"), hash("staff1234"), hash("driver1234"),
   ]);
+  const rootPw = await hash("root1234");
+
+  // Platform operator: the only account that can create organizations and read
+  // across them. Deliberately separate from the tenant ADMIN below.
+  await prisma.user.upsert({
+    where: { email: "root@fleetflow.local" },
+    update: {},
+    create: { name: "Platform Administrator", email: "root@fleetflow.local", passwordHash: rootPw, role: "SUPER_ADMIN" },
+  });
 
   const admin = await prisma.user.upsert({
     where: { email: "admin@fleetflow.local" },
@@ -455,11 +473,11 @@ async function main() {
   }
   console.log(`  Units of measure: ${STARTER_UNITS.length} starter units (${DATA_AREA})`);
 
-  // Dynamic RBAC: seed the permission catalog + the 5 system roles with their defaults.
+  // Dynamic RBAC: seed the permission catalog + the 6 system roles with their defaults.
   await seedRbac();
-  console.log("  RBAC: permission catalog + 5 system roles seeded");
+  console.log("  RBAC: permission catalog + 6 system roles seeded");
 
-  console.log("✅ Seed complete.\n  admin@fleetflow.local / admin1234\n  dispatcher@fleetflow.local / dispatch1234\n  finance@fleetflow.local / finance1234\n  driver@fleetflow.local / driver1234\n  staff@fleetflow.local / staff1234");
+  console.log("✅ Seed complete.\n  root@fleetflow.local / root1234        (platform admin, all organizations)\n  admin@fleetflow.local / admin1234\n  dispatcher@fleetflow.local / dispatch1234\n  finance@fleetflow.local / finance1234\n  driver@fleetflow.local / driver1234\n  staff@fleetflow.local / staff1234");
 }
 
 main()

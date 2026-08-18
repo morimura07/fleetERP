@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
+import { CurrencySelect } from "@frontend/components/ui/currency-select";
 import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
@@ -37,7 +38,9 @@ export function FxManager() {
   const form = useForm<ExchangeRateInput>({ resolver: zodResolver(exchangeRateSchema) });
 
   function openCreate() {
-    form.reset({ dataAreaId: "HQ01", currency: "", baseCurrency: "USD", rateType: "SPOT", rate: "", validFrom: new Date() });
+    // `currency` is left unset so the picker shows its placeholder — the foreign
+    // currency is the whole point of the rate and must be chosen deliberately.
+    form.reset({ dataAreaId: "HQ01", baseCurrency: "USD", rateType: "SPOT", rate: "", validFrom: new Date() });
     setOpen(true);
   }
 
@@ -71,10 +74,10 @@ export function FxManager() {
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Currency</Label>
-                <Input maxLength={3} placeholder="TZS" {...form.register("currency")} />
+                <CurrencySelect value={form.watch("currency")} onChange={(v) => form.setValue("currency", v)} placeholder="Foreign currency" />
                 {form.formState.errors.currency && <p className="text-xs text-destructive">{form.formState.errors.currency.message}</p>}
               </div>
-              <div className="space-y-1.5"><Label>Base Currency</Label><Input maxLength={3} {...form.register("baseCurrency")} /></div>
+              <div className="space-y-1.5"><Label>Base Currency</Label><CurrencySelect value={form.watch("baseCurrency")} onChange={(v) => form.setValue("baseCurrency", v)} /></div>
               <div className="space-y-1.5">
                 <Label>Rate Type</Label>
                 <Select value={form.watch("rateType")} onValueChange={(v) => form.setValue("rateType", v as RateType)}>

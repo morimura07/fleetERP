@@ -16,6 +16,7 @@ import {
  */
 
 const SYSTEM_ROLE_NAMES: Record<Role, string> = {
+  SUPER_ADMIN: "Platform Administrator",
   ADMIN: "Administrator",
   DISPATCHER: "Dispatcher",
   FINANCE: "Finance Controller",
@@ -23,7 +24,7 @@ const SYSTEM_ROLE_NAMES: Record<Role, string> = {
   STAFF: "Staff",
 };
 
-/** Idempotently seed the permission catalog + the 5 system roles with their default grants. */
+/** Idempotently seed the permission catalog + the 6 system roles with their default grants. */
 export async function seedRbac() {
   // Permission catalog.
   for (const key of ALL) {

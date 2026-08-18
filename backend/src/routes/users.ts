@@ -5,6 +5,7 @@ import { paginationSchema } from "@backend/lib/validations";
 import { hashPassword } from "@backend/lib/password";
 import { logActivity } from "@backend/lib/activity";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { areaForWrite } from "@backend/lib/scope";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 const ou = (max: number) => z.string().max(max).optional().or(z.literal(""));
@@ -53,12 +54,15 @@ users.get("/", requireAuth, requirePermission("user:manage"), async (c) => {
 users.post("/", requireAuth, requirePermission("user:manage"), async (c) => {
   const admin = c.get("user");
   const body = userSchema.parse(await c.req.json());
+  // `areaForWrite` refuses a company outside the admin's own organization, so a
+  // user can never be planted inside another tenant.
+  const dataAreaId = areaForWrite(admin, body.dataAreaId);
   const user = await prisma.user.create({
     data: {
       name: body.name,
       email: body.email.toLowerCase(),
       role: body.role,
-      dataAreaId: body.dataAreaId ?? admin.dataAreaId, // assign company (default: admin's)
+      dataAreaId,
       passwordHash: await hashPassword(body.password),
       phone: body.phone || null,
       jobTitle: body.jobTitle || null,

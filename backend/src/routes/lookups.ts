@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { prisma } from "@backend/lib/prisma";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
-import { areaScope } from "@backend/lib/scope";
+import { areaScope, isPlatformAdmin } from "@backend/lib/scope";
 import { ok } from "@backend/lib/http";
 
 /**
@@ -79,10 +79,20 @@ lookups.get("/warehouse-form", requireAuth, requirePermission("warehouse:read"),
   return ok(c, { items, warehouses });
 });
 
-/** Active companies for the user-assignment dropdown (admin). */
+/**
+ * Active companies for the company switcher and the user-assignment dropdown.
+ * Scoped to the caller's organization — this list is what an ADMIN can switch
+ * into and assign users to, so leaking another tenant's entities here would
+ * leak both their names and a target to point a user at.
+ */
 lookups.get("/companies", requireAuth, requirePermission("user:manage"), async (c) => {
+  const user = c.get("user");
   const rows = await prisma.company.findMany({
-    where: { isActive: true },
+    where: {
+      isActive: true,
+      // null organization = SUPER_ADMIN, who legitimately sees every tenant.
+      ...(isPlatformAdmin(user) ? {} : { organizationId: user.organizationId ?? "__none__" }),
+    },
     select: { code: true, name: true, baseCurrency: true, isSandbox: true },
     orderBy: { code: "asc" },
   });

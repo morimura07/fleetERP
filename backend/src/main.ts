@@ -47,6 +47,7 @@ import { serviceOrders } from "@backend/routes/service-orders";
 import { hr } from "@backend/routes/hr";
 import { attendance } from "@backend/routes/attendance";
 import { companies } from "@backend/routes/companies";
+import { organizations } from "@backend/routes/organizations";
 import { operationalKpi } from "@backend/routes/operational-kpi";
 import { sales } from "@backend/routes/sales";
 import { projects } from "@backend/routes/projects";
@@ -58,6 +59,7 @@ import { productAttributes } from "@backend/routes/product-attributes";
 import { units } from "@backend/routes/uom";
 import { sandbox } from "@backend/routes/sandbox";
 import { refreshRuntime } from "@backend/services/rbac-admin";
+import { refreshOrganizations } from "@backend/services/organization";
 
 /**
  * FleetERP standalone API (Hono). Deploys independently from the web app and
@@ -133,6 +135,7 @@ app.route("/api/service-orders", serviceOrders);
 app.route("/api/hr", hr);
 app.route("/api/attendance", attendance);
 app.route("/api/companies", companies);
+app.route("/api/organizations", organizations);
 app.route("/api/operational-kpi", operationalKpi);
 app.route("/api/sales", sales);
 app.route("/api/projects", projects);
@@ -151,6 +154,12 @@ app.notFound((c) => c.json({ error: "Not found" }, 404));
 // `can()` reflects admin edits. Best-effort: on failure, the built-in defaults
 // remain in force (the app still authorizes correctly for system roles).
 refreshRuntime().catch((e) => console.error("[rbac] hydrate on startup failed; using defaults", e));
+
+// Load the company → organization map so `areaScope()` can bound an ADMIN to
+// their own parent company without an await. Best-effort, and it fails CLOSED:
+// with an empty map an ADMIN sees only their own entity rather than the whole
+// organization — narrower than intended, never wider.
+refreshOrganizations().catch((e) => console.error("[org] hydrate on startup failed; admins are limited to their own entity", e));
 
 const port = Number(process.env.PORT ?? 4000);
 serve({ fetch: app.fetch, port });

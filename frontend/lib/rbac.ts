@@ -6,7 +6,7 @@
  * must be kept in sync. Roles are a local string-literal union (the frontend has
  * no Prisma dependency).
  */
-export type Role = "ADMIN" | "DISPATCHER" | "FINANCE" | "DRIVER" | "STAFF";
+export type Role = "SUPER_ADMIN" | "ADMIN" | "DISPATCHER" | "FINANCE" | "DRIVER" | "STAFF";
 
 export type Permission =
   | "dashboard:view"
@@ -104,7 +104,8 @@ export type Permission =
   | "export:run"
   | "activity:read"
   | "user:manage"
-  | "company:manage";
+  | "company:manage"
+  | "organization:manage";
 
 const ALL: Permission[] = [
   "dashboard:view",
@@ -151,10 +152,12 @@ const ALL: Permission[] = [
   "activity:read",
   "user:manage",
   "company:manage",
+  "organization:manage",
 ];
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-  ADMIN: ALL,
+  SUPER_ADMIN: ALL,
+  ADMIN: ALL.filter((p) => p !== "organization:manage"),
   DISPATCHER: [
     "dashboard:view",
     "driver:read", "vehicle:read",
@@ -220,6 +223,7 @@ export function permissionsFor(role: Role): Permission[] {
 }
 
 export const ROLE_LABELS: Record<Role, string> = {
+  SUPER_ADMIN: "Platform Administrator",
   ADMIN: "Administrator",
   DISPATCHER: "Operations Planner",
   FINANCE: "Finance Controller",
@@ -279,6 +283,7 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/activity", permission: "activity:read" },
   { prefix: "/users", permission: "user:manage" },
   { prefix: "/roles", permission: "user:manage" },
+  { prefix: "/organizations", permission: "organization:manage" },
   { prefix: "/companies", permission: "company:manage" },
   { prefix: "/sandbox", permission: "company:manage" },
 ];
