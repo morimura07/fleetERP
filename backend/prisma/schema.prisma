@@ -13,7 +13,8 @@ datasource db {
 // ───────────────────────── Enums ─────────────────────────
 
 enum Role {
-  ADMIN
+  SUPER_ADMIN // platform operator — creates organizations, the only role that sees across them
+  ADMIN // organization administrator — every company inside their own organization
   DISPATCHER
   FINANCE // Finance Controller — GL/AP/AR/budget/tax/payroll, no fleet ops
   DRIVER
@@ -592,21 +593,53 @@ enum PosPaymentMethod {
 // business record; the code is validated against this registry on write. Kept as
 // a lightweight registry (no DB-level FK from every table) so partitioning stays a
 // simple, indexable string across the ~30 partitioned models.
+/**
+ * Tenant boundary (parent company). An Organization owns a group of legal
+ * entities; two organizations on the same database must never see each other,
+ * and each has its own ADMIN. Only SUPER_ADMIN sees across organizations.
+ *
+ * Isolation is still carried by `dataAreaId` on every business record — the
+ * organization simply decides *which* dataAreaIds a user may reach, resolved in
+ * `lib/scope.ts`. No business table changes.
+ */
+model Organization {
+  id       String  @id @default(cuid())
+  code     String  @unique // short key, e.g. "ACME"
+  name     String
+  isActive Boolean @default(true)
+
+  companies Company[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("organizations")
+}
+
 model Company {
-  id           String   @id @default(cuid())
-  code         String   @unique // = dataAreaId (e.g. HQ01, KE01)
-  name         String
-  baseCurrency String   @default("USD")
-  country      String   @default("TZ") // ISO country
-  isActive     Boolean  @default(true)
-  isSandbox    Boolean  @default(false) // demo/sandbox partition — safe to reset (M32)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  code           String        @unique // = dataAreaId (e.g. HQ01, KE01)
+  name           String
+  baseCurrency   String        @default("USD")
+  country        String        @default("TZ") // ISO country
+  isActive       Boolean       @default(true)
+  isSandbox      Boolean       @default(false) // demo/sandbox partition — safe to reset (M32)
+  // Sandbox access window: after this instant every login into the partition is
+  // refused. Null = no expiry. Only meaningful when `isSandbox`.
+  sandboxExpiresAt DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   version     Int     @default(0)
   createdById String?
   updatedById String?
 
+  @@index([organizationId])
   @@map("companies")
 }
 
@@ -622,6 +655,9 @@ model User {
   customRole        RbacRole? @relation(fields: [roleKey], references: [key], onDelete: SetNull)
   dataAreaId        String    @default("HQ01") // legal entity the user belongs to (multi-company isolation, PRD §6.2)
   isActive          Boolean   @default(true)
+  // Throwaway login generated for a sandbox partition (M32). Flagged so a sandbox
+  // wipe can delete exactly these and never a real account.
+  isDemo            Boolean   @default(false)
   emailVerified     DateTime?
   image             String?
   resetToken        String?   @unique
@@ -660,6 +696,7 @@ model User {
 
   @@index([role])
   @@index([dataAreaId])
+  @@index([isDemo, dataAreaId])
   @@map("users")
 }
 

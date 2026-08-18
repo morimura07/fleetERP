@@ -6,7 +6,7 @@
  * sync with backend/prisma/schema.prisma.
  */
 
-export type Role = "ADMIN" | "DISPATCHER" | "FINANCE" | "DRIVER" | "STAFF";
+export type Role = "SUPER_ADMIN" | "ADMIN" | "DISPATCHER" | "FINANCE" | "DRIVER" | "STAFF";
 export type DriverStatus = "ACTIVE" | "VACATION" | "INACTIVE";
 export type ContractType = "EMPLOYEE" | "CONTRACTOR" | "PARTTIME";
 export type VehicleStatus = "AVAILABLE" | "MAINTENANCE" | "UNAVAILABLE";

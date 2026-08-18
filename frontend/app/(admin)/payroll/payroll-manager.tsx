@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
+import { CurrencySelect } from "@frontend/components/ui/currency-select";
 import { Badge } from "@frontend/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@frontend/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
@@ -98,7 +99,7 @@ function EmployeesTab() {
                 </Select>
               </div>
               <div className="space-y-1.5"><Label>Gross Salary (monthly)</Label><Input type="number" step="0.01" {...form.register("grossSalary")} />{form.formState.errors.grossSalary && <p className="text-xs text-destructive">{form.formState.errors.grossSalary.message}</p>}</div>
-              <div className="space-y-1.5"><Label>Currency</Label><Input maxLength={3} {...form.register("currency")} /></div>
+              <div className="space-y-1.5"><Label>Currency</Label><CurrencySelect value={form.watch("currency")} onChange={(v) => form.setValue("currency", v)} /></div>
               <div className="space-y-1.5"><Label>Hired At</Label><Input type="date" {...form.register("hiredAt")} /></div>
               <div className="space-y-1.5"><Label>National ID</Label><Input {...form.register("nationalId")} /></div>
               <div className="space-y-1.5"><Label>TIN</Label><Input {...form.register("tin")} /></div>

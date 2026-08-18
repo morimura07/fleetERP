@@ -11,7 +11,7 @@ import {
   ShieldCheck, MapPin, Boxes, ShoppingCart, BadgeDollarSign, Warehouse, Receipt, Scale, Tags, Ruler,
   Building, Wrench, UserCog, Clock,
   Anchor, PackageX, MessageSquareHeart,
-  Target, FileSignature, FolderKanban, CalendarRange, ShoppingBag,
+  Target, FileSignature, FolderKanban, CalendarRange, ShoppingBag, Network,
 } from "lucide-react";
 import { cn } from "@frontend/lib/utils";
 import { can, type Permission, type Role } from "@frontend/lib/rbac";
@@ -19,6 +19,18 @@ import { can, type Permission, type Role } from "@frontend/lib/rbac";
 type NavItem = { href: string; label: string; icon: typeof Users; perm: Permission };
 type NavGroup = { label: string; items: NavItem[] };
 
+/**
+ * Navigation grouped by the department that owns the work, per the client review
+ * ("we just need to realign some of these… human resource, this one's under HR").
+ *
+ * Two groups had become dumping grounds — "Fleet & People" mixed trucks, spare
+ * parts and payroll, while Finance ran to eighteen entries — so both are split
+ * along the lines a user would actually look under. Master Planning moves to
+ * Finance because it is the finance team who forecast the period, not dispatch.
+ *
+ * Grouping is presentation only: every href is unchanged, and a group disappears
+ * entirely when the role can see none of its items.
+ */
 const GROUPS: NavGroup[] = [
   {
     label: "Overview",
@@ -29,10 +41,18 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/orders", label: "Orders", icon: ClipboardList, perm: "order:read" },
       { href: "/trips", label: "Trips", icon: Route, perm: "trip:read" },
-      { href: "/projects", label: "Projects", icon: FolderKanban, perm: "project:read" },
-      { href: "/jobs", label: "Delivery Jobs", icon: Package, perm: "job:read" },
       { href: "/dispatch", label: "Dispatch", icon: CalendarClock, perm: "dispatch:read" },
-      { href: "/planning", label: "Master Planning", icon: CalendarRange, perm: "planning:read" },
+      { href: "/jobs", label: "Delivery Jobs", icon: Package, perm: "job:read" },
+      { href: "/projects", label: "Projects", icon: FolderKanban, perm: "project:read" },
+      { href: "/waypoints", label: "GPS Waypoints", icon: MapPin, perm: "waypoint:read" },
+      { href: "/reports", label: "Daily Reports", icon: FileText, perm: "report:read" },
+    ],
+  },
+  {
+    // The three capture screens that feed the dashboard's service-quality KPIs
+    // (turnaround, damage rate, CSAT/NPS) — walked through as a set in review.
+    label: "Service Quality",
+    items: [
       { href: "/dock-events", label: "Dock Events", icon: Anchor, perm: "kpi:read" },
       { href: "/damage-reports", label: "Damage Reports", icon: PackageX, perm: "kpi:read" },
       { href: "/feedback", label: "Customer Feedback", icon: MessageSquareHeart, perm: "kpi:read" },
@@ -43,7 +63,46 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/leads", label: "Leads", icon: Target, perm: "sales:read" },
       { href: "/quotes", label: "Quotes", icon: FileSignature, perm: "sales:read" },
+      { href: "/clients", label: "Clients", icon: Building2, perm: "client:read" },
       { href: "/pos", label: "Retail POS", icon: ShoppingBag, perm: "pos:read" },
+    ],
+  },
+  {
+    label: "Fleet",
+    items: [
+      { href: "/vehicles", label: "Vehicles", icon: Truck, perm: "vehicle:read" },
+      { href: "/drivers", label: "Drivers", icon: Users, perm: "driver:read" },
+      { href: "/service", label: "Service Orders", icon: Wrench, perm: "service:read" },
+      { href: "/compliance", label: "Compliance", icon: ShieldCheck, perm: "compliance:read" },
+    ],
+  },
+  {
+    label: "Inventory & Supply Chain",
+    items: [
+      { href: "/inventory", label: "Inventory", icon: Boxes, perm: "inventory:read" },
+      { href: "/warehouses", label: "Warehouses", icon: Warehouse, perm: "warehouse:read" },
+      { href: "/procurement", label: "Procurement", icon: ShoppingCart, perm: "procurement:read" },
+      { href: "/product-attributes", label: "Product Attributes", icon: Tags, perm: "inventory:read" },
+      { href: "/units", label: "Units of Measure", icon: Ruler, perm: "inventory:read" },
+      { href: "/cost-variance", label: "Cost Variance", icon: Scale, perm: "inventory:read" },
+    ],
+  },
+  {
+    label: "Human Resources",
+    items: [
+      { href: "/hr", label: "Human Resources", icon: UserCog, perm: "hr:read" },
+      { href: "/attendance", label: "Time & Attendance", icon: Clock, perm: "attendance:read" },
+      { href: "/payroll", label: "Payroll", icon: BadgeDollarSign, perm: "payroll:read" },
+    ],
+  },
+  {
+    label: "Receivables & Payables",
+    items: [
+      { href: "/customers", label: "Customers", icon: Contact, perm: "customer:read" },
+      { href: "/receivables", label: "Receivables (AR)", icon: HandCoins, perm: "receivable:read" },
+      { href: "/collections", label: "Collections", icon: AlarmClock, perm: "collection:read" },
+      { href: "/vendors", label: "Vendors", icon: Store, perm: "vendor:read" },
+      { href: "/payables", label: "Payables (AP)", icon: ReceiptText, perm: "payable:read" },
     ],
   },
   {
@@ -51,52 +110,30 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/accounts", label: "Chart of Accounts", icon: BookOpen, perm: "account:read" },
       { href: "/ledger", label: "Journal", icon: BookText, perm: "ledger:read" },
-      { href: "/vendors", label: "Vendors", icon: Store, perm: "vendor:read" },
-      { href: "/payables", label: "Payables (AP)", icon: ReceiptText, perm: "payable:read" },
-      { href: "/customers", label: "Customers", icon: Contact, perm: "customer:read" },
-      { href: "/receivables", label: "Receivables (AR)", icon: HandCoins, perm: "receivable:read" },
-      { href: "/collections", label: "Collections", icon: AlarmClock, perm: "collection:read" },
+      { href: "/periods", label: "Accounting Periods", icon: CalendarCheck, perm: "period:read" },
       { href: "/bank", label: "Cash & Bank", icon: Landmark, perm: "bank:read" },
+      { href: "/payments", label: "Payments", icon: Wallet, perm: "payment:read" },
+      { href: "/expenses", label: "Expenses", icon: Receipt, perm: "expense:read" },
       { href: "/budgets", label: "Budgets", icon: PiggyBank, perm: "budget:read" },
+      { href: "/planning", label: "Master Planning", icon: CalendarRange, perm: "planning:read" },
       { href: "/tax", label: "Tax", icon: Percent, perm: "tax:read" },
       { href: "/fx", label: "Exchange Rates", icon: Coins, perm: "fx:read" },
       { href: "/consolidation", label: "Consolidation", icon: Combine, perm: "consolidation:read" },
-      { href: "/periods", label: "Accounting Periods", icon: CalendarCheck, perm: "period:read" },
-      { href: "/corridor-pnl", label: "Corridor P&L", icon: TrendingUp, perm: "dashboard:view" },
-      { href: "/payments", label: "Payments", icon: Wallet, perm: "payment:read" },
-      { href: "/payroll", label: "Payroll", icon: BadgeDollarSign, perm: "payroll:read" },
-      { href: "/expenses", label: "Expenses", icon: Receipt, perm: "expense:read" },
       { href: "/assets", label: "Fixed Assets", icon: Building, perm: "asset:read" },
-    ],
-  },
-  {
-    label: "Fleet & People",
-    items: [
-      { href: "/drivers", label: "Drivers", icon: Users, perm: "driver:read" },
-      { href: "/vehicles", label: "Vehicles", icon: Truck, perm: "vehicle:read" },
-      { href: "/service", label: "Service Orders", icon: Wrench, perm: "service:read" },
-      { href: "/clients", label: "Clients", icon: Building2, perm: "client:read" },
-      { href: "/inventory", label: "Inventory", icon: Boxes, perm: "inventory:read" },
-      { href: "/product-attributes", label: "Product Attributes", icon: Tags, perm: "inventory:read" },
-      { href: "/units", label: "Units of Measure", icon: Ruler, perm: "inventory:read" },
-      { href: "/cost-variance", label: "Cost Variance", icon: Scale, perm: "inventory:read" },
-      { href: "/warehouses", label: "Warehouses", icon: Warehouse, perm: "warehouse:read" },
-      { href: "/procurement", label: "Procurement", icon: ShoppingCart, perm: "procurement:read" },
-      { href: "/compliance", label: "Compliance", icon: ShieldCheck, perm: "compliance:read" },
-      { href: "/hr", label: "Human Resources", icon: UserCog, perm: "hr:read" },
-      { href: "/attendance", label: "Time & Attendance", icon: Clock, perm: "attendance:read" },
-      { href: "/waypoints", label: "GPS Waypoints", icon: MapPin, perm: "waypoint:read" },
-      { href: "/reports", label: "Daily Reports", icon: FileText, perm: "report:read" },
+      { href: "/corridor-pnl", label: "Corridor P&L", icon: TrendingUp, perm: "dashboard:view" },
     ],
   },
   {
     label: "System",
     items: [
+      // Only the platform operator holds organization:manage, so this entry is
+      // invisible to a tenant ADMIN.
+      { href: "/organizations", label: "Organizations", icon: Network, perm: "organization:manage" },
       { href: "/companies", label: "Companies", icon: Building2, perm: "company:manage" },
       { href: "/sandbox", label: "Demo Sandbox", icon: FlaskConical, perm: "company:manage" },
-      { href: "/activity", label: "Activity Log", icon: ScrollText, perm: "activity:read" },
       { href: "/users", label: "Users", icon: Settings, perm: "user:manage" },
       { href: "/roles", label: "Roles & Permissions", icon: ShieldCheck, perm: "user:manage" },
+      { href: "/activity", label: "Activity Log", icon: ScrollText, perm: "activity:read" },
     ],
   },
 ];

@@ -1,0 +1,1420 @@
+So, you can start breathing, May.
+
+0:08
+We can go one by one.
+
+0:21
+Hello?
+
+0:24
+OK.
+
+0:44
+Omar, what is the standard of creating orders?
+
+0:47
+Orders are created by accountants in the company, or, who is it?
+
+0:51
+Or there are some interface through which we must create orders.
+
+0:55
+Oh, so, I mean, of course, every organisation is different, chain, but, really you can size and the company.
+
+1:08
+I can't hear you somehow.
+
+1:10
+Can everybody hear Omar?
+
+1:13
+No.
+
+1:15
+There is a voice, voice clarity problem, Omar.
+
+1:24
+I don't Yeah.
+
+1:27
+It's better?
+
+1:30
+Just speak something so that we know.
+
+1:33
+I know.
+
+1:36
+Hollow is OK, but after that you need to speak something otherwise the continuity is a problem.
+
+1:43
+OK, so, so I'm saying.
+
+1:46
+in terms of mid-size and larger companies, we have, you know, like different, so, typically you'll have somebody who coordinates, with, company or this.
+
+1:58
+so have that, that team that would, basically the whole.
+
+2:06
+which is not accounts, on, net finance.
+
+2:09
+, and then we'll have, and then the second phase would be like operation.
+
+2:16
+So operation would be the, the guys who would, dispatch or execute that, particular order.
+
+2:25
+And then, and then, let's assigning drivers and, pick up location and deliver the phones and then making sure that, the things are done and, and the orders or the vehicles are back to.
+
+2:43
+to the yard.
+
+2:44
+And then, and then those documentation or the proof of deliveries.
+
+2:51
+and, and invoices.
+
+2:54
+Gets passed on into accounts and then they process the order into the system.
+
+3:00
+Oh.
+
+3:02
+Rather, convert that order into an invoice, for, for payment.
+
+3:13
+OK, let's go one by one.
+
+3:15
+So orders, what I understand is there is an order, so where we fill the details like the client, of course, who want to move the things from one place to another.
+
+3:27
+So there is an origin as a city and a destination city.
+
+3:30
+This is only a city name or is it an address?
+
+3:36
+No, I think it can be anything, yeah.
+
+3:39
+It can be anything.
+
+3:40
+We can put a complete address there, isn't it?
+
+3:43
+Yeah.
+
+3:44
+And where to put the, where to register the company?
+
+3:50
+As a client, you mean client?
+
+3:52
+Yeah, yeah, we'll have multiple clients, permanent clients probably.
+
+3:58
+OK, so there are clients, yeah.
+
+4:00
+OK, perfect.
+
+4:01
+OK, so there's a company you create and for that company you make an order.
+
+4:05
+So before making an order, you have to select the company, isn't it?
+
+4:09
+Yes, yeah.
+
+4:11
+It's a selection box rather than creating.
+
+4:13
+Can we see there, Maury?
+
+4:15
+I mean, Amit, just go there.
+
+4:17
+Client is a selection box.
+
+4:18
+OK, good.
+
+4:19
+So, origin destination is a proper writing like a text.
+
+4:23
+How many, can you type a lot, I mean, there, how many characters are there?
+
+4:30
+I think that they know, you can.
+
+4:33
+There's no limit.
+
+4:34
+No limit.
+
+4:37
+OK.
+
+4:37
+So you can put an entire address.
+
+4:39
+And cargo means you have to define, right?
+
+4:42
+What is exactly inside.
+
+4:44
+Yeah, generally the PMS or AGO.
+
+4:47
+OK.
+
+4:48
+OK.
+
+4:50
+Fine, so there are no fixed things, you can write anything basically.
+
+4:53
+Freight amount you can put.
+
+4:56
+so, the currency, where do you change the currency?
+
+4:58
+OK, there is currency here.
+
+4:59
+USD.
+
+5:00
+What are the options?
+
+5:03
+you can add any, but I, I don't know how it will be calculated for the.
+
+5:08
+No, currency has to be a selection, right?
+
+5:10
+You cannot just type anything.
+
+5:12
+Yeah.
+
+5:14
+Mori.
+
+5:18
+Yeah.
+
+5:19
+If let's say, here I can see only, is there any possibility to select the currency over here?
+
+6:15
+Yeah, we'll have to do that.
+
+6:17
+Productive spend, yeah, but over here what we want to do is we want to have a drop down sort of typing the selection.
+
+6:35
+Yes, for currency, you have to give a dropdown with all the currencies available.
+
+6:43
+Because from here, you have to then replicate it everywhere, depending on the currency of the order, the invoices and all other things will be done, isn't it?
+
+6:57
+So that's one change.
+
+6:59
+In the order, yeah?
+
+7:02
+So once we create the order, what is the next step, Omar?
+
+8:03
+OK, so Marie, regarding this, order, so we are going to integrate with the fleet flow, right?
+
+8:10
+Our tracking system.
+
+8:12
+So, that integration is possible, right?
+
+8:16
+Do you have an API for that?
+
+8:42
+Mhm.
+
+8:48
+OK.
+
+8:50
+So I think Priam, Priam is doing that fleet flow.
+
+8:55
+So he, he probably he can send to you the, the API for that.
+
+9:03
+Then we can integrate.
+
+9:07
+Wait, wait, how that integration will happen, Priam?
+
+9:09
+Do you have a clear picture on how that integration will happen?
+
+9:12
+You take the order from here and then create the trip there.
+
+9:17
+no, I, I'm not aware about the integration yet.
+
+9:22
+And do we have to show the live location here, or do we have to show the scripts and all that's on the fleet now?
+
+9:31
+So, with, we want to have.
+
+9:35
+People because, just for people that are not going to be using the targets, for instance, for HR in terms of payroll, accounts for for for this purpose.
+
+9:57
+Hello You, so I'm saying what we want to do is we want to add map on, on, on fleet flow, because, it will be used by, by like finance and accounts team, and HR, mo.
+
+10:22
+Because for many companies, They pay drivers by trip.
+
+10:29
+So what they do is they certify that the vehicle has gone for a trip, or even in terms of payment, to see, in terms of an audit where this particular vehicle took this many days, it went this particular route because also reimbursement and payments are done, as per certain, routes.
+
+10:56
+So I think this one, Priam can help you with that.
+
+10:59
+creating that, that part of it.
+
+11:04
+Remember we had it in the, the document before.
+
+11:07
+And you said that this one is something you're not.
+
+11:11
+You're not familiar with.
+
+11:12
+So BM can help you.
+
+11:47
+OK.
+
+11:52
+Integration plus we should have a kind of I think I, I don't know if the priam work let's say here we have a live location.
+
+12:02
+Once the, you know, we integrated with the fleet flow, OK.
+
+12:07
+So Priam, I, I believe it does it the same way, is it?
+
+12:11
+Yes.
+
+12:14
+Right Then it can be done.
+
+12:22
+It's similar to the other application that we had shared before.
+
+12:25
+What's it called?
+
+12:31
+Something like this Yeah, yeah, in time, in time.
+
+12:38
+Yeah OK.
+
+12:40
+So this one, any question to anyone, Ramesh, for the trip?
+
+12:46
+No, the integration is not yet done, so how can we.
+
+12:51
+Move from here.
+
+12:51
+That's, that's my question.
+
+12:52
+No, no, yeah, yeah, there's no integration.
+
+12:54
+This is just an order.
+
+12:56
+This is no integration here.
+
+12:58
+It's an order process.
+
+13:01
+So this is just an order and then, who, you know, how this goes to the truck, who allocates the truck and all those things?
+
+13:09
+What is the connection between the ERP system and the fleet flow?
+
+13:14
+No, so, so basically, in, in the tracking system, the annotation is done like on paperwork.
+
+13:25
+What happens is they prepare documents and then they say, OK, this document or this order on paper, it will go on, truck T 700 for instance.
+
+13:36
+And then it's given to the driver and the driver goes.
+
+13:39
+Now, in this, in here in the ERP system, it will be allocated by the order process.
+
+13:44
+So it will be documented on onto the system that this order was, or this, this particular order was allocated.
+
+13:55
+to 700.
+
+13:57
+So it's a manual assignment in the ERP.
+
+14:00
+Yeah.
+
+14:03
+OK.
+
+14:03
+Paperwork is done and do a manual allocation that this order is going to this particular vehicle or whatever, yeah?
+
+14:10
+Yeah.
+
+14:12
+OK.
+
+14:13
+That's fine.
+
+14:16
+I mean we can look, we can look at, we can look at doing it, I guess once, once we start adding the map to, maybe we can find a way to.
+
+14:32
+for it to, I mean, end of the day, it will be there because, the moment you assign that particular truck, you'll be able to monitor that truck on the map.
+
+14:47
+Yeah, here, here in the order you are anyway, order and trip, you're allocating the, you're creating the order and then you're allocating the truck.
+
+14:55
+It is already there in the ERP system, right?
+
+14:57
+As a manual process.
+
+14:59
+Then it will be tracked in the fleet flow, once the truck starts moving.
+
+15:04
+Yeah, right, so once the completion happens, where are the things to be done in ERP?
+
+15:10
+No, Ramesh, it can be tracked from the fleet flow also it can be tracked from here as well, right?
+
+15:15
+That, that's why he, he will integrate the API.
+
+15:21
+So, from here you can access the fleet flow.
+
+15:23
+That's what you're saying?
+
+15:25
+Yes.
+
+15:27
+Let's say this one we integrated with this one Watercom, right, so they don't need to go to fleet flow size.
+
+15:34
+They are into the order management section.
+
+15:36
+They are, they are, allocating the vehicle.
+
+15:40
+They can see the vehicle from here.
+
+15:41
+It's so, so that, that integration is pending which, Priam will help Mari to get done, right?
+
+15:48
+Yes, yes.
+
+15:50
+OK, so that is the action point.
+
+15:52
+All right.
+
+15:54
+OK.
+
+15:55
+Moving forward.
+
+16:00
+So this is the, I think, I believe this is a new trip, right?
+
+16:05
+Where you can define the way the feet are going, select the vehicle.
+
+16:10
+Manually.
+
+16:12
+Right?
+
+16:12
+Yeah, this is, this is the only point I said, you know, you're selecting it manually here.
+
+16:16
+Yeah.
+
+16:18
+And then why does it, why does it 2 times, Mari.
+
+16:24
+you can.
+
+16:25
+OK, this is a trailer.
+
+16:28
+He's the driver.
+
+16:29
+OK.
+
+16:32
+Maury, we can't hear you.
+
+16:33
+You're away from the mic.
+
+17:33
+I think that, that's fine.
+
+17:36
+That's fine.
+
+17:44
+Yeah, I think this part is OK.
+
+17:50
+Yeah And this is OK.
+
+17:54
+Fine.
+
+18:00
+What is this project?
+
+18:07
+Project, so basically project is, like for instance.
+
+18:13
+you have, like a concert.
+
+18:16
+Right, let's say you have a contract with a certain company that, you're going to be doing, their, their deliveries, for a period of, I don't know, like 3 months or 6 months.
+
+18:29
+So this is where, and, and that's, and that project would be, let's say, we need to clear there's 100,000 tonnes of, of copper.
+
+18:43
+for this period of time, and then, and they could pay you X amount.
+
+18:53
+Oh, OK.
+
+18:55
+So basically you're creating 11 big project, right?
+
+19:00
+With the start date and end date, right, and project description.
+
+19:04
+That Like, then, for each, order, then, Omar we have to create a project.
+
+19:13
+No, no, no, no, project is, is basically a bigger because, when you look at like project basically, a lot of times when, you know, like these tenders, basically like a tender.
+
+19:26
+Yes, right, so you'll find let's say a tender like, I don't know, Puma or these ones where Say that every month we need let's say for, for one year we need you to supply 1.6 trillion tonnes of fuel to all these different locations for instance.
+
+19:54
+Mhm.
+
+19:56
+OK.
+
+19:57
+And one, important point I missed in order, more generally here they, they assign multiple vehicle because the, the quantity is big, big, so we have to go one by one vehicle or there's an option to select the multiple vehicle also.
+
+20:26
+so right now, this feature is not there.
+
+20:32
+Can we, can we do that?
+
+20:36
+Let's, yeah, because there's the one order big order is coming and they are almost minimum 10 or 15 vehicles they will assign altogether for that particular, you know, order.
+
+20:51
+Then We should have option, let's say vehicle then driver ID number, right?
+
+20:57
+sorry driver name which we are assigning.
+
+21:01
+For that particular order.
+
+21:04
+So that is in the trips again, right?
+
+21:06
+We have to have a plus button to add more vehicles.
+
+21:11
+Isn't it?
+
+21:14
+Yeah, somewhere here.
+
+21:16
+There's a one order.
+
+21:18
+This is the order, and there should be multiple vehicle option to select for that vehicle and driver, both vehicle and driver all together.
+
+21:28
+There should be a plus, plus thing.
+
+21:32
+Yeah, plus driver and vehicle.
+
+21:34
+Yeah, plus or select anything.
+
+21:37
+But start date will be the same for all the vehicles or it can be different as well?
+
+21:45
+this will be, it can be different, but order ID will be the same.
+
+21:51
+OK, then all this field has to be replicated, right, when you give a plus.
+
+21:57
+Yes.
+
+21:58
+Driver, vehicle, start date, end date and what is more?
+
+22:03
+Yeah.
+
+22:05
+Distance kilometre distance kilometre, so all these things have to be selected for each of the vehicle.
+
+22:15
+Yes.
+
+22:16
+So the moment you'll select here driver, the vehicle number, driver is mostly assigned.
+
+22:21
+So you should be automatically select like which driver is there.
+
+22:27
+What So just the operation team need to review whether all the driver assigned correctly, then he can he can create the trip.
+
+22:39
+Fine.
+
+22:42
+This will be the, maybe extra point.
+
+22:46
+Or maybe what we can do is, the same way where you select the order.
+
+22:53
+so let's say you collect that order and then you collect the vehicle.
+
+22:58
+It's a good fibre, and then what, what we can do is part of the integration is that, the moment they set a vehicle starts the trip then the start date will automatically update.
+
+23:14
+no, then it will be rely on our GPS, you know, sometimes GPS if it is offline, it will be completely missed.
+
+23:28
+So rather than here he can put the, we can check today, right?
+
+23:33
+If let's say the same order number, if he's going with a different date, so for each vehicle they are tracking date by date or for order only order.
+
+23:43
+You know.
+
+23:45
+So let's say if this vehicle is started today and next vehicle is, let's say, is going tomorrow, so someone had to change.
+
+23:54
+Right OK.
+
+24:03
+Fine, May, you understand?
+
+24:05
+Anyways, for, for all these, updates, May, because, you know, today we have, we have a presentation to one company.
+
+24:15
+so we're going to take the feedback and then we'll give you a consolidated, amendments, or additions, then, they'll all be small, small things because, majority of the things is already there, the only thing that, In terms of, edit, it would be basically just edit, feedback drop down, maybe additional fields or change of name and all that stuff, so it's, it's small, small things that we're expecting to get feedback.
+
+24:48
+So I think by we'll plan by next week, because we have two big companies that we are dependent on, to get good feedback from.
+
+24:58
+So once we get those.
+
+25:00
+then we can give you consolidated, amendments.
+
+25:05
+Oh OK.
+
+25:09
+Because, the, the only, and then also another thing that we need to do, with that the way we, you know, like these finance and people and all, we just need to realign some of these because like for instance, there's others we want to have, let's say, human resource, this one's under HR for instance.
+
+25:30
+So we have.
+
+25:36
+OK.
+
+25:48
+OK.
+
+25:50
+So OK.
+
+25:53
+Let's go next model.
+
+25:54
+This is the delivery jobs.
+
+25:58
+So, Job codes?
+
+26:04
+Yeah.
+
+26:10
+Yeah, so here, what's the difference between delivery jobs and trips?
+
+27:35
+So delivery jobs would be more like like local deliveries.
+
+27:40
+Like small deliveries and all, right?
+
+27:54
+Yeah Yes.
+
+29:32
+Oh Yeah, yeah, yeah, OK, I got it.
+
+30:09
+So basically I'm with Priam.
+
+30:10
+This is like It's just like for local.
+
+30:16
+Those type of delivery.
+
+30:21
+You mean local deliveries?
+
+30:25
+yeah, mainly, mainly it's like local deliveries, but these look, you can look at them as, you know, like, like FedEx and these ones where, where they live, where the deliveries, have been placed and there's, they need to be delivered at, at a certain time.
+
+30:42
+but.
+
+30:46
+if you look at like the transport industry.
+
+30:49
+you'll have an order, that means, but, but it doesn't have like a time, it's not time bound, it's just a movement.
+
+31:00
+OK.
+
+31:09
+Sure, sure.
+
+31:10
+OK.
+
+31:14
+The dispatch I mean, Ahmed, can you go to dispatch?
+
+31:41
+Dispatch, yeah.
+
+31:52
+Yeah, yeah, sure.
+
+31:54
+Yeah, it's OK.
+
+32:07
+Oh I mean I mean Click on create dispatch.
+
+32:39
+I'm sleeping.
+
+32:41
+Ahmed, where are you sleeping?
+
+32:53
+Seriously, he slept, man.
+
+32:54
+Omar, you're not with him.
+
+32:56
+No, no.
+
+32:59
+where is he?
+
+33:09
+I can't see him.
+
+33:09
+Where is he?
+
+33:13
+Online.
+
+33:15
+Ahmed.
+
+33:24
+No, he kept the laptop there and went somewhere.
+
+33:28
+I'm in.
+
+33:33
+I'm here.
+
+33:33
+Yeah, you click on the dispatch.
+
+33:35
+We are waiting for you to click on the dispatch.
+
+33:37
+Hello, click on the dispatch.
+
+33:39
+Yeah, yeah, actually there's an issue with the, there's issue with the internet desk.
+
+33:43
+OK, create dispatch.
+
+33:45
+It, it is coming all create filled.
+
+33:50
+Yes, Molly, yeah, yeah.
+
+33:52
+I OK.
+
+34:14
+Mhm Yeah.
+
+34:56
+I think.
+
+36:44
+Yeah, I think this is fine.
+
+36:45
+It's understand.
+
+38:32
+OK, so this one This model should be in, in finance.
+
+38:37
+Right, because that, yeah, they will be planning, let's say, let's say 2, next year we expect.
+
+38:47
+100,000 tonnes corridor, 100,000 north corridor like that.
+
+38:54
+And then, and then here in capacity plan.
+
+38:58
+So that means when the trip, as the trips go, this one would have, somewhere where it's showing the comparison, right?
+
+39:10
+how much was forecast and how much was the tax now right.
+
+39:17
+So, and it will be showing here, on top, right?
+
+39:22
+Oh, I No, so, the actual versus the plan, where we see on dashboard or where?
+
+39:34
+So like here after we do the planning.
+
+39:38
+Right?
+
+39:39
+That's it Like this one is done now.
+
+39:42
+This one you did here, 10 loads, 5 tonnes, 5 tonnes, right?
+
+39:48
+yeah, so how do we, how do we measure the results?
+
+40:06
+Yeah.
+
+40:08
+But where's that data?
+
+40:10
+Where can we see that data?
+
+40:12
+That has dashboard.
+
+40:30
+Because I think it should be here itself, where we're able to see, like this one now, this forecast, and then, so here you can have a demand for and actual focus.
+
+40:51
+But then, and then you, and then that data can be seen on on dashboard because I think, I think it's there on dashboard.
+
+41:02
+Sexual OK.
+
+41:12
+Yeah, I think you should have it on, on dashboard.
+
+41:18
+Oh OK, continue.
+
+42:12
+OK, so I will have to drop off from the meeting.
+
+42:16
+I have something I have to do.
+
+42:19
+No problem, that's fine.
+
+42:21
+OK.
+
+42:23
+OK.
+
+42:31
+Just go, just go up on the.
+
+42:57
+So this one I think we, we know this, this is for maintenance of vehicles.
+
+43:05
+Yeah, so this is fine.
+
+43:10
+Yeah.
+
+43:12
+This is, morning.
+
+43:44
+Yeah, sorry.
+
+43:45
+let's just, just for the sake of time, let's, like these ones, we, we, we know these ones.
+
+43:54
+So we, we just want, let's just go through those modules that, are things that we just need understanding.
+
+44:01
+So let's just go up.
+
+44:05
+Yeah, let's go more up.
+
+44:12
+OK, so finished, the planning must yeah, document.
+
+44:17
+Let's do documents.
+
+44:23
+It's under master planning.
+
+44:25
+Do.
+
+44:25
+Do.
+
+44:27
+Yeah yeah.
+
+44:29
+OK.
+
+44:42
+Yes, OK.
+
+45:26
+so just click, click record event.
+
+45:35
+OK.
+
+46:20
+OK, so basically, doc, for, it, it records the time that the vehicle took to reach a certain destination and, the time it came back.
+
+46:40
+OK.
+
+46:41
+OK.
+
+46:44
+and then, let's us, damage report.
+
+46:49
+It's basically, that if there's any, shortage on goods, right?
+
+47:12
+just click file report.
+
+47:17
+file report.
+
+47:23
+Oh, they're on the right, right, on the right.
+
+47:28
+Yeah.
+
+47:31
+Ok.
+
+47:31
+Report date, cargo and.
+
+47:44
+OK.
+
+47:46
+OK, good.
+
+47:54
+Mhm OK.
+
+47:59
+customer feedback.
+
+48:36
+this one NPS is what?
+
+48:39
+What does it stand for?
+
+48:51
+OK.
+
+49:03
+Yeah, Yeah, yeah, bro.
+
+49:20
+So should I present again?
+
+49:29
+OK.
+
+49:36
+Hello?
+
+49:39
+Yeah.
+
+49:40
+So should I present again?
+
+49:46
+this one, the GPS waypoints.
+
+49:49
+GPS wavepoint and procurement, too, we wanted to understand.
+
+49:54
+Named corridor checkpoint.
+
+49:57
+OK.
+
+49:57
+Cheapest waypoints is just.
+
+50:00
+pinpoint locations.
+
+50:03
+OK.
+
+50:05
+This, in procurement.
+
+50:10
+procurement is, is good.
+
+50:12
+It's fine.
+
+50:13
+That's right.
+
+50:14
+Yeah.
+
+50:15
+OK.
+
+50:15
+We'll just, Omar, what, what about the, what about the HR?
+
+50:26
+Payrolls and other things, yeah, it's fine.
+
+50:28
+It's not be part of it.
+
+50:32
+Well, I spoke to HR yesterday, so there's just, more fields to, to add.
+
+50:40
+Do this.
+
+50:56
+OK.
+
+50:57
+So, we are good that At process wise, right?
+
+51:04
+Yeah.
+
+51:06
+Now, Naresh you can ask your question how you will.
+
+51:11
+You know, Going to deploy and taking over.
+
+51:20
+Hello?
+
+51:23
+Hello?
+
+51:26
+Yes, yes.
+
+51:29
+Yeah, so, wait, wait, so May, what is the plan for handover?
+
+51:33
+How you, you, you will want to finish everything and start the handover, or you want to start handing over now itself?
+
+51:48
+I'm talking about, you know, handing over the project with the source code and everything.
+
+51:54
+So you want to start it now or you will finish the remaining integrations and then start the handover?
+
+52:26
+Mhm.
+
+52:29
+Mhm.
+
+52:32
+OK.
+
+52:40
+OK.
+
+52:41
+OK, so what is our timeline, Omar, for reminding to be completed?
+
+52:46
+Omar, do we have here, so timeline, basically what we need to do now with Amit and myself is, is we're going to sit with, like we said, there's two main companies that we've identified.
+
+53:02
+That we need to sit and, and, sort of populate the, the system, so that we make sure that, it's in line with, with our market in terms of, the fields and all.
+
+53:20
+so the timeline of that, I would, I would say maximum a month, but what we're planning is, a couple of weeks.
+
+53:31
+Like 2 weeks, 3 weeks.
+
+53:34
+No, but when you will be able to give the next feedback to May to start working on the integrations and other modifications like that will be next week itself, yeah, by next week.
+
+53:46
+So, so another 2 weeks, we are planning to keep giving feedback to May to make the modifications and integrations.
+
+53:55
+Yes, yeah, one meeting we have it today and one meeting we have on Monday.
+
+54:00
+After that, you can prepare a document or, you know, chats or whatever, give to May.
+
+54:05
+So 2 weeks from now, we are planning to, finish up the remaining modifications and integrations, Maury.
+
+54:13
+Is that OK?
+
+54:14
+Do you think that timeline is feasible?
+
+54:26
+OK.
+
+54:26
+2 weeks to 1 month is the, is the, project timeline, yeah, but we cannot exceed another month because we have to start with other clients as well.
+
+54:37
+That's why, yeah.
+
+54:39
+We need to go to the market for other clients, meaning, we can spare a maximum of 1 month.
+
+54:45
+So 2 weeks is optimal, but if it exceeds, then maximum 4 weeks.
+
+54:51
+OK?
+
+54:55
+So from 4 weeks, 4 weeks from now we'll start the handover, but before that, Naresh, I think there is some source code already shared by Maurie to preempt.
+
+55:05
+So, so you go through that with the preempt and prepare yourself to take the handover.
+
+55:11
+No problem.
+
+55:12
+I'll go to it.
+
+55:13
+Amit, just before we leave, May, this one, demo sandbox.
+
+55:18
+Can you, Amit, can you just go down?
+
+55:22
+On the modules there is a demo sandbox.
+
+55:28
+This one?
+
+55:29
+Yeah.
+
+55:31
+so this one, how, Molly, how does this work?
+
+56:01
+So this would be a sign in for them, right?
+
+56:04
+OK, for the demo.
+
+56:06
+OK.
+
+56:08
+And any timeline for demo we can define the timeline.
+
+56:21
+Yeah, OK.
+
+56:22
+Perfect.
+
+56:35
+I think it's OK, no.
+
+56:37
+Yeah.
+
+56:44
+But then how But then how do they, how do they sign in?
+
+56:53
+Yeah.
+
+56:54
+So, Murray we have to send this link, how they will sign it?
+
+56:59
+Where we create the user name and password.
+
+57:02
+For the demo?
+
+57:12
+I think it's not yet activated, yeah.
+
+57:18
+OK.
+
+57:20
+Mhm.
+
+57:21
+Because this one, because the sign-in is asking for an email.
+
+57:25
+Yeah, OK.
+
+57:29
+Oh Is it possible to activate it today?
+
+57:43
+OK.
+
+57:50
+Oh, OK.
+
+57:52
+Oh, OK.
+
+57:54
+Yeah, yeah, sure, sure, sure.
+
+57:56
+OK, no problem.
+
+57:57
+I think, I think, everything is.
+
+58:01
+I, is under is understood.
+
+58:06
+so, we, I think we have a meeting in 1 hour and 15 minutes.
+
+58:14
+So we'll go and present and then get feedbacks.
+
+58:19
+you enjoy your weekend, and then we'll catch up on, next week.
+
+58:32
+Thanks, man.
+
+58:33
+All right.
+
+58:34
+Most of, most of us is starting tomorrow.
+
+58:38
+We are still at work today.
+
+58:41
+OK.
+
+58:43
+Bori, thank you very much.
+
+58:44
+the ERP system looks very nice.
+
+58:47
+I say, very good.
+
+58:51
+OK.
+
+58:53
+OK, thank you.
+
+58:55
+You too.
+
+58:56
+OK.
+
+58:57
+And sorry for taking your time on weekend.
+
+59:03
+thank you.
+
+59:04
+OK, buddy.
+
+59:05
+All right.
+
+59:06
+All right, cheers, bye-bye.

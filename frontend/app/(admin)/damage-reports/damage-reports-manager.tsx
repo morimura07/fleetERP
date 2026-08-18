@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
+import { CurrencySelect } from "@frontend/components/ui/currency-select";
 import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
@@ -99,7 +100,7 @@ export function DamageReportsManager({ orders, trips }: { orders: Order[]; trips
               </div>
               <div className="space-y-1.5">
                 <Label>Currency</Label>
-                <Input placeholder="USD" maxLength={3} {...form.register("currency")} />
+                <CurrencySelect value={form.watch("currency")} onChange={(v) => form.setValue("currency", v)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Cargo Value</Label>

@@ -4,6 +4,8 @@ import { prisma } from "@backend/lib/prisma";
 import { verifyPassword } from "@backend/lib/password";
 import { AuthError } from "@backend/lib/errors";
 import { can, type Permission } from "@backend/lib/rbac";
+import { isSandboxExpired } from "@backend/services/sandbox";
+import { organizationOf } from "@backend/lib/organization";
 import type { Role } from "@prisma/client";
 
 /**
@@ -22,7 +24,13 @@ export interface AuthUser {
   driverId: string | null;
   /** Legal entity the user belongs to; drives multi-company data isolation. */
   dataAreaId: string;
-  /** ADMIN-only per-request "active company" from the X-Data-Area header (company switcher). */
+  /**
+   * Tenant the user belongs to, resolved from their company at login. Bounds an
+   * ADMIN to the companies inside their own organization. Null for SUPER_ADMIN,
+   * who is not scoped to one.
+   */
+  organizationId: string | null;
+  /** Cross-entity per-request "active company" from the X-Data-Area header (company switcher). */
   activeArea?: string;
 }
 
@@ -35,7 +43,7 @@ const secret = () => new TextEncoder().encode(process.env.JWT_SECRET ?? "dev-sec
 const EXPIRES = process.env.JWT_EXPIRES ?? "1d";
 
 export async function signToken(user: AuthUser): Promise<string> {
-  return new SignJWT({ email: user.email, role: user.role, roleKey: user.roleKey, driverId: user.driverId, name: user.name, dataAreaId: user.dataAreaId })
+  return new SignJWT({ email: user.email, role: user.role, roleKey: user.roleKey, driverId: user.driverId, name: user.name, dataAreaId: user.dataAreaId, organizationId: user.organizationId })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
@@ -53,6 +61,9 @@ export async function verifyToken(token: string): Promise<AuthUser> {
     roleKey: (payload.roleKey as string | null) ?? null,
     driverId: (payload.driverId as string | null) ?? null,
     dataAreaId: (payload.dataAreaId as string) ?? "HQ01",
+    // Tokens issued before the organization layer carry no claim; fall back to
+    // the live map so an existing session keeps working after deploy.
+    organizationId: (payload.organizationId as string | null) ?? organizationOf((payload.dataAreaId as string) ?? "HQ01"),
   };
 }
 
@@ -65,7 +76,29 @@ export async function authenticate(email: string, password: string): Promise<Aut
   if (!user || !user.isActive) throw new AuthError("Invalid credentials", 401);
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) throw new AuthError("Invalid credentials", 401);
-  return { id: user.id, email: user.email, name: user.name, role: user.role, roleKey: user.roleKey ?? null, driverId: user.driver?.id ?? null, dataAreaId: user.dataAreaId };
+
+  // A sandbox partition may carry an access window (M32). Checked only after the
+  // password verifies, so an anonymous caller can't probe which areas are demos.
+  const company = await prisma.company.findUnique({
+    where: { code: user.dataAreaId },
+    select: { isSandbox: true, sandboxExpiresAt: true, organizationId: true },
+  });
+  if (company && isSandboxExpired(company)) {
+    throw new AuthError("This demo environment has expired. Please contact your administrator", 403);
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    roleKey: user.roleKey ?? null,
+    driverId: user.driver?.id ?? null,
+    dataAreaId: user.dataAreaId,
+    // The tenant is a property of the user's company, not of the user, so it is
+    // resolved here rather than stored on the row where it could drift.
+    organizationId: company?.organizationId ?? null,
+  };
 }
 
 declare module "hono" {

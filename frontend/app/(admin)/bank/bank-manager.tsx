@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
+import { CurrencySelect } from "@frontend/components/ui/currency-select";
 import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
@@ -103,7 +104,7 @@ function AccountsTab() {
                 <Input placeholder="1010" {...form.register("glCode")} />
                 {form.formState.errors.glCode && <p className="text-xs text-destructive">{form.formState.errors.glCode.message}</p>}
               </div>
-              <div className="space-y-1.5"><Label>Currency</Label><Input maxLength={3} {...form.register("currency")} /></div>
+              <div className="space-y-1.5"><Label>Currency</Label><CurrencySelect value={form.watch("currency")} onChange={(v) => form.setValue("currency", v)} /></div>
               <div className="space-y-1.5"><Label>Provider</Label><Input placeholder="Safaricom / CRDB" {...form.register("provider")} /></div>
               <div className="space-y-1.5"><Label>IBAN</Label><Input {...form.register("iban")} /></div>
               <div className="space-y-1.5"><Label>SWIFT</Label><Input {...form.register("swift")} /></div>
@@ -207,7 +208,7 @@ function TransfersTab() {
                 <Input placeholder="500.00" {...form.register("amount")} />
                 {form.formState.errors.amount && <p className="text-xs text-destructive">{form.formState.errors.amount.message}</p>}
               </div>
-              <div className="space-y-1.5"><Label>Currency</Label><Input maxLength={3} {...form.register("currency")} /></div>
+              <div className="space-y-1.5"><Label>Currency</Label><CurrencySelect value={form.watch("currency")} onChange={(v) => form.setValue("currency", v)} /></div>
               <div className="space-y-1.5"><Label>Expense GL Code</Label><Input placeholder="5030" {...form.register("expenseCode")} /></div>
               <div className="space-y-1.5"><Label>Date</Label><Input type="date" {...form.register("transferredAt")} /></div>
               <div className="space-y-1.5"><Label>External Ref (M-Pesa/Airtel)</Label><Input {...form.register("externalRef")} /></div>

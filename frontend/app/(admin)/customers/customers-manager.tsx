@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
+import { CurrencySelect } from "@frontend/components/ui/currency-select";
 import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
@@ -81,7 +82,7 @@ export function CustomersManager() {
                 {form.formState.errors.name && <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>}
               </div>
               <div className="space-y-1.5"><Label>TIN</Label><Input {...form.register("tin")} /></div>
-              <div className="space-y-1.5"><Label>Currency</Label><Input maxLength={3} {...form.register("currency")} /></div>
+              <div className="space-y-1.5"><Label>Currency</Label><CurrencySelect value={form.watch("currency")} onChange={(v) => form.setValue("currency", v)} /></div>
               <div className="space-y-1.5"><Label>Credit Limit</Label><Input inputMode="decimal" {...form.register("creditLimit")} /></div>
               <div className="space-y-1.5"><Label>Credit Days</Label><Input type="number" {...form.register("creditDays")} /></div>
               <div className="space-y-1.5"><Label>Email</Label><Input type="email" {...form.register("email")} /></div>

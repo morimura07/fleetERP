@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
+import { CurrencySelect } from "@frontend/components/ui/currency-select";
 import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
@@ -135,7 +136,7 @@ export function InventoryManager() {
               <div className="space-y-1.5"><Label>Inventory GL Code</Label><Input {...form.register("glCode")} /></div>
               <div className="space-y-1.5"><Label>Expense Code (on issue)</Label><Input {...form.register("expenseCode")} /></div>
               <div className="space-y-1.5"><Label>Reorder Level</Label><Input type="number" step="0.001" {...form.register("reorderLevel")} /></div>
-              <div className="space-y-1.5"><Label>Currency</Label><Input maxLength={3} {...form.register("currency")} /></div>
+              <div className="space-y-1.5"><Label>Currency</Label><CurrencySelect value={form.watch("currency")} onChange={(v) => form.setValue("currency", v)} /></div>
             </div>
 
             <FormSection title="Part Identification & Fleet">

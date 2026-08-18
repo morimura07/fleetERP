@@ -1,4 +1,12 @@
 import { z } from "zod";
+import { CURRENCY_CODES } from "@frontend/lib/currency";
+
+/**
+ * A currency must be one the system offers, not any 3 characters — the client
+ * asked for a fixed dropdown so an order's currency can be relied on downstream
+ * (invoices, FX, consolidation). Extend the list in `lib/currency.ts`.
+ */
+export const currencyCode = z.enum(CURRENCY_CODES);
 
 // ───────── shared ─────────
 export const idSchema = z.string().cuid();
@@ -214,7 +222,7 @@ export const clientSchema = z.object({
   website: z.string().max(200).optional().or(z.literal("")),
   // Billing & financial (spec §2)
   tin: z.string().max(50).optional().or(z.literal("")),
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   paymentTerm: z.enum(["NET_30", "NET_60", "COD"]).default("NET_30"),
   creditLimit: z.coerce.number().min(0).default(0),
   taxExempt: z.boolean().default(false),
@@ -340,7 +348,7 @@ export const journalLineSchema = z.object({
 export const journalEntrySchema = z.object({
   dataAreaId: z.string().min(1).max(10).default("HQ01"),
   postingDate: z.coerce.date(),
-  currency: z.string().length(3, "Currency must be a 3-letter ISO 4217 code").default("USD"),
+  currency: currencyCode.default("USD"),
   exchangeRate: z
     .string()
     .regex(/^\d+(\.\d{1,6})?$/, "Invalid exchange rate")
@@ -374,7 +382,7 @@ export const orderSchema = z.object({
   volumeCbm: decimalAmount.optional().default("0"),
   freightAmount: decimalAmount,
   demurrageAmount: decimalAmount.optional().default("0"),
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   bookingDate: z.coerce.date(),
   status: z
     .enum(["DRAFT", "CONFIRMED", "IN_TRANSIT", "DELIVERED", "INVOICED", "CANCELLED"])
@@ -480,7 +488,7 @@ export const tripExpenseSchema = z.object({
     "OTHER",
   ]),
   amount: decimalAmount,
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   note: z.string().max(255).optional(),
   post: z.boolean().optional().default(false), // post to ledger immediately
 });
@@ -500,7 +508,7 @@ export const vendorSchema = z.object({
   tin: z.string().max(50).optional(),
   vrn: z.string().max(50).optional(),
   paymentTerm: z.enum(["NET_30", "NET_60", "COD"]).default("NET_30"),
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().max(20).optional(),
   isActive: z.boolean().default(true),
@@ -537,7 +545,7 @@ export const vendorInvoiceSchema = z.object({
   invoiceNumber: z.string().min(1, "Invoice number is required").max(60),
   invoiceDate: z.coerce.date(),
   dueDate: z.coerce.date().optional(),
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   subtotal: decimalAmount,
   vatAmount: money0,
   whtAmount: money0,
@@ -562,7 +570,7 @@ export const customerSchema = z.object({
   creditLimit: money0,
   creditDays: z.coerce.number().int().min(0).max(365).default(30),
   taxExempt: z.boolean().default(false),
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().max(20).optional(),
   isActive: z.boolean().default(true),
@@ -613,7 +621,7 @@ export const customerInvoiceSchema = z.object({
   customerId: idSchema,
   invoiceDate: z.coerce.date(),
   dueDate: z.coerce.date().optional(),
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   subtotal: decimalAmount,
   vatAmount: money0,
   revenueCode: z.string().min(1).max(20).default("4000"),
@@ -635,8 +643,8 @@ const rateValue = z
 
 export const exchangeRateSchema = z.object({
   dataAreaId: z.string().min(1).max(10).default("HQ01"),
-  currency: z.string().length(3, "3-letter ISO 4217 code"),
-  baseCurrency: z.string().length(3).default("USD"),
+  currency: currencyCode,
+  baseCurrency: currencyCode.default("USD"),
   rateType: z.enum(["SPOT", "AVERAGE", "HISTORICAL"]).default("SPOT"),
   rate: rateValue,
   validFrom: z.coerce.date(),
@@ -649,7 +657,7 @@ export const bankAccountSchema = z.object({
   name: z.string().min(1, "Name is required").max(150),
   type: z.enum(["BANK", "MOBILE_MONEY", "CASH"]).default("BANK"),
   glCode: z.string().min(1, "GL account code is required").max(20),
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   iban: z.string().max(40).optional().or(z.literal("")),
   swift: z.string().max(20).optional().or(z.literal("")),
   provider: z.string().max(60).optional().or(z.literal("")),
@@ -667,7 +675,7 @@ export const moneyTransferSchema = z.object({
     .enum(["FUEL_ALLOWANCE", "TOLLS", "BORDER_FEES", "EMERGENCY_REPAIR", "DRIVER_ADVANCE", "OTHER"])
     .default("OTHER"),
   amount: decimalAmount,
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   expenseCode: z.string().min(1).max(20).default("5030"),
   externalRef: z.string().max(100).optional(),
   transferredAt: z.coerce.date(),
@@ -735,7 +743,7 @@ export const stockItemSchema = z.object({
   glCode: z.string().min(1).max(20).default("1300"),
   expenseCode: z.string().min(1).max(20).default("5100"),
   reorderLevel: z.coerce.number().min(0).default(0),
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   isActive: z.boolean().default(true),
   // Identification & fleet (spec §1–2)
   oemPartNumber: os(60),
@@ -792,7 +800,7 @@ export const poLineSchema = z.object({
 export const purchaseOrderSchema = z.object({
   dataAreaId: z.string().min(1).max(10).default("HQ01"),
   vendorId: z.string().min(1, "Vendor is required"),
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   orderDate: z.coerce.date(),
   expectedAt: z.coerce.date().optional().nullable(),
   memo: z.string().max(300).optional().or(z.literal("")),
@@ -811,7 +819,7 @@ export const employeeSchema = z.object({
   tin: z.string().max(40).optional().or(z.literal("")),
   country: z.string().length(2).default("TZ"),
   grossSalary: z.coerce.number().positive("Gross salary must be positive"),
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   status: z.enum(["ACTIVE", "ON_LEAVE", "TERMINATED"]).default("ACTIVE"),
   bankAccount: z.string().max(60).optional().or(z.literal("")),
   hiredAt: z.coerce.date(),
@@ -880,7 +888,7 @@ export const expenseClaimSchema = z.object({
   dataAreaId: z.string().min(1).max(10).default("HQ01"),
   driverId: z.string().optional().nullable(),
   title: z.string().min(1, "Title is required").max(150),
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   advanceId: z.string().optional().nullable(),
   lines: z.array(expenseLineSchema).min(1, "At least one line is required"),
 });
@@ -892,7 +900,7 @@ export type ExpenseLineInput = z.infer<typeof expenseLineSchema>;
 export const companySchema = z.object({
   code: z.string().min(1, "Code is required").max(10).regex(/^[A-Z0-9]+$/, "Code must be uppercase letters/digits"),
   name: z.string().min(1, "Name is required").max(150),
-  baseCurrency: z.string().length(3).default("USD"),
+  baseCurrency: currencyCode.default("USD"),
   country: z.string().length(2).default("TZ"),
   isActive: z.boolean().default(true),
 });
@@ -938,7 +946,7 @@ export const serviceOrderSchema = z.object({
   vendorId: z.string().optional().nullable(),
   odometerKm: z.coerce.number().int().min(0).optional().nullable(),
   fault: z.string().min(1, "Describe the fault / service reason").max(500),
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
 }).refine((o) => o.kind !== "EXTERNAL" || !!o.vendorId, {
   message: "An external garage requires a vendor",
   path: ["vendorId"],
@@ -966,7 +974,7 @@ export const contractSchema = z.object({
   type: z.enum(["PERMANENT", "FIXED_TERM", "PROBATION", "CONTRACTOR"]).default("PERMANENT"),
   title: z.string().min(1, "Job title is required").max(120),
   grossSalary: z.coerce.number().positive("Gross salary must be positive"),
-  currency: z.string().length(3).default("USD"),
+  currency: currencyCode.default("USD"),
   startDate: z.coerce.date(),
   endDate: z.coerce.date().optional().nullable(),
   note: z.string().max(500).optional().nullable(),
@@ -1083,7 +1091,7 @@ export const damageReportSchema = z.object({
   reportedAt: z.coerce.date(),
   cargoValue: z.coerce.number().min(0, "Cargo value cannot be negative"),
   damageValue: z.coerce.number().min(0, "Damage value cannot be negative"),
-  currency: z.string().length(3).optional(),
+  currency: currencyCode.optional(),
   description: os(1000),
 }).refine((d) => d.damageValue <= d.cargoValue, {
   message: "Damage value cannot exceed the cargo value",
@@ -1121,7 +1129,7 @@ export const leadSchema = z.object({
   source: os(80),
   stage: z.enum(["NEW", "CONTACTED", "QUALIFIED", "WON", "LOST"]).default("NEW"),
   estimatedValue: z.coerce.number().min(0).default(0),
-  currency: z.string().length(3).optional(),
+  currency: currencyCode.optional(),
   ownerId: os(40),
   notes: os(1000),
 });
@@ -1143,7 +1151,7 @@ export const quoteSchema = z.object({
   originZone: os(120),
   destinationZone: os(120),
   cargoDescription: os(300),
-  currency: z.string().length(3).optional(),
+  currency: currencyCode.optional(),
   validUntil: z.coerce.date(),
   notes: os(1000),
   lines: z.array(quoteLineSchema).min(1, "Add at least one line item"),
@@ -1164,7 +1172,7 @@ export const projectSchema = z.object({
   name: z.string().min(1, "Project name is required").max(200),
   clientId: os(40),
   manager: os(120),
-  currency: z.string().length(3).optional(),
+  currency: currencyCode.optional(),
   budgetRevenue: z.coerce.number().min(0).default(0),
   budgetCost: z.coerce.number().min(0).default(0),
   startDate: z.coerce.date().optional().nullable(),
@@ -1227,7 +1235,7 @@ export const posLineSchema = z.object({
 export const posSaleSchema = z.object({
   customerName: os(120),
   paymentMethod: z.enum(["CASH", "MOBILE_MONEY", "CARD"]).default("CASH"),
-  currency: z.string().length(3).optional(),
+  currency: currencyCode.optional(),
   taxAmount: z.coerce.number().min(0).default(0),
   note: os(500),
   lines: z.array(posLineSchema).min(1, "Add at least one item"),

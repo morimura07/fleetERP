@@ -129,6 +129,7 @@ export const FACILITY_TYPE_LABEL: Record<FacilityType, string> = {
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
+  SUPER_ADMIN: "Platform Administrator",
   ADMIN: "Administrator",
   DISPATCHER: "Operations Planner",
   FINANCE: "Finance Controller",

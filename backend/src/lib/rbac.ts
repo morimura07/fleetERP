@@ -103,7 +103,8 @@ export type Permission =
   | "export:run"
   | "activity:read"
   | "user:manage"
-  | "company:manage"; // legal-entity / company registry (M34)
+  | "company:manage" // legal-entity / company registry (M34)
+  | "organization:manage"; // parent-company (tenant) registry — SUPER_ADMIN only
 
 export const ALL: Permission[] = [
   "dashboard:view",
@@ -202,16 +203,22 @@ export const ALL: Permission[] = [
   "activity:read",
   "user:manage",
   "company:manage",
+  "organization:manage",
 ];
 
 /**
- * The built-in defaults for the 5 system roles. This is the seed source of truth
+ * The built-in defaults for the 6 system roles. This is the seed source of truth
  * for the `rbac_*` tables; at runtime the effective grants are read from
  * `runtimePermissions`, which is hydrated from the DB (so admins can change them)
  * and falls back to these defaults until hydration runs.
+ *
+ * SUPER_ADMIN and ADMIN hold the same permission keys — what separates them is
+ * *reach*, not capability: only SUPER_ADMIN crosses the organization boundary
+ * (see `lib/scope.ts`), and only SUPER_ADMIN may manage the parent registry.
  */
 export const DEFAULT_ROLE_PERMISSIONS: Record<Role, Permission[]> = {
-  ADMIN: ALL,
+  SUPER_ADMIN: ALL,
+  ADMIN: ALL.filter((p) => p !== "organization:manage"),
   DISPATCHER: [
     "dashboard:view",
     "driver:read",

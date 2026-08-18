@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
+import { CurrencySelect } from "@frontend/components/ui/currency-select";
 import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { useToast } from "@frontend/components/ui/toast";
@@ -69,7 +70,7 @@ export function CompaniesManager() {
                 <Input placeholder="Kenya Operations Ltd" {...form.register("name")} />
                 {form.formState.errors.name && <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>}
               </div>
-              <div className="space-y-1.5"><Label>Base Currency</Label><Input maxLength={3} {...form.register("baseCurrency")} /></div>
+              <div className="space-y-1.5"><Label>Base Currency</Label><CurrencySelect value={form.watch("baseCurrency")} onChange={(v) => form.setValue("baseCurrency", v)} /></div>
               <div className="space-y-1.5"><Label>Country (ISO)</Label><Input maxLength={2} {...form.register("country")} /></div>
             </div>
             <p className="text-xs text-muted-foreground">The code becomes this company&apos;s data partition and can&apos;t be changed after creation.</p>
