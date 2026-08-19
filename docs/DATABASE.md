@@ -1,156 +1,152 @@
 # Database Design
 
-PostgreSQL with Prisma. **19 models.** Physical table names are snake_case via `@@map`. All monetary ledger/freight amounts use `Decimal`; legacy domestic values use `Int`.
+PostgreSQL with Prisma. **79 models, 69 enums, 38 migrations.** Physical table names
+are snake_case via `@@map`. All monetary amounts use `Decimal` (141 columns); a few
+legacy domestic-delivery values are still `Int`.
 
-## Domain overview
+`backend/prisma/schema.prisma` is the authoritative column-level reference. This
+document covers the design rules that are not obvious from reading it.
 
-The schema spans four domains:
+---
 
-- **Auth & org** — `User`, `ActivityLog`, `Notification`
-- **Accounting** — `Account`, `JournalEntry`, `JournalLine`
-- **Freight** — `Order`, `Trip`, `TripExpense`
-- **Fleet / domestic delivery** — `Driver`, `DriverAvailability`, `Holiday`, `Vehicle`, `VehicleMaintenance`, `Client`, `DeliveryJob`, `Dispatch`, `DailyReport`, `Payment`
-
-## ER overview
+## 1. Tenancy: the two levels above every record
 
 ```
-User 1──0..1 Driver
-User 1──* Notification | ActivityLog | Dispatch(createdBy) | JournalEntry(createdBy) | Order(createdBy) | Trip(createdBy)
+Organization          the tenant boundary (parent company). Separate customers.
+  └─ Company          a legal entity. Its `code` IS the dataAreaId.
+       └─ business records, each carrying `dataAreaId`
+```
+
+**60 of 79 models carry `dataAreaId`.** It is a plain string column, not a foreign key,
+holding the owning `Company.code` (`HQ01`, `KE01`, …). Isolation is enforced at the
+query layer by `backend/src/lib/scope.ts`, never by the database.
+
+The 19 models without it fall into three groups, and the reason matters:
+
+| Group | Models | Why no `dataAreaId` |
+|---|---|---|
+| Above tenancy | `Organization`, `Company` | They *define* the partitions |
+| Cross-tenant infrastructure | `User`, `Notification`, `ActivityLog`, `RbacPermission`, `RbacRole`, `RbacRolePermission` | Auth and audit span the platform. `User` instead carries its own `dataAreaId` for the entity the user belongs to |
+| Child rows | `JournalLine`, `TripExpense`, `BudgetLine`, `PurchaseOrderLine`, `GoodsReceiptLine`, `ExpenseLine`, `Payslip`, `StockBalance`, `VendorPayment`, `CustomerReceipt`, `ConsolidationMap`, `Payment` | They inherit the partition from their parent and cascade with it |
+
+> **Adding a partitioned model?** Give it `dataAreaId`, scope every query with
+> `areaScope(user)`, and guard single fetches with `assertSameArea(user, row)`.
+> A model that forgets this is invisible to the isolation tests and leaks across tenants.
+
+## 2. Cross-cutting columns
+
+| Column | Coverage | Purpose |
+|---|---|---|
+| `dataAreaId` | 60 models | Tenant partition (above) |
+| `version Int @default(0)` | 45 models | Optimistic concurrency (PRD §7.1) via `updateWithVersion()`; a stale write is rejected with 409 rather than clobbering |
+| `createdById` | 49 models | Audit: who created the row |
+| `updatedById` | 43 models | Audit: who last changed it |
+
+Every write is additionally recorded in `ActivityLog`, and the master-data update
+routes capture a field-level before→after diff through `diffFields()`.
+
+## 3. Referential integrity
+
+44 `Cascade`, 51 `SetNull`, 15 `Restrict`. The choice encodes intent:
+
+- **Cascade** — the child has no meaning without its parent. Deleting an `Order` removes its `Trip`s; deleting a `JournalEntry` removes its `JournalLine`s.
+- **SetNull** — the reference is informational. Deleting a `User` nulls the `createdById` on everything they touched rather than destroying business history.
+- **Restrict** — deletion would orphan real data. An `Organization` holding companies, a `Driver` on a trip, and a `Client` with orders all refuse to delete.
+
+## 4. Domain map
+
+**Tenancy & auth** — `Organization`, `Company`, `User`, `RbacRole`, `RbacPermission`,
+`RbacRolePermission`, `ActivityLog`, `Notification`
+
+**Accounting** — `Account` (self-referencing chart-of-accounts tree), `JournalEntry`,
+`JournalLine`, `FiscalPeriod`
+
+**Freight** — `Order`, `Trip`, `TripExpense`
+
+**Fleet & drivers** — `Driver`, `DriverAvailability`, `Holiday`, `DriverDocument`,
+`Vehicle`, `VehicleMaintenance`, `VehiclePosition`, `GpsWaypoint`
+
+**Domestic delivery** — `Client`, `DeliveryJob`, `Dispatch`, `DailyReport`, `Payment`
+
+**AP / AR / collections** — `Vendor`, `VendorInvoice`, `VendorPayment`, `Customer`,
+`CustomerInvoice`, `CustomerReceipt`, `CollectionActivity`
+
+**Core finance** — `Budget`, `BudgetLine`, `BankAccount`, `MoneyTransfer`,
+`ConsolidationMap`, `ExchangeRate`
+
+**Inventory & supply chain** — `StockItem`, `StockMovement`, `StockBalance`, `Warehouse`,
+`UnitOfMeasure`, `ProductAttribute`, `StockItemAttribute`, `PurchaseOrder`,
+`PurchaseOrderLine`, `GoodsReceipt`, `GoodsReceiptLine`
+
+**Assets & workshop** — `FixedAsset`, `DepreciationEntry`, `AssetAssignment`,
+`ServiceOrder`, `ServicePart`, `ServiceLabor`
+
+**Human capital** — `Employee`, `EmploymentContract`, `EmployeeDocument`, `PayRun`,
+`Payslip`, `ExpenseClaim`, `ExpenseLine`, `LeaveRequest`, `LeaveBalance`, `TimeEntry`,
+`Timesheet`
+
+**Commercial** — `Lead`, `SalesQuote`, `SalesQuoteLine`, `Project`, `DemandForecast`,
+`PosSale`, `PosSaleLine`
+
+**Service quality** — `DockEvent`, `DamageReport`, `CustomerFeedback`
+
+## 5. Key relationships
+
+```
+# Tenancy
+Organization 1──* Company                      # Restrict: a parent with entities cannot be deleted
+Company.code ──> dataAreaId on 60 models       # by value, not by foreign key
 
 # Accounting
-Account 1──* Account (self, parent/children)       # chart-of-accounts tree
-Account 1──* JournalLine
-JournalEntry 1──* JournalLine
-JournalEntry 0..1──0..1 JournalEntry (reversalOf)  # reversal trail
-JournalEntry 0..1── Order (invoice)                # AR invoice link
-JournalEntry 0..1── TripExpense (entry)            # expense posting link
+Account 1──* Account                           # self-referencing chart-of-accounts tree
+JournalEntry 1──* JournalLine                  # must balance; POSTED is immutable
+JournalEntry 0..1──0..1 JournalEntry           # reversalOf: the contra-entry trail
+JournalEntry 0..1── Order                      # the AR invoice link
+JournalEntry 0..1── TripExpense                # the expense posting link
 
 # Freight
-Client 1──* Order 1──0..1 Trip 1──* TripExpense
-Driver 1──* Trip      Vehicle 1──* Trip
+Client 1──* Order 1──* Trip 1──* TripExpense   # MANY trips per order (10-15 trucks)
+Driver 1──* Trip        Vehicle 1──* Trip
+Vehicle 0..1── Driver                          # defaultDriver: pre-fills dispatch
+Project 1──* Order                             # contract grouping, budget vs actual
 
-# Fleet / domestic
-Driver 1──* DriverAvailability | Holiday | Dispatch | DailyReport | Payment
-Vehicle 1──* VehicleMaintenance | Dispatch
-Client 1──* DeliveryJob 1──0..1 Dispatch
-DeliveryJob 1──0..1 DailyReport
+# Inventory
+StockItem 1──* StockMovement                   # moving-average cost recomputed per movement
+StockItem 1──* StockBalance ──1 Warehouse      # per-location on-hand
+PurchaseOrder 1──* GoodsReceipt                # 3-way match: PO / receipt / invoice
 ```
 
-## Enums
+## 6. Rules the schema alone does not tell you
 
-| Enum | Values |
-|------|--------|
-| Role | ADMIN, DISPATCHER, FINANCE, DRIVER, STAFF |
-| DriverStatus | ACTIVE, VACATION, INACTIVE |
-| ContractType | EMPLOYEE, CONTRACTOR, PARTTIME |
-| VehicleStatus | AVAILABLE, MAINTENANCE, UNAVAILABLE |
-| JobStatus | PENDING, WAITING_DISPATCH, ASSIGNED, DELIVERING, COMPLETED, CANCELLED |
-| DispatchStatus | SCHEDULED, IN_PROGRESS, DONE, CANCELLED |
-| NotificationType | DISPATCH, JOB_UPDATE, COMPLETION, SYSTEM |
-| AccountType | ASSET, LIABILITY, EQUITY, INCOME, EXPENSE |
-| JournalStatus | DRAFT, POSTED, REVERSED |
-| OrderStatus | DRAFT, CONFIRMED, IN_TRANSIT, DELIVERED, INVOICED, CANCELLED |
-| TripStatus | PLANNED, DISPATCHED, IN_PROGRESS, COMPLETED, CANCELLED |
-| CorridorType | NORTHERN, CENTRAL, DOMESTIC |
-| TripExpenseType | FUEL, TOLLS, BORDER_FEES, DRIVER_ALLOWANCE, DEMURRAGE, MAINTENANCE, OTHER |
+**A posted journal entry is immutable.** Corrections go through a contra-entry that
+links back via `reversalOf`. This is an audit requirement, enforced in
+`services/ledger.ts`, not by a database constraint.
 
-## Tables (key columns)
+**Entries must balance.** Debits equal credits, checked before write. A `JournalEntry`
+that does not balance is never persisted.
 
-### Auth & org
+**A closed fiscal period rejects new postings.** `FiscalPeriod` is checked inside
+`createJournalEntry`, so every posting path — invoices, POS, payroll, revaluation —
+respects it without each one implementing the check.
 
-#### users
-| Column | Type | Notes |
-|--------|------|-------|
-| id | cuid | PK |
-| name | string | display name |
-| email | string | UNIQUE |
-| passwordHash | string | bcrypt |
-| role | Role | default STAFF |
-| isActive | bool | can sign in |
-| resetToken / resetTokenExpires | string? / datetime? | password reset |
+**`Company.code` cannot change after creation.** It is the partition key already stamped
+on every child record; renaming it would orphan that data. The same applies to
+`Organization.code`, which the runtime scope map resolves through.
 
-#### notifications
-`userId`, `type`, `title`, `body`, `link`, `isRead`. Index `(userId, isRead)`.
+**One order, many trips.** `Trip.orderId` was unique until August 2026. A large
+consignment goes out on 10 to 15 trucks, so cost rollups must sum across all of them
+and on-time delivery is judged against the *last* arrival.
 
-#### activity_logs
-`userId?` (→SetNull), `action`, `target` ("Model:id"), `detail` (JSON string), `ipAddress`, `createdAt`. Indexes on `userId`, `createdAt`.
+## 7. Migrations
 
-### Accounting
+38 migrations under `backend/prisma/migrations/`, applied with `prisma migrate deploy`.
 
-#### accounts
-Chart of accounts. `dataAreaId` (legal entity, default "HQ01"), `code`, `name`, `type` (AccountType), `parentId` (self-relation tree, →SetNull), `isActive`.
-**UNIQUE `(dataAreaId, code)`.** Index on `type`.
+Two conventions worth keeping:
 
-#### journal_entries
-A balanced double-entry voucher. `dataAreaId`, `voucherNumber`, `postingDate` (DATE), `currency` (ISO 4217, default USD), `exchangeRate` (Decimal 18,6 — recorded per posting), `memo`, `status` (JournalStatus), `reversalOfId` (UNIQUE self-relation, →SetNull), `postedAt`, `createdById` (→SetNull).
-**UNIQUE `(dataAreaId, voucherNumber)`.** Indexes on `status`, `postingDate`.
+- **Additive first.** A NOT NULL column on a populated table is added nullable, backfilled, then constrained — see `20260818140000_add_organization_tenancy`, which does exactly that for `Company.organizationId`.
+- **New enum values go last.** Postgres forbids using an enum value in the same transaction that creates it.
 
-#### journal_lines
-One side of a posting. `entryId` (→Cascade), `accountId` (→Restrict), `debit` / `credit` (Decimal 18,2, default 0), `memo`, `dimension` (free-form branch/cost-object tag). Indexes on `entryId`, `accountId`.
-**Invariant (app layer):** exactly one of debit/credit is non-zero per line, and `SUM(debit) == SUM(credit)` per entry.
-
-### Freight
-
-#### orders
-Cross-border freight booking. `dataAreaId`, `orderCode` (UNIQUE), `clientId` (→Restrict), `originZone`, `destinationZone`, `corridor` (CorridorType), `cargoDescription`, `grossWeightKg` / `volumeCbm` (Decimal 12,2), `freightAmount` / `demurrageAmount` (Decimal 18,2), `currency`, `bookingDate` (DATE), `status` (OrderStatus), `invoiceEntryId` (UNIQUE → JournalEntry, →SetNull), `createdById` (→SetNull). Indexes on `status`, `clientId`, `bookingDate`.
-
-#### trips
-Execution of an order. `dataAreaId`, `tripCode` (UNIQUE), `orderId` (UNIQUE→Cascade), `driverId` / `vehicleId` (→Restrict), `corridor`, `mileageKm` / `transitHours` (Decimal), `scheduledStart`, `scheduledEnd`, `status` (TripStatus), `createdById` (→SetNull). Indexes on `(driverId, scheduledStart)`, `(vehicleId, scheduledStart)`, `status`.
-
-#### trip_expenses
-`tripId` (→Cascade), `type` (TripExpenseType), `amount` (Decimal 18,2), `currency`, `note`, `entryId` (UNIQUE → JournalEntry, →SetNull). Index on `tripId`.
-
-### Fleet / domestic delivery
-
-#### drivers
-`name`, `email` (UNIQUE), `phone`, `address`, `contractType`, `joinedAt`, `status`. `userId` links to User 1:1 (optional). Index on `status`.
-
-#### driver_availabilities
-**UNIQUE `(driverId, weekday)`.** weekday 0=Sun..6=Sat, `startTime`/`endTime` as "HH:mm".
-
-#### holidays
-**UNIQUE `(driverId, date)`.** `date` is DATE. Index on `date`.
-
-#### vehicles
-`vehicleNumber` (UNIQUE), `plateNumber` (UNIQUE), `maker`, `model`, `insuranceExpiry` (DATE), `inspectionExpiry` (DATE), `status`. Index on `status`.
-
-#### vehicle_maintenances
-`maintenanceType`, `date` (DATE), `cost` (Int), `note`. Index on `vehicleId`.
-
-#### clients
-`companyName`, `contactPerson`, `phone`, `address`, `email`. Index on `companyName`.
-
-#### delivery_jobs
-`jobCode` (UNIQUE), `clientId` (→Restrict), `pickupAddress`, `deliveryAddress`, `deliveryDate`, `cargoDescription`, `rewardAmount` (Int), `note`, `status`. Indexes on `status`, `deliveryDate`, `clientId`.
-
-#### dispatches
-`jobId` (UNIQUE→Cascade), `driverId` / `vehicleId` (→Restrict), `scheduledStart`, `scheduledEnd`, `status`, `createdById`. Indexes on `(driverId, scheduledStart)`, `(vehicleId, scheduledStart)` — speeds up conflict checks.
-
-#### daily_reports
-`jobId` (UNIQUE), `driverId`, `workStart`, `workEnd`, `mileage` (km), `note`, `proofImageUrl`.
-
-#### payments
-**UNIQUE `(driverId, year, month)`.** `totalAmount`, `jobCount`, `finalizedAt`. Holds the finalized monthly aggregate.
-
-## Referential-integrity policy
-
-- **Restrict** — DeliveryJob→Client, Dispatch→Driver/Vehicle, Order→Client, Trip→Driver/Vehicle, JournalLine→Account (preserve history; block parent deletion while referenced).
-- **Cascade** — Dispatch/DailyReport→DeliveryJob, Availability/Holiday→Driver, JournalLine→JournalEntry, Trip→Order, TripExpense→Trip.
-- **SetNull** — Driver→User, ActivityLog→User, `createdBy` links, and ledger links on Order/TripExpense (keep records when the related entity is removed).
-
-## Invariants (enforced at the application layer)
-
-**Accounting** (`lib/services/ledger.ts`)
-- A journal entry must balance: `SUM(debit) == SUM(credit)`, each line has exactly one non-zero side, amounts ≥ 0, ≥ 2 lines.
-- Posted entries are immutable; corrections are made by a REVERSED contra-entry (debits/credits swapped), never by edit/delete.
-- Voucher numbers are sequential per legal entity (`JV-000001`).
-
-**Freight** (`lib/services/freight.ts`)
-- Invoicing an order posts **Dr Accounts Receivable (1100) / Cr Freight Revenue (4000)** (+ Cr Demurrage Income (4100) when applicable) and sets the order to INVOICED. Idempotent — an already-invoiced order is rejected.
-- Posting a trip expense posts **Dr <expense account> / Cr Accounts Payable (2000)**; the expense type maps 1:1 to a chart-of-accounts code.
-- Trip P&L = order revenue (freight + demurrage) − sum of trip expenses.
-
-**Domestic delivery**
-- A dispatch cannot overlap the same driver/vehicle in time (`checkDispatchConflict`).
-- A daily report can only be filed by the job's assigned driver; filing transitions the job to COMPLETED and the dispatch to DONE.
-- Monthly payment = sum of `rewardAmount` over COMPLETED jobs in the month, grouped by driver.
+> Some early schema changes were applied with `prisma db push`, which does not record a
+> migration. If `migrate deploy` fails with "type already exists", the objects are present
+> but unrecorded — resolve with `prisma migrate resolve --applied <name>` after confirming
+> with `prisma migrate diff` that the database really does match the schema.

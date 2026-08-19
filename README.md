@@ -35,10 +35,36 @@ An integrated ERP for cross-border logistics across the East & Central Africa tr
 - **Accounting integration** — Invoicing an order posts accounts receivable (Dr A/R / Cr Freight Revenue); trip expenses post accounts payable (Dr Expense / Cr A/P) automatically.
 - **Dispatch & daily reports** — Domestic delivery dispatch (with conflict checking) and driver daily reports.
 
+### Fleet & compliance
+- **Vehicles & drivers** — Registry, maintenance history, workshop service orders, and a default driver per truck that pre-fills dispatch.
+- **Expiry warnings** — Insurance, inspection, COMESA permit, Yellow Card, licence and passport, all surfaced 14 days ahead. A truck impounded at a border is the loss this prevents.
+- **Fuel efficiency** — Actual km/L per vehicle against a target, which is how siphoning shows up.
+
+### Inventory, procurement & assets
+- **Stock** — Spare parts, tyres and fuel on moving-average cost, multi-warehouse balances and transfers, with ledger postings on issue.
+- **Procurement** — Purchase orders through to goods receipt with 3-way matching and variance flags.
+- **Fixed assets** — Register, straight-line depreciation runs, disposal with gain/loss, plus custody and warranty tracking.
+
+### People & payroll
+- **HR** — Employment contracts, leave with balance accounting, employee documents with expiry warnings.
+- **Time & attendance** — Clock-in/out rolled into monthly timesheets; approved overtime feeds payroll.
+- **Payroll** — Monthly pay runs with per-country statutory computation (PAYE bands, NSSF, SHIF) posted to the ledger.
+
+### Commercial
+- **Sales** — CRM leads and freight quotations; an accepted quote converts atomically into an order.
+- **Projects** — Contracts grouping orders, tracked live against a planned budget.
+- **Master planning** — Demand forecast per period and corridor, capacity against the live fleet, and **forecast vs actual** once the work has run.
+
 ### Management & analytics
-- **Executive dashboard** — KPIs (utilization, bookings, receivables, trip P&L), financial gauges, and vehicle document-expiry tracking.
-- **Audit log & notifications** — Every write operation is logged; drivers are notified of new dispatches.
-- **Document exports** — Dispatch sheet, daily report, and monthly payment PDFs, plus jobs CSV.
+- **KPI dashboard** — The client's five KPI categories plus plan-vs-actual, each tile linking to its underlying records.
+- **Cost accounting** — Per-trip, per-corridor and per-project P&L; standard-vs-actual cost variance.
+- **Audit log & notifications** — Every write is logged with a field-level before→after diff; drivers are notified of new dispatches.
+- **Document exports** — Dispatch sheet, daily report and monthly payment PDFs, plus jobs CSV.
+
+### Multi-tenancy
+- **Organizations** — Separate customers on one database, each with their own administrators and their own companies, invisible to each other.
+- **Companies** — Legal entities inside an organization, with every business record partitioned by `dataAreaId` and a company switcher for cross-entity users.
+- **Demo sandbox** — Throwaway partitions with their own sign-in details and an expiry date, resettable without touching real data.
 
 ---
 
@@ -103,49 +129,108 @@ and talks to the API with a JWT bearer token.
 
 ## 4. Data Model
 
-The Prisma schema (`prisma/schema.prisma`) defines **34 models**, grouped by domain:
+The Prisma schema (`backend/prisma/schema.prisma`) defines **79 models** and 69 enums
+across 38 migrations, grouped by domain:
 
-**Auth & org**
-- `User` (5 roles) / `ActivityLog` (audit log) / `Notification`
+**Tenancy & auth**
+- `Organization` (parent company — the tenant boundary) / `Company` (legal entity, its `code` is the `dataAreaId`)
+- `User` (6 roles) / `RbacRole` / `RbacPermission` / `RbacRolePermission` (dynamic RBAC)
+- `ActivityLog` (audit log) / `Notification`
 
 **Accounting**
-- `Account` (chart of accounts) / `JournalEntry` (voucher) / `JournalLine` (line)
+- `Account` (chart of accounts) / `JournalEntry` (voucher) / `JournalLine` / `FiscalPeriod` (period close)
 
 **Freight**
-- `Order` / `Trip` / `TripExpense`
+- `Order` / `Trip` (many per order) / `TripExpense`
 
 **Fleet & drivers**
-- `Driver` / `DriverAvailability` / `Holiday` / `Vehicle` / `VehicleMaintenance`
+- `Driver` / `DriverAvailability` / `Holiday` / `DriverDocument`
+- `Vehicle` / `VehicleMaintenance` / `VehiclePosition` / `GpsWaypoint`
 
-**Domestic delivery & payroll**
+**Domestic delivery**
 - `Client` / `DeliveryJob` / `Dispatch` / `DailyReport` / `Payment`
 
-**AP / AR (M1 / M2)**
-- `Vendor` / `VendorInvoice` / `VendorPayment` / `Customer` / `CustomerInvoice` / `CustomerReceipt`
+**AP / AR & collections (M1 / M2 / M7)**
+- `Vendor` / `VendorInvoice` / `VendorPayment`
+- `Customer` / `CustomerInvoice` / `CustomerReceipt` / `CollectionActivity`
 
-**Core Finance (M3 / M4 / M5 / multi-currency)**
+**Core finance (M3 / M4 / M5 / M10, multi-currency)**
 - `Budget` / `BudgetLine` / `BankAccount` / `MoneyTransfer` / `ConsolidationMap` / `ExchangeRate`
 
-**Operations (M11 / M12 / M30)**
-- `DriverDocument` / `GpsWaypoint` / `VehiclePosition` (+ compliance & fuel fields on `Vehicle`/`Trip`)
+**Inventory & supply chain (M13–M18)**
+- `StockItem` / `StockMovement` / `StockBalance` / `Warehouse` / `UnitOfMeasure`
+- `ProductAttribute` / `StockItemAttribute`
+- `PurchaseOrder` / `PurchaseOrderLine` / `GoodsReceipt` / `GoodsReceiptLine`
 
-> See [docs/DATABASE.md](docs/DATABASE.md) for detailed table definitions and relations, and [docs/PRD-STATUS.md](docs/PRD-STATUS.md) for the 36-module PRD coverage map.
+**Assets & workshop (M19–M22)**
+- `FixedAsset` / `DepreciationEntry` / `AssetAssignment` (custody)
+- `ServiceOrder` / `ServicePart` / `ServiceLabor`
+
+**Human capital (M9 / M23 / M24 / M26)**
+- `Employee` / `EmploymentContract` / `EmployeeDocument`
+- `PayRun` / `Payslip` / `ExpenseClaim` / `ExpenseLine`
+- `LeaveRequest` / `LeaveBalance` / `TimeEntry` / `Timesheet`
+
+**Commercial (M27–M29 / M33)**
+- `Lead` / `SalesQuote` / `SalesQuoteLine` / `Project` / `DemandForecast`
+- `PosSale` / `PosSaleLine`
+
+**Service quality (KPI capture)**
+- `DockEvent` (turnaround) / `DamageReport` / `CustomerFeedback` (CSAT / NPS)
+
+> See [docs/DATABASE.md](docs/DATABASE.md) for table definitions and relations, and
+> [docs/PRD-STATUS.md](docs/PRD-STATUS.md) for the 36-module PRD coverage map.
 
 ---
 
-## 5. Access Control (RBAC)
+## 5. Access Control
 
-Permissions are centralized in a "role → permission" map in `lib/rbac.ts`, enforced in two layers: middleware (per route) and `requirePermission()` (per API).
+Two independent mechanisms: **who you are** (RBAC) and **what you can reach** (tenancy).
+
+### 5.1 Roles & permissions (RBAC)
+
+97 permission keys across 6 system roles. Grants live in the `rbac_*` tables so an
+admin can create custom roles and re-map permissions from the Roles screen; they
+hydrate into an in-memory map at startup so `can()` stays synchronous. The built-in
+roles are seeded with `isSystem` and cannot be deleted, but their grants are editable.
+
+Enforced in two layers: frontend `middleware` (per route) and
+`requireAuth` + `requirePermission()` (per API call).
 
 | Role | Function | Main permissions |
 |------|----------|------------------|
-| **ADMIN** | System administrator | All permissions |
+| **SUPER_ADMIN** | Platform operator | Everything, and the only role that creates organizations or reads across them |
+| **ADMIN** | Organization administrator | Everything inside their own organization |
 | **DISPATCHER** | Operations Planner | Create/edit orders, trips, dispatch, jobs; accounting is read-only |
 | **FINANCE** | Finance Controller | Post/reverse journal entries, maintain accounts, invoice orders, finalize payments; operations are read-only; no user management |
 | **DRIVER** | Driver | View own jobs and file daily reports (isolated to the driver portal) |
 | **STAFF** | General staff | Read access to core data |
 
-> **Separation of duties**: accounting authority (FINANCE) and operations editing (DISPATCHER) are kept separate. Invoicing and journal posting require finance permissions.
+> **Separation of duties**: accounting authority (FINANCE) and operations editing
+> (DISPATCHER) are kept separate. Invoicing and journal posting require finance permissions.
+
+### 5.2 Tenancy & data isolation
+
+Two levels above the data, both resolved in `backend/src/lib/scope.ts` — the single
+place the rule is expressed, so every query enforces it identically:
+
+```
+Organization   the tenant boundary (parent company). Separate customers.
+  └─ Company   a legal entity, carried on every business record as `dataAreaId`
+```
+
+| Role | Reach |
+|------|-------|
+| SUPER_ADMIN | every organization |
+| ADMIN | every company inside **their own** organization |
+| everyone else | their own company only |
+
+The company → organization map is held in memory (`lib/organization.ts`, hydrated at
+startup) so `areaScope()` can stay synchronous. It **fails closed**: if hydration fails,
+an ADMIN drops to seeing only their own entity — narrower than intended, never wider.
+The `X-Data-Area` company-switcher header is caller-supplied and can never widen reach
+beyond the caller's own organization. Cross-tenant reads return **404, not 403**, so the
+existence of another tenant is never revealed.
 
 ---
 
@@ -159,33 +244,110 @@ Permissions are centralized in a "role → permission" map in `lib/rbac.ts`, enf
 | `/reset-password` | Set new password |
 | `/forbidden` | 403 (access denied) |
 
-### Admin console `(admin)`
-| Path | Screen | Primary roles |
-|------|--------|---------------|
-| `/dashboard` | Dashboard (KPIs, financial gauges, document expiry) | ADMIN, DISPATCHER, FINANCE, STAFF |
-| `/orders` | Orders (CRUD, invoicing) | ADMIN, DISPATCHER (FINANCE: read + invoice) |
-| `/trips` | Trips (CRUD, expenses, trip P&L) | ADMIN, DISPATCHER |
-| `/accounts` | Chart of Accounts | ADMIN, FINANCE |
-| `/ledger` | Journal (post / reverse) | ADMIN, FINANCE |
-| `/vendors` · `/payables` | Vendors & AP bills (post, pay) | ADMIN, FINANCE |
-| `/customers` · `/receivables` | Customers & AR invoices (post, receipt) | ADMIN, FINANCE |
-| `/collections` | AR aging buckets | ADMIN, FINANCE, DISPATCHER, STAFF (read) |
-| `/bank` | Cash & bank accounts + driver disbursements (M4) | ADMIN, FINANCE |
-| `/budgets` | CapEx/OpEx budget control (M3) | ADMIN, FINANCE |
-| `/tax` | VAT/WHT return preparation (M10) | ADMIN, FINANCE |
-| `/fx` | Exchange rates — Spot/Average/Historical | ADMIN, FINANCE |
-| `/consolidation` | Subsidiary→parent rollup (M5) | ADMIN, FINANCE |
-| `/payments` | Monthly payment aggregation, finalize, PDF | ADMIN, FINANCE |
-| `/jobs` | Delivery jobs CRUD (search, status filter, CSV) | ADMIN, DISPATCHER |
-| `/dispatch` | Dispatch (free driver/vehicle lookup, conflict check, dispatch-sheet PDF) | ADMIN, DISPATCHER |
-| `/drivers` · `/drivers/[id]` | Driver CRUD / availability & holidays | ADMIN |
-| `/vehicles` | Vehicle CRUD + maintenance history | ADMIN |
-| `/clients` | Client CRUD | ADMIN, DISPATCHER |
-| `/compliance` | Document-expiry dashboard + fuel-efficiency monitor (M11) | ADMIN, DISPATCHER, FINANCE, STAFF |
-| `/waypoints` | GPS waypoint registry (M30) | ADMIN, DISPATCHER |
-| `/reports` | Daily report review (PDF export) | ADMIN, DISPATCHER, STAFF |
-| `/activity` | Audit log | ADMIN |
-| `/users` | User management | ADMIN |
+### Admin console `(admin)` — 53 screens
+
+Grouped as they appear in the sidebar. Each entry lists the permission that gates
+it; a nav group disappears entirely when the role holds none of its permissions.
+
+**Overview**
+
+| Path | Screen | Permission |
+|------|--------|------------|
+| `/dashboard` | KPI dashboard, financial gauges, document expiry, plan vs actual | `dashboard:view` |
+
+**Operations**
+
+| Path | Screen | Permission |
+|------|--------|------------|
+| `/orders` | Orders (CRUD, invoicing) | `order:read` |
+| `/trips` | Trips — assign many vehicles per order, expenses, trip P&L | `trip:read` |
+| `/dispatch` | Dispatch (free driver/vehicle lookup, conflict check, PDF) | `dispatch:read` |
+| `/jobs` | Delivery jobs (search, status filter, CSV) | `job:read` |
+| `/projects` | Projects / contracts with budget-vs-actual P&L (M29) | `project:read` |
+| `/waypoints` | GPS waypoint registry (M30) | `waypoint:read` |
+| `/reports` | Daily report review (PDF export) | `report:read` |
+
+**Service Quality** — the capture screens feeding the dashboard's KPIs
+
+| Path | Screen | Permission |
+|------|--------|------------|
+| `/dock-events` | Arrival/departure → truck turnaround | `kpi:read` |
+| `/damage-reports` | Damage & claim rate | `kpi:read` |
+| `/feedback` | CSAT / NPS | `kpi:read` |
+
+**Sales & Marketing**
+
+| Path | Screen | Permission |
+|------|--------|------------|
+| `/leads` | CRM leads (M27) | `sales:read` |
+| `/quotes` | Freight quotations, convert to order | `sales:read` |
+| `/clients` | Client registry | `client:read` |
+| `/pos` | Retail / POS counter sales (M28) | `pos:read` |
+
+**Fleet**
+
+| Path | Screen | Permission |
+|------|--------|------------|
+| `/vehicles` | Vehicle CRUD, maintenance history, default driver | `vehicle:read` |
+| `/drivers` · `/drivers/[id]` | Driver CRUD, availability & holidays | `driver:read` |
+| `/service` | Workshop service orders (M22) | `service:read` |
+| `/compliance` | Document-expiry dashboard + fuel-efficiency monitor (M11) | `compliance:read` |
+
+**Inventory & Supply Chain**
+
+| Path | Screen | Permission |
+|------|--------|------------|
+| `/inventory` | Stock items, moving-average cost, movements (M14) | `inventory:read` |
+| `/warehouses` | Multi-warehouse balances & transfers (M18) | `warehouse:read` |
+| `/procurement` | Purchase orders, goods receipts, 3-way match (M15) | `procurement:read` |
+| `/product-attributes` | Custom item specifications (M16) | `inventory:read` |
+| `/units` | Units-of-measure registry & converter (M30) | `inventory:read` |
+| `/cost-variance` | Standard vs moving-average cost (M13) | `inventory:read` |
+
+**Human Resources**
+
+| Path | Screen | Permission |
+|------|--------|------------|
+| `/hr` | Contracts, leave, employee documents (M24) | `hr:read` |
+| `/attendance` | Clock-in/out, timesheets (M26) | `attendance:read` |
+| `/payroll` | Pay runs with country statutory computation (M9) | `payroll:read` |
+
+**Receivables & Payables**
+
+| Path | Screen | Permission |
+|------|--------|------------|
+| `/customers` · `/receivables` | Customers & AR invoices (post, receipt) | `customer:read` · `receivable:read` |
+| `/collections` | Aging buckets, dunning, disputes, write-off (M7) | `collection:read` |
+| `/vendors` · `/payables` | Vendors & AP bills (post, pay) | `vendor:read` · `payable:read` |
+
+**Finance**
+
+| Path | Screen | Permission |
+|------|--------|------------|
+| `/accounts` | Chart of Accounts | `account:read` |
+| `/ledger` | Journal (post / reverse) | `ledger:read` |
+| `/periods` | Fiscal calendar & period close (M34) | `period:read` |
+| `/bank` | Cash & bank accounts + driver disbursements (M4) | `bank:read` |
+| `/payments` | Monthly payment aggregation, finalize, PDF | `payment:read` |
+| `/expenses` | Trip cash sheets / expense claims (M23) | `expense:read` |
+| `/budgets` | CapEx/OpEx budget control (M3) | `budget:read` |
+| `/planning` | Demand forecast, capacity plan, forecast vs actual (M33) | `planning:read` |
+| `/tax` | VAT/WHT return preparation (M10) | `tax:read` |
+| `/fx` | Exchange rates + period-end revaluation | `fx:read` |
+| `/consolidation` | Subsidiary→parent rollup (M5) | `consolidation:read` |
+| `/assets` | Fixed assets, depreciation, custody & warranty (M19/M20) | `asset:read` |
+| `/corridor-pnl` | Per-corridor profitability (M6) | `dashboard:view` |
+
+**System**
+
+| Path | Screen | Permission |
+|------|--------|------------|
+| `/organizations` | Parent-company registry — **SUPER_ADMIN only** | `organization:manage` |
+| `/companies` | Legal entities inside the organization | `company:manage` |
+| `/sandbox` | Demo partitions, demo logins, access window (M32) | `company:manage` |
+| `/users` | User management | `user:manage` |
+| `/roles` | Roles & permissions matrix (dynamic RBAC, M36) | `user:manage` |
+| `/activity` | Audit log with field-level before→after diff (M31) | `activity:read` |
 
 ### Driver portal `(driver)`
 | Path | Screen |
@@ -207,7 +369,7 @@ fleetERP/
 ├─ backend/                  # @fleeterp/api — standalone Hono API (owns the DB)
 │  ├─ package.json  tsconfig.json  .env.example  vitest.config.ts
 │  ├─ prisma/
-│  │  ├─ schema.prisma        # 34 model definitions
+│  │  ├─ schema.prisma        # 79 models, 69 enums
 │  │  ├─ migrations/          # init / orders_trips / finance_role / accounting_ledger / ap_ar / core_finance / operations
 │  │  └─ seed.ts              # seed data (users per role, chart of accounts, demo data)
 │  ├─ uploads/                # proof-of-delivery images (served at /uploads)
@@ -217,7 +379,7 @@ fleetERP/
 │  │  │                       # validations  activity  notifications  mail  password  rate-limit  format  errors
 │  │  ├─ services/            # ledger  freight  ap-ar  dispatch  payment  tax  collections
 │  │  │                       # budget  cash-bank  fx  consolidation  compliance  fuel  dashboard  pdf  csv
-│  │  └─ routes/              # one file per domain (orders, trips, ledger, payables, … 30 routers)
+│  │  └─ routes/              # one file per domain (orders, trips, ledger, payables, … 53 routers)
 │  └─ tests/  unit/ + integration/
 ├─ frontend/                 # @fleeterp/web — standalone Next.js app (no DB dependency)
 │  ├─ package.json  tsconfig.json  next.config.mjs  tailwind.config.ts  .env.example
@@ -267,6 +429,7 @@ npm run dev          # → http://localhost:3000
 ### Seeded logins
 | Role | Email | Password |
 |------|-------|----------|
+| SUPER_ADMIN | root@fleetflow.local | root1234 |
 | ADMIN | admin@fleetflow.local | admin1234 |
 | DISPATCHER | dispatcher@fleetflow.local | dispatch1234 |
 | FINANCE | finance@fleetflow.local | finance1234 |
@@ -291,7 +454,8 @@ cd frontend && npm run build && npm start              # → :3000
 Tests live with the backend (they cover the domain services):
 ```bash
 cd backend
-npm test                 # unit tests (RBAC, double-entry balancing, trip P&L, dispatch conflict, validation, error mapping)
+npm test                 # 328 unit tests (tenancy isolation, double-entry balancing, trip P&L,
+                         # dispatch conflicts, plan vs actual, statutory payroll, validation)
 npm run test:integration # integration tests (requires DATABASE_URL + migrate deploy)
 npm run typecheck        # type check
 
