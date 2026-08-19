@@ -37,7 +37,7 @@ orders.get("/", requireAuth, requirePermission("order:read"), async (c) => {
   const [items, total] = await Promise.all([
     prisma.order.findMany({
       where,
-      include: { client: { select: { companyName: true } }, trip: { select: { id: true, status: true } } },
+      include: { client: { select: { companyName: true } }, trips: { select: { id: true, status: true, tripCode: true } } },
       orderBy: { bookingDate: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,

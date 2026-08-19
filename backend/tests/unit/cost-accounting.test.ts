@@ -11,7 +11,8 @@ const order = (
   corridor,
   freightAmount: freight,
   demurrageAmount: demurrage,
-  trip: trip ? { driverWages: trip.wages, tollPermitCost: trip.tolls, miscExpense: trip.misc, expenses: trip.expenses.map((amount) => ({ amount })) } : null,
+  // An order now carries a list of trips; a single-truck order is a one-item list.
+  trips: trip ? [{ driverWages: trip.wages, tollPermitCost: trip.tolls, miscExpense: trip.misc, expenses: trip.expenses.map((amount) => ({ amount })) }] : [],
 });
 
 describe("per-corridor profitability (M6)", () => {

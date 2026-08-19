@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 type TripForm = {
   orders: { id: string; orderCode: string; originZone: string; destinationZone: string; corridor: CorridorType }[];
   drivers: { id: string; name: string }[];
-  vehicles: { id: string; vehicleNumber: string; plateNumber: string }[];
+  vehicles: { id: string; vehicleNumber: string; plateNumber: string; defaultDriverId?: string | null }[];
 };
 
 export default async function TripsPage() {

@@ -39,6 +39,18 @@ interface CapacityPlan {
   totalForecastLoads: number; totalCapacityLoads: number; totalShortfall: number; overallUtilizationPct: number;
 }
 
+interface PlanActualLine {
+  corridor: CorridorType;
+  forecastLoads: number; actualLoads: number; loadVariance: number; loadAchievedPct: number;
+  forecastTonnes: string; actualTonnes: string; tonneVariance: string; tonneAchievedPct: number;
+}
+interface PlanVsActual {
+  period: string; lines: PlanActualLine[];
+  totalForecastLoads: number; totalActualLoads: number;
+  totalForecastTonnes: string; totalActualTonnes: string;
+  loadAchievedPct: number; tonneAchievedPct: number;
+}
+
 export function PlanningManager() {
   const { toast } = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
@@ -151,6 +163,7 @@ function CapacityPanel({ refreshKey }: { refreshKey: number }) {
   const [periods, setPeriods] = useState<string[]>([]);
   const [period, setPeriod] = useState<string>("");
   const [plan, setPlan] = useState<CapacityPlan | null>(null);
+  const [actual, setActual] = useState<PlanVsActual | null>(null);
   const [loading, setLoading] = useState(false);
 
   const loadPeriods = useCallback(async () => {
@@ -162,11 +175,17 @@ function CapacityPanel({ refreshKey }: { refreshKey: number }) {
   }, []);
 
   const loadPlan = useCallback(async (p: string) => {
-    if (!p) { setPlan(null); return; }
+    if (!p) { setPlan(null); setActual(null); return; }
     setLoading(true);
     try {
-      const data = await apiFetch<CapacityPlan>(`/api/planning/capacity?period=${encodeURIComponent(p)}`);
-      setPlan(data);
+      // The plan and the result it is measured against always move together, so
+      // one period selection drives both.
+      const [capacity, results] = await Promise.all([
+        apiFetch<CapacityPlan>(`/api/planning/capacity?period=${encodeURIComponent(p)}`),
+        apiFetch<PlanVsActual>(`/api/planning/actuals?period=${encodeURIComponent(p)}`),
+      ]);
+      setPlan(capacity);
+      setActual(results);
     } catch (e) {
       toast({ title: "Error", description: e instanceof ApiError ? e.message : "Failed to load plan", variant: "destructive" });
     } finally { setLoading(false); }
@@ -222,9 +241,76 @@ function CapacityPanel({ refreshKey }: { refreshKey: number }) {
           </div>
         </>
       )}
+
+      {actual && actual.lines.length > 0 && (
+        <div className="mt-6 border-t border-border pt-5">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">
+            Forecast vs Actual <span className="font-normal text-muted-foreground">— what was planned against what moved</span>
+          </h3>
+
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Metric label="Forecast Loads" value={String(actual.totalForecastLoads)} />
+            <Metric label="Actual Loads" value={String(actual.totalActualLoads)} tone={achievedTone(actual.loadAchievedPct)} />
+            <Metric label="Forecast Tonnes" value={Number(actual.totalForecastTonnes).toLocaleString()} />
+            <Metric label="Actual Tonnes" value={Number(actual.totalActualTonnes).toLocaleString()} tone={achievedTone(actual.tonneAchievedPct)} />
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[34rem] text-sm">
+              <thead>
+                <tr className="border-b border-border text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <th className="pb-1.5 text-left font-medium">Corridor</th>
+                  <th className="pb-1.5 text-right font-medium">Loads plan / actual</th>
+                  <th className="pb-1.5 text-right font-medium">Var</th>
+                  <th className="pb-1.5 text-right font-medium">Tonnes plan / actual</th>
+                  <th className="pb-1.5 text-right font-medium">Var</th>
+                </tr>
+              </thead>
+              <tbody>
+                {actual.lines.map((l) => (
+                  <tr key={l.corridor} className="border-b border-border/50 last:border-0">
+                    <td className="py-2 font-medium">
+                      {CORRIDOR_LABEL[l.corridor]}
+                      {l.forecastLoads === 0 && (
+                        <span className="ml-2 text-[10px] uppercase tracking-wide text-amber-500">unplanned</span>
+                      )}
+                    </td>
+                    <td className="py-2 text-right tabular-nums text-muted-foreground">
+                      {l.forecastLoads} / <span className="text-foreground">{l.actualLoads}</span>
+                    </td>
+                    <td className={`py-2 text-right tabular-nums font-medium ${varianceColor(l.loadVariance)}`}>
+                      {signed(l.loadVariance)}
+                    </td>
+                    <td className="py-2 text-right tabular-nums text-muted-foreground">
+                      {Number(l.forecastTonnes).toLocaleString()} / <span className="text-foreground">{Number(l.actualTonnes).toLocaleString()}</span>
+                    </td>
+                    <td className={`py-2 text-right tabular-nums font-medium ${varianceColor(Number(l.tonneVariance))}`}>
+                      {signed(Number(l.tonneVariance))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+/** Delivering under plan is the problem case; at or above it is not. */
+function achievedTone(pct: number): "pos" | "neg" | undefined {
+  if (pct === 0) return undefined; // nothing forecast, so nothing to judge
+  return pct >= 100 ? "pos" : "neg";
+}
+
+function varianceColor(v: number): string {
+  if (v > 0) return "text-emerald-500";
+  if (v < 0) return "text-destructive";
+  return "text-muted-foreground";
+}
+
+const signed = (v: number) => (v > 0 ? `+${v.toLocaleString()}` : v.toLocaleString());
 
 function Metric({ label, value, tone }: { label: string; value: string; tone?: "pos" | "neg" }) {
   const color = tone === "pos" ? "text-emerald-500" : tone === "neg" ? "text-destructive" : "text-foreground";

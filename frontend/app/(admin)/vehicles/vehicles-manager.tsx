@@ -25,6 +25,8 @@ const FUEL_TYPES = Object.keys(FUEL_TYPE_LABEL) as FuelType[];
 interface Vehicle {
   id: string; version: number; vehicleNumber: string; plateNumber: string; maker: string; model: string;
   insuranceExpiry: string; inspectionExpiry: string; status: VehicleStatus;
+  // Loaded on edit so the picker shows the driver already set, rather than "None".
+  defaultDriverId: string | null;
 }
 interface Maintenance { id: string; maintenanceType: string; date: string; cost: number; note: string | null; }
 
@@ -32,7 +34,12 @@ const STATUS_VARIANT: Record<VehicleStatus, "success" | "warning" | "secondary">
   AVAILABLE: "success", MAINTENANCE: "warning", UNAVAILABLE: "secondary",
 };
 
-export function VehiclesManager() {
+export interface DriverOption { id: string; name: string; }
+
+/** Radix Select refuses an empty string as a value, so "no driver" needs a token. */
+const UNASSIGNED = "__none__";
+
+export function VehiclesManager({ drivers }: { drivers: DriverOption[] }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [maintOpen, setMaintOpen] = useState(false);
@@ -177,7 +184,23 @@ export function VehiclesManager() {
               <div className="space-y-1.5"><Label>Fuel Card No.</Label><Input {...form.register("fuelCardNumber")} /></div>
               <div className="space-y-1.5"><Label>Telematics / GPS ID</Label><Input {...form.register("telematicsId")} /></div>
               <div className="space-y-1.5"><Label>Home Terminal</Label><Input {...form.register("homeTerminal")} /></div>
-              <div className="space-y-1.5"><Label>Assigned Driver</Label><Input {...form.register("assignedDriver")} /></div>
+              <div className="space-y-1.5"><Label>Assigned Driver <span className="text-muted-foreground">(note)</span></Label><Input {...form.register("assignedDriver")} /></div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>Default Driver</Label>
+                <Select
+                  value={form.watch("defaultDriverId") ?? UNASSIGNED}
+                  onValueChange={(v) => form.setValue("defaultDriverId", v === UNASSIGNED ? null : v)}
+                >
+                  <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED}>None</SelectItem>
+                    {drivers.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Pre-filled on the trip form when this vehicle is chosen, so dispatch confirms the crew instead of retyping it.
+                </p>
+              </div>
               <div className="space-y-1.5"><Label>Fuel Target (km/L)</Label><Input inputMode="decimal" {...form.register("fuelTargetKmPerL")} /></div>
             </FormSection>
 
