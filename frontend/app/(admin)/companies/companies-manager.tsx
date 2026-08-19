@@ -9,25 +9,52 @@ import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
 import { CurrencySelect } from "@frontend/components/ui/currency-select";
 import { Badge } from "@frontend/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { useToast } from "@frontend/components/ui/toast";
 import { companySchema, type CompanyInput } from "@frontend/lib/validations";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 
-interface Company extends CompanyInput { id: string; version: number; }
+export interface OrganizationOption {
+  id: string;
+  code: string;
+  name: string;
+}
 
-export function CompaniesManager() {
+interface Company extends CompanyInput {
+  id: string;
+  version: number;
+  organizationId: string;
+}
+
+export function CompaniesManager({
+  isPlatformAdmin,
+  organizations,
+}: {
+  isPlatformAdmin: boolean;
+  organizations: OrganizationOption[];
+}) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const form = useForm<CompanyInput>({ resolver: zodResolver(companySchema) });
 
+  const orgName = (id: string) => organizations.find((o) => o.id === id)?.code ?? "";
+
   function openCreate() {
-    form.reset({ code: "", name: "", baseCurrency: "USD", country: "TZ", isActive: true });
+    form.reset({
+      code: "", name: "", baseCurrency: "USD", country: "TZ", isActive: true,
+      // Pre-select when there is only one parent to choose from.
+      organizationId: isPlatformAdmin && organizations.length === 1 ? organizations[0].id : undefined,
+    });
     setOpen(true);
   }
 
   async function onSubmit(data: CompanyInput) {
+    if (isPlatformAdmin && !data.organizationId) {
+      toast({ title: "Choose an organization", description: "A company must belong to a parent.", variant: "destructive" });
+      return;
+    }
     try {
       await apiFetch("/api/companies", { method: "POST", body: JSON.stringify(data) });
       toast({ title: "Company created", variant: "success" });
@@ -41,6 +68,15 @@ export function CompaniesManager() {
   const columns: Column<Company>[] = [
     { key: "code", header: "Code", render: (r) => <span className="font-mono font-medium">{r.code}</span> },
     { key: "name", header: "Name" },
+    // Only meaningful when more than one parent is visible, so it is shown to
+    // the platform operator alone.
+    ...(isPlatformAdmin
+      ? [{
+          key: "organizationId",
+          header: "Organization",
+          render: (r: Company) => <span className="font-mono text-xs text-muted-foreground">{orgName(r.organizationId)}</span>,
+        } as Column<Company>]
+      : []),
     { key: "baseCurrency", header: "Currency" },
     { key: "country", header: "Country" },
     { key: "isActive", header: "Status", render: (r) => (r.isActive ? <Badge variant="success">Active</Badge> : <Badge variant="secondary">Inactive</Badge>) },
@@ -59,6 +95,28 @@ export function CompaniesManager() {
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>New Company</DialogTitle></DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {isPlatformAdmin && (
+              <div className="space-y-1.5">
+                <Label>Organization</Label>
+                <Select
+                  value={form.watch("organizationId") ?? undefined}
+                  onValueChange={(v) => form.setValue("organizationId", v)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select the parent organization" /></SelectTrigger>
+                  <SelectContent>
+                    {organizations.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        <span className="font-mono">{o.code}</span>
+                        <span className="ml-2 text-muted-foreground">{o.name}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Only admins inside this organization will be able to see the company.
+                </p>
+              </div>
+            )}
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Code (used as the data partition)</Label>

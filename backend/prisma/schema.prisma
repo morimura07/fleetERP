@@ -754,6 +754,7 @@ model Driver {
   payments          Payment[]
   trips             Trip[]
   secondDriverTrips Trip[]               @relation("TripSecondDriver")
+  defaultForVehicles Vehicle[]           @relation("VehicleDefaultDriver")
   transfers         MoneyTransfer[]
   documents         DriverDocument[]
   employee          Employee?
@@ -851,7 +852,11 @@ model Vehicle {
   fuelCardNumber  String?
   telematicsId    String? // GPS device ID
   homeTerminal    String?
-  assignedDriver  String?
+  assignedDriver  String? // free-text note kept from the original spec
+  // The driver normally paired with this truck. Pre-fills the trip form when the
+  // vehicle is picked, so dispatch confirms rather than retypes (client review).
+  defaultDriverId String?
+  defaultDriver   Driver? @relation("VehicleDefaultDriver", fields: [defaultDriverId], references: [id], onDelete: SetNull)
 
   // ── Maintenance & workshop (spec: Vehicles §5) ──
   odometerKm      Int?
@@ -882,6 +887,7 @@ model Vehicle {
   createdById   String? // audit: creator user id
   updatedById   String? // audit: last-modifier user id
 
+  @@index([defaultDriverId])
   @@index([status])
   @@index([dataAreaId])
   @@map("vehicles")
@@ -1292,7 +1298,10 @@ model Order {
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
-  trip               Trip?
+  // One order is dispatched across as many trucks as the load needs — a large
+  // consignment routinely takes 10 to 15 (client review). Each Trip is one
+  // vehicle + driver leg of the same order.
+  trips              Trip[]
   damageReports      DamageReport[]
   feedback           CustomerFeedback[]
   convertedFromQuote SalesQuote?        @relation("QuoteConvertedOrder")
@@ -1314,7 +1323,7 @@ model Trip {
   id             String       @id @default(cuid())
   dataAreaId     String       @default("HQ01")
   tripCode       String       @unique
-  orderId        String       @unique
+  orderId        String
   order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   driverId       String
   driver         Driver       @relation(fields: [driverId], references: [id], onDelete: Restrict)
@@ -1385,6 +1394,7 @@ model Trip {
 
   @@index([driverId, scheduledStart])
   @@index([vehicleId, scheduledStart])
+  @@index([orderId])
   @@index([status])
   @@index([reconStatus])
   @@map("trips")

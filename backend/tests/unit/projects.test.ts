@@ -30,16 +30,38 @@ describe("order actuals rollup", () => {
   it("revenue = freight + demurrage; cost = trip base costs + expenses", () => {
     const a = orderActuals({
       freightAmount: 5000, demurrageAmount: 200,
-      trip: { driverWages: 800, tollPermitCost: 150, miscExpense: 50, expenses: [{ amount: 300 }, { amount: 100 }] },
+      trips: [{ driverWages: 800, tollPermitCost: 150, miscExpense: 50, expenses: [{ amount: 300 }, { amount: 100 }] }],
     });
     expect(a.revenue.toFixed(2)).toBe("5200.00");
     expect(a.cost.toFixed(2)).toBe("1400.00"); // 800+150+50+300+100
   });
 
   it("an order with no trip has revenue but zero cost", () => {
-    const a = orderActuals({ freightAmount: 3000, demurrageAmount: 0, trip: null });
+    const a = orderActuals({ freightAmount: 3000, demurrageAmount: 0, trips: [] });
     expect(a.revenue.toFixed(2)).toBe("3000.00");
     expect(a.cost.toFixed(2)).toBe("0.00");
+  });
+
+  it("totals the cost of every truck on a multi-vehicle order", () => {
+    // A large consignment goes out on several trucks; counting only the first
+    // would understate the cost of the order by the rest of the fleet.
+    const leg = (wages: number) => ({
+      driverWages: wages, tollPermitCost: 100, miscExpense: 25, expenses: [{ amount: 200 }],
+    });
+    const a = orderActuals({
+      freightAmount: 20000, demurrageAmount: 0,
+      trips: [leg(800), leg(750), leg(900)],
+    });
+    expect(a.revenue.toFixed(2)).toBe("20000.00");
+    // (800+100+25+200) + (750+100+25+200) + (900+100+25+200)
+    expect(a.cost.toFixed(2)).toBe("3425.00");
+  });
+
+  it("scales linearly with the number of trucks", () => {
+    const leg = { driverWages: 100, tollPermitCost: 0, miscExpense: 0, expenses: [] };
+    const one = orderActuals({ freightAmount: 0, demurrageAmount: 0, trips: [leg] });
+    const fifteen = orderActuals({ freightAmount: 0, demurrageAmount: 0, trips: Array(15).fill(leg) });
+    expect(fifteen.cost.toFixed(2)).toBe(one.cost.times(15).toFixed(2));
   });
 });
 

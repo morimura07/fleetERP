@@ -28,7 +28,7 @@ type OrderRow = {
   corridor: CorridorType;
   freightAmount: Prisma.Decimal.Value;
   demurrageAmount: Prisma.Decimal.Value;
-  trip: { driverWages: Prisma.Decimal.Value; tollPermitCost: Prisma.Decimal.Value; miscExpense: Prisma.Decimal.Value; expenses: { amount: Prisma.Decimal.Value }[] } | null;
+  trips: { driverWages: Prisma.Decimal.Value; tollPermitCost: Prisma.Decimal.Value; miscExpense: Prisma.Decimal.Value; expenses: { amount: Prisma.Decimal.Value }[] }[];
 };
 
 function marginPct(profit: Prisma.Decimal, revenue: Prisma.Decimal): Prisma.Decimal {
@@ -95,7 +95,7 @@ export async function getCorridorProfitability(dataAreaId: string): Promise<Corr
       corridor: true,
       freightAmount: true,
       demurrageAmount: true,
-      trip: { select: { driverWages: true, tollPermitCost: true, miscExpense: true, expenses: { select: { amount: true } } } },
+      trips: { select: { driverWages: true, tollPermitCost: true, miscExpense: true, expenses: { select: { amount: true } } } },
     },
   });
 

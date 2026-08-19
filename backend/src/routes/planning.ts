@@ -6,6 +6,7 @@ import {
 } from "@backend/lib/validations";
 import {
   createForecast, updateForecast, setForecastStatus, computeCapacityPlan,
+  computePlanVsActual,
 } from "@backend/services/planning";
 import { logActivity } from "@backend/lib/activity";
 import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
@@ -92,6 +93,29 @@ planning.get("/capacity", requireAuth, requirePermission("planning:read"), async
   const out = {
     ...plan,
     lines: plan.lines.map((l) => ({ ...l, forecastTonnes: l.forecastTonnes.toFixed(2) })),
+  };
+  return ok(c, out);
+});
+
+// ── Plan vs actual (what was forecast against what actually moved) ───────────
+
+planning.get("/actuals", requireAuth, requirePermission("planning:read"), async (c) => {
+  const user = c.get("user");
+  const period = c.req.query("period");
+  if (!period) return c.json({ error: "A period query parameter is required" }, 422);
+  const dataAreaId = areaForWrite(user, undefined);
+  const result = await computePlanVsActual(dataAreaId, period);
+  // Decimals are serialized as fixed strings so the client never sees an object.
+  const out = {
+    ...result,
+    totalForecastTonnes: result.totalForecastTonnes.toFixed(2),
+    totalActualTonnes: result.totalActualTonnes.toFixed(2),
+    lines: result.lines.map((l) => ({
+      ...l,
+      forecastTonnes: l.forecastTonnes.toFixed(2),
+      actualTonnes: l.actualTonnes.toFixed(2),
+      tonneVariance: l.tonneVariance.toFixed(2),
+    })),
   };
   return ok(c, out);
 });

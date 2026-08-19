@@ -133,18 +133,29 @@ lookups.get("/customers", requireAuth, requirePermission("receivable:read"), asy
 lookups.get("/trip-form", requireAuth, requirePermission("trip:read"), async (c) => {
   const [orders, drivers, vehicles] = await Promise.all([
     prisma.order.findMany({
-      where: { trip: null, status: { in: ["DRAFT", "CONFIRMED"] } },
+      // An order stays selectable while more trucks are still being added to it.
+      where: { status: { in: ["DRAFT", "CONFIRMED"] } },
       select: { id: true, orderCode: true, originZone: true, destinationZone: true, corridor: true },
       orderBy: { bookingDate: "desc" },
     }),
     prisma.driver.findMany({ where: { status: "ACTIVE" }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.vehicle.findMany({
       where: { status: "AVAILABLE" },
-      select: { id: true, vehicleNumber: true, plateNumber: true },
+      select: { id: true, vehicleNumber: true, plateNumber: true, defaultDriverId: true },
       orderBy: { vehicleNumber: "asc" },
     }),
   ]);
   return ok(c, { orders, drivers, vehicles });
+});
+
+/** Active drivers for the vehicle form's default-driver picker. */
+lookups.get("/vehicle-form", requireAuth, requirePermission("vehicle:read"), async (c) => {
+  const drivers = await prisma.driver.findMany({
+    where: { status: "ACTIVE" },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+  return ok(c, { drivers });
 });
 
 /** Active employees for the asset-custody assign dialog (asset permission). */

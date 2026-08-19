@@ -144,6 +144,8 @@ export const vehicleSchema = z.object({
   telematicsId: os(60),
   homeTerminal: os(120),
   assignedDriver: os(120),
+  // Pre-fills the trip form when this vehicle is chosen.
+  defaultDriverId: z.string().nullish(),
   // Maintenance (spec §5)
   odometerKm: z.coerce.number().int().min(0).optional().nullable(),
   engineNumber: os(60),
@@ -478,6 +480,36 @@ export const tripSchema = tripBaseSchema.refine(
   (d) => d.scheduledEnd > d.scheduledStart,
   { message: "End time must be after start time", path: ["scheduledEnd"] },
 );
+
+/**
+ * Assign several trucks to one order in a single action (client review: a large
+ * consignment goes out on 10 to 15 vehicles). Each leg is its own trip, so each
+ * carries its own crew, window and distance; the order and corridor are shared.
+ */
+export const tripLegSchema = z
+  .object({
+    driverId: idSchema,
+    vehicleId: idSchema,
+    secondDriverId: z.string().optional().nullable(),
+    trailerId: oStr(60),
+    scheduledStart: z.coerce.date(),
+    scheduledEnd: z.coerce.date(),
+    mileageKm: decimalAmount.optional().default("0"),
+    transitHours: decimalAmount.optional().default("0"),
+  })
+  .refine((d) => d.scheduledEnd > d.scheduledStart, {
+    message: "End time must be after start time",
+    path: ["scheduledEnd"],
+  });
+
+export const tripBatchSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  orderId: idSchema,
+  corridor: z.enum(["NORTHERN", "CENTRAL", "DOMESTIC"]).default("DOMESTIC"),
+  legs: z.array(tripLegSchema).min(1, "Add at least one vehicle").max(50, "At most 50 vehicles per order"),
+});
+export type TripLegInput = z.infer<typeof tripLegSchema>;
+export type TripBatchInput = z.infer<typeof tripBatchSchema>;
 
 export const tripExpenseSchema = z.object({
   type: z.enum([

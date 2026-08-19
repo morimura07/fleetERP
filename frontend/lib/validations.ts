@@ -142,6 +142,8 @@ export const vehicleSchema = z.object({
   telematicsId: os(60),
   homeTerminal: os(120),
   assignedDriver: os(120),
+  // Pre-fills the trip form when this vehicle is chosen.
+  defaultDriverId: z.string().nullish(),
   // Maintenance (spec §5)
   odometerKm: z.coerce.number().int().min(0).optional().nullable(),
   engineNumber: os(60),
@@ -903,8 +905,18 @@ export const companySchema = z.object({
   baseCurrency: currencyCode.default("USD"),
   country: z.string().length(2).default("TZ"),
   isActive: z.boolean().default(true),
+  // Parent organization. Honoured only for SUPER_ADMIN — an ADMIN always creates
+  // inside their own parent, so the field is ignored rather than trusted.
+  organizationId: z.string().cuid().optional(),
 });
 export type CompanyInput = z.infer<typeof companySchema>;
+
+export const organizationSchema = z.object({
+  code: z.string().min(2, "Code is required").max(10).regex(/^[A-Z0-9]+$/, "Code must be uppercase letters/digits"),
+  name: z.string().min(1, "Name is required").max(150),
+  isActive: z.boolean().default(true),
+});
+export type OrganizationInput = z.infer<typeof organizationSchema>;
 
 // ── Fixed Assets (M20) ──
 export const fixedAssetSchema = z.object({

@@ -52,18 +52,31 @@ export function projectPnL(
   };
 }
 
-/** One order's contribution: revenue = freight + demurrage; cost = Σ trip costs. */
+export interface TripCostRow {
+  driverWages: Prisma.Decimal.Value;
+  tollPermitCost: Prisma.Decimal.Value;
+  miscExpense: Prisma.Decimal.Value;
+  expenses: { amount: Prisma.Decimal.Value }[];
+}
+
+/**
+ * One order's contribution: revenue = freight + demurrage; cost = Σ over every
+ * trip on the order.
+ *
+ * An order is dispatched across as many trucks as the load needs, so the cost
+ * side must total all of them. Counting only one would understate the cost of a
+ * 15-truck consignment by roughly fifteen times.
+ */
 export function orderActuals(order: {
   freightAmount: Prisma.Decimal.Value;
   demurrageAmount: Prisma.Decimal.Value;
-  trip: { driverWages: Prisma.Decimal.Value; tollPermitCost: Prisma.Decimal.Value; miscExpense: Prisma.Decimal.Value; expenses: { amount: Prisma.Decimal.Value }[] } | null;
+  trips: TripCostRow[];
 }): { revenue: Prisma.Decimal; cost: Prisma.Decimal } {
   const revenue = D(order.freightAmount).plus(order.demurrageAmount);
-  let cost = new Prisma.Decimal(0);
-  if (order.trip) {
-    const exp = order.trip.expenses.reduce((s, e) => s.plus(e.amount), new Prisma.Decimal(0));
-    cost = exp.plus(order.trip.driverWages).plus(order.trip.tollPermitCost).plus(order.trip.miscExpense);
-  }
+  const cost = order.trips.reduce((total, t) => {
+    const exp = t.expenses.reduce((s, e) => s.plus(e.amount), new Prisma.Decimal(0));
+    return total.plus(exp).plus(t.driverWages).plus(t.tollPermitCost).plus(t.miscExpense);
+  }, new Prisma.Decimal(0));
   return { revenue, cost };
 }
 
@@ -161,7 +174,7 @@ export async function computeProjectPnL(dataAreaId: string, id: string): Promise
       orders: {
         select: {
           freightAmount: true, demurrageAmount: true,
-          trip: { select: { driverWages: true, tollPermitCost: true, miscExpense: true, expenses: { select: { amount: true } } } },
+          trips: { select: { driverWages: true, tollPermitCost: true, miscExpense: true, expenses: { select: { amount: true } } } },
         },
       },
     },

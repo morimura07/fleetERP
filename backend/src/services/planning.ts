@@ -64,6 +64,178 @@ export function summarizePlan(period: string, lines: CapacityLine[]): CapacityPl
   return { period, lines, totalForecastLoads, totalCapacityLoads, totalShortfall, overallUtilizationPct };
 }
 
+// ── Plan vs actual (M33, client review: "how do we measure the results?") ────
+
+/**
+ * The date window a period label covers, as a half-open range [start, end).
+ *
+ * Supports the two labels the forecast model documents: "2026-08" (month) and
+ * "2026-W32" (ISO week, Monday start, week 1 being the week containing 4 Jan).
+ * Returns null for anything else rather than guessing, so a malformed period
+ * reports no actuals instead of silently matching the wrong dates.
+ */
+export function periodRange(period: string): { start: Date; end: Date } | null {
+  const month = /^(\d{4})-(\d{2})$/.exec(period);
+  if (month) {
+    const year = Number(month[1]);
+    const m = Number(month[2]);
+    if (m < 1 || m > 12) return null;
+    return { start: new Date(Date.UTC(year, m - 1, 1)), end: new Date(Date.UTC(year, m, 1)) };
+  }
+
+  const week = /^(\d{4})-W(\d{1,2})$/.exec(period);
+  if (week) {
+    const year = Number(week[1]);
+    const w = Number(week[2]);
+    if (w < 1 || w > 53) return null;
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const mondayOffset = (jan4.getUTCDay() + 6) % 7; // shift so Monday = 0
+    const week1Monday = new Date(jan4.getTime() - mondayOffset * 86_400_000);
+    const start = new Date(week1Monday.getTime() + (w - 1) * 7 * 86_400_000);
+    return { start, end: new Date(start.getTime() + 7 * 86_400_000) };
+  }
+
+  return null;
+}
+
+export interface PlanActualLine {
+  corridor: CorridorType;
+  forecastLoads: number;
+  actualLoads: number;
+  loadVariance: number; // actual − forecast; negative means under-delivered
+  loadAchievedPct: number; // actual / forecast × 100
+  forecastTonnes: Prisma.Decimal;
+  actualTonnes: Prisma.Decimal;
+  tonneVariance: Prisma.Decimal;
+  tonneAchievedPct: number;
+}
+
+/**
+ * Forecast against what actually moved on one corridor. Pure — no Prisma.
+ *
+ * Achieved percentages are 0 when nothing was forecast: dividing by zero would
+ * be meaningless, and the variance still carries the signal (a corridor that ran
+ * unplanned work shows +N with 0%).
+ */
+export function planActualLine(
+  corridor: CorridorType,
+  forecastLoads: number,
+  forecastTonnes: Prisma.Decimal.Value,
+  actualLoads: number,
+  actualTonnes: Prisma.Decimal.Value,
+): PlanActualLine {
+  const fTonnes = D(forecastTonnes);
+  const aTonnes = D(actualTonnes);
+  const pct = (actual: Prisma.Decimal, forecast: Prisma.Decimal) =>
+    forecast.greaterThan(0) ? Math.round(actual.div(forecast).toNumber() * 1000) / 10 : 0;
+
+  return {
+    corridor,
+    forecastLoads,
+    actualLoads,
+    loadVariance: actualLoads - forecastLoads,
+    loadAchievedPct: forecastLoads > 0 ? Math.round((actualLoads / forecastLoads) * 1000) / 10 : 0,
+    forecastTonnes: fTonnes,
+    actualTonnes: aTonnes,
+    tonneVariance: aTonnes.minus(fTonnes),
+    tonneAchievedPct: pct(aTonnes, fTonnes),
+  };
+}
+
+export interface PlanVsActual {
+  period: string;
+  lines: PlanActualLine[];
+  totalForecastLoads: number;
+  totalActualLoads: number;
+  totalForecastTonnes: Prisma.Decimal;
+  totalActualTonnes: Prisma.Decimal;
+  loadAchievedPct: number;
+  tonneAchievedPct: number;
+}
+
+/** Roll corridor lines into a period summary. Pure. */
+export function summarizePlanVsActual(period: string, lines: PlanActualLine[]): PlanVsActual {
+  const zero = D(0);
+  const totalForecastLoads = lines.reduce((s, l) => s + l.forecastLoads, 0);
+  const totalActualLoads = lines.reduce((s, l) => s + l.actualLoads, 0);
+  const totalForecastTonnes = lines.reduce((s, l) => s.plus(l.forecastTonnes), zero);
+  const totalActualTonnes = lines.reduce((s, l) => s.plus(l.actualTonnes), zero);
+
+  return {
+    period,
+    lines,
+    totalForecastLoads,
+    totalActualLoads,
+    totalForecastTonnes,
+    totalActualTonnes,
+    loadAchievedPct: totalForecastLoads > 0 ? Math.round((totalActualLoads / totalForecastLoads) * 1000) / 10 : 0,
+    tonneAchievedPct: totalForecastTonnes.greaterThan(0)
+      ? Math.round(totalActualTonnes.div(totalForecastTonnes).toNumber() * 1000) / 10
+      : 0,
+  };
+}
+
+/** Orders that represent real movement: a draft is a quote, a cancellation never ran. */
+const ACTUAL_ORDER_STATUSES = ["CONFIRMED", "IN_TRANSIT", "DELIVERED", "INVOICED"] as const;
+
+/**
+ * Forecast vs actual for a period, per corridor.
+ *
+ * Actuals come from orders booked inside the period: one order is one load, and
+ * tonnage is their gross weight converted from kilograms. Corridors that carried
+ * work without a forecast are included with a zero plan, so unplanned volume is
+ * visible rather than dropped.
+ */
+export async function computePlanVsActual(dataAreaId: string, period: string): Promise<PlanVsActual> {
+  const range = periodRange(period);
+
+  const forecasts = await prisma.demandForecast.findMany({
+    where: { dataAreaId, period, status: { in: ["CONFIRMED", "ARCHIVED"] } },
+    orderBy: { corridor: "asc" },
+  });
+
+  const orders = range
+    ? await prisma.order.groupBy({
+        by: ["corridor"],
+        where: {
+          dataAreaId,
+          status: { in: [...ACTUAL_ORDER_STATUSES] },
+          bookingDate: { gte: range.start, lt: range.end },
+        },
+        _count: { _all: true },
+        _sum: { grossWeightKg: true },
+      })
+    : [];
+
+  const actualByCorridor = new Map(
+    orders.map((o) => [
+      o.corridor,
+      { loads: o._count._all, tonnes: D(o._sum.grossWeightKg ?? 0).div(1000) }, // kg → tonnes
+    ]),
+  );
+
+  const corridors = new Set<CorridorType>([
+    ...forecasts.map((f) => f.corridor),
+    ...actualByCorridor.keys(),
+  ]);
+
+  const lines = [...corridors]
+    .sort()
+    .map((corridor) => {
+      const f = forecasts.find((x) => x.corridor === corridor);
+      const a = actualByCorridor.get(corridor);
+      return planActualLine(
+        corridor,
+        f?.forecastLoads ?? 0,
+        f?.forecastTonnes ?? 0,
+        a?.loads ?? 0,
+        a?.tonnes ?? 0,
+      );
+    });
+
+  return summarizePlanVsActual(period, lines);
+}
+
 // ── Forecast CRUD ────────────────────────────────────────────────────────────
 
 export interface ForecastInput {

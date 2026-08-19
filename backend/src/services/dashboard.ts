@@ -7,6 +7,7 @@ import {
   driverTurnoverPct, billingAccuracyPct, arRecoveryPct,
   avgTurnaroundHours, damageRatePct, avgCsat, computeNps,
 } from "@backend/services/dashboard-kpi";
+import { computePlanVsActual } from "@backend/services/planning";
 
 export interface DashboardStats {
   todayJobs: number;
@@ -214,7 +215,7 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
   const [orders, trips, maint, drivers, invoices, vehicles, dockEvents, damageReports, feedback] = await Promise.all([
     prisma.order.findMany({
       where: { dataAreaId, status: { not: "CANCELLED" } },
-      select: { status: true, eta: true, freightAmount: true, demurrageAmount: true, grossWeightKg: true, trip: { select: { actualEnd: true } } },
+      select: { status: true, eta: true, freightAmount: true, demurrageAmount: true, grossWeightKg: true, trips: { select: { actualEnd: true } } },
     }),
     prisma.trip.findMany({
       where: { dataAreaId },
@@ -256,7 +257,16 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
   const maintCost = maint.reduce((s, m) => s.plus(m.cost), new Prisma.Decimal(0));
 
   // OTD data: delivered orders with an ETA and an actual delivery (trip.actualEnd).
-  const otdOrders = delivered.map((o) => ({ eta: o.eta, actualDelivery: o.trip?.actualEnd ?? null }));
+  // An order spread over several trucks is only delivered once the LAST one
+  // arrives, so on-time is judged against the latest actualEnd. Any leg still
+  // running leaves the order undelivered rather than counting it early.
+  const otdOrders = delivered.map((o) => {
+    const ends = o.trips.map((t) => t.actualEnd);
+    const actualDelivery = ends.length > 0 && ends.every((e) => e != null)
+      ? new Date(Math.max(...ends.map((e) => (e as Date).getTime())))
+      : null;
+    return { eta: o.eta, actualDelivery };
+  });
   // Fill rate: Σ order gross weight vs Σ payload of vehicles that ran a laden trip.
   const totalOrderWeight = orders.reduce((s, o) => s.plus(o.grossWeightKg), new Prisma.Decimal(0));
   const totalPayload = trips.reduce((s, t) => s.plus(t.orderId ? (t.vehicle?.payloadKg ?? 0) : 0), new Prisma.Decimal(0));
@@ -329,6 +339,26 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
       ],
     },
   ];
+
+  // Master Planning result for the current month (client review: "that data can
+  // be seen on dashboard"). Only shown once a forecast exists for the period —
+  // an empty plan would render a row of zeroes that means nothing.
+  const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const planned = await computePlanVsActual(dataAreaId, period);
+  if (planned.lines.length > 0) {
+    cats.push({
+      key: "planning",
+      title: `Plan vs Actual (${period})`,
+      tiles: [
+        { key: "forecastLoads", label: "Forecast Loads", value: String(planned.totalForecastLoads), href: "/planning", hint: "Confirmed demand for this month" },
+        { key: "actualLoads", label: "Actual Loads", value: String(planned.totalActualLoads), href: "/planning", hint: "Orders booked this month" },
+        { key: "loadAchieved", label: "Loads Achieved", value: String(planned.loadAchievedPct), unit: "%", href: "/planning", hint: "Actual ÷ forecast loads" },
+        { key: "forecastTonnes", label: "Forecast Tonnes", value: planned.totalForecastTonnes.toFixed(2), unit: "t", href: "/planning" },
+        { key: "actualTonnes", label: "Actual Tonnes", value: planned.totalActualTonnes.toFixed(2), unit: "t", href: "/planning", hint: "Gross weight moved this month" },
+        { key: "tonneAchieved", label: "Tonnes Achieved", value: String(planned.tonneAchievedPct), unit: "%", href: "/planning", hint: "Actual ÷ forecast tonnage" },
+      ],
+    });
+  }
 
   return { asOf: now.toISOString().slice(0, 10), currency: "USD", categories: cats };
 }

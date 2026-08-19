@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Plus, BarChart3 } from "lucide-react";
+import { Plus, BarChart3, Trash2 } from "lucide-react";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
@@ -23,7 +23,11 @@ import type { TripStatus, CorridorType, TripExpenseType } from "@frontend/lib/en
 
 interface OrderOpt { id: string; orderCode: string; originZone: string; destinationZone: string; corridor: CorridorType; }
 interface DriverOpt { id: string; name: string; }
-interface VehicleOpt { id: string; vehicleNumber: string; plateNumber: string; }
+interface VehicleOpt { id: string; vehicleNumber: string; plateNumber: string; defaultDriverId?: string | null; }
+
+/** One truck on the order. A consignment is dispatched across as many as it needs. */
+interface Leg { driverId: string; vehicleId: string; start: string; end: string; mileage: string; }
+const emptyLeg = (): Leg => ({ driverId: "", vehicleId: "", start: "", end: "", mileage: "0" });
 interface Trip {
   id: string;
   tripCode: string;
@@ -49,11 +53,19 @@ export function TripsManager({ orders, drivers, vehicles }: { orders: OrderOpt[]
   // create dialog
   const [open, setOpen] = useState(false);
   const [orderId, setOrderId] = useState("");
-  const [driverId, setDriverId] = useState("");
-  const [vehicleId, setVehicleId] = useState("");
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
-  const [mileage, setMileage] = useState("0");
+  const [legs, setLegs] = useState<Leg[]>([emptyLeg()]);
+
+  const setLeg = (i: number, patch: Partial<Leg>) =>
+    setLegs((ls) => ls.map((l, n) => (n === i ? { ...l, ...patch } : l)));
+  const addLeg = () => setLegs((ls) => [...ls, { ...emptyLeg(), start: ls[ls.length - 1]?.start ?? "", end: ls[ls.length - 1]?.end ?? "" }]);
+  const removeLeg = (i: number) => setLegs((ls) => (ls.length === 1 ? ls : ls.filter((_, n) => n !== i)));
+
+  /** Picking a truck fills in the driver normally paired with it (client review:
+   *  "the driver is mostly assigned, operations just review it"). */
+  function chooseVehicle(i: number, vehicleId: string) {
+    const v = vehicles.find((x) => x.id === vehicleId);
+    setLeg(i, { vehicleId, ...(v?.defaultDriverId && !legs[i].driverId ? { driverId: v.defaultDriverId } : {}) });
+  }
   // Extra spec fields (kept in one object to keep the form manageable).
   const emptyExtra = {
     trailerId: "", secondDriverId: "", originFacility: "", destinationFacility: "",
@@ -72,7 +84,7 @@ export function TripsManager({ orders, drivers, vehicles }: { orders: OrderOpt[]
   const [expPost, setExpPost] = useState(true);
 
   function openCreate() {
-    setOrderId(""); setDriverId(""); setVehicleId(""); setStart(""); setEnd(""); setMileage("0");
+    setOrderId(""); setLegs([emptyLeg()]);
     setExtra({ ...emptyExtra });
     setOpen(true);
   }
@@ -89,23 +101,46 @@ export function TripsManager({ orders, drivers, vehicles }: { orders: OrderOpt[]
   }
 
   async function createTrip() {
-    if (!orderId || !driverId || !vehicleId || !start || !end) {
-      toast({ title: "Please fill in all fields", variant: "destructive" }); return;
+    if (!orderId) { toast({ title: "Select an order", variant: "destructive" }); return; }
+    const incomplete = legs.findIndex((l) => !l.driverId || !l.vehicleId || !l.start || !l.end);
+    if (incomplete >= 0) {
+      toast({ title: `Vehicle ${incomplete + 1} is incomplete`, description: "Each row needs a vehicle, driver and both dates.", variant: "destructive" });
+      return;
     }
     const order = orders.find((o) => o.id === orderId);
+    const corridor = order?.corridor ?? "DOMESTIC";
+
     try {
-      await apiFetch("/api/trips", {
-        method: "POST",
-        body: JSON.stringify({
-          orderId, driverId, vehicleId,
-          corridor: order?.corridor ?? "DOMESTIC",
-          mileageKm: mileage || "0",
-          scheduledStart: new Date(start).toISOString(),
-          scheduledEnd: new Date(end).toISOString(),
-          ...extraPayload(),
-        }),
-      });
-      toast({ title: "Trip saved", variant: "success" });
+      if (legs.length === 1) {
+        // A single truck keeps the detailed form, extras and all.
+        const l = legs[0];
+        await apiFetch("/api/trips", {
+          method: "POST",
+          body: JSON.stringify({
+            orderId, driverId: l.driverId, vehicleId: l.vehicleId, corridor,
+            mileageKm: l.mileage || "0",
+            scheduledStart: new Date(l.start).toISOString(),
+            scheduledEnd: new Date(l.end).toISOString(),
+            ...extraPayload(),
+          }),
+        });
+      } else {
+        // A convoy is created in one transaction so a clash on the last row
+        // does not leave the earlier ones behind.
+        await apiFetch("/api/trips/batch", {
+          method: "POST",
+          body: JSON.stringify({
+            orderId, corridor,
+            legs: legs.map((l) => ({
+              driverId: l.driverId, vehicleId: l.vehicleId,
+              mileageKm: l.mileage || "0",
+              scheduledStart: new Date(l.start).toISOString(),
+              scheduledEnd: new Date(l.end).toISOString(),
+            })),
+          }),
+        });
+      }
+      toast({ title: legs.length === 1 ? "Trip saved" : `${legs.length} trips assigned`, variant: "success" });
       setOpen(false);
       setRefreshKey((k) => k + 1);
     } catch (e) {
@@ -177,26 +212,55 @@ export function TripsManager({ orders, drivers, vehicles }: { orders: OrderOpt[]
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>Driver</Label>
-                <Select value={driverId} onValueChange={setDriverId}>
-                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent>{drivers.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
-                </Select>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Vehicles on this order</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addLeg}>
+                  <Plus className="h-3.5 w-3.5" />Add vehicle
+                </Button>
               </div>
-              <div className="space-y-1.5">
-                <Label>Vehicle</Label>
-                <Select value={vehicleId} onValueChange={setVehicleId}>
-                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent>{vehicles.map((v) => <SelectItem key={v.id} value={v.id}>{v.vehicleNumber} ({v.plateNumber})</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5"><Label>Start</Label><Input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label>End</Label><Input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label>Distance (km)</Label><Input inputMode="decimal" value={mileage} onChange={(e) => setMileage(e.target.value)} /></div>
+
+              {legs.map((l, i) => (
+                <div key={i} className="rounded-lg border border-border bg-background/40 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Vehicle {i + 1}</span>
+                    {legs.length > 1 && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeLeg(i)}>
+                        <Trash2 className="h-3.5 w-3.5" />Remove
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label>Vehicle</Label>
+                      <Select value={l.vehicleId} onValueChange={(v) => chooseVehicle(i, v)}>
+                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>{vehicles.map((v) => <SelectItem key={v.id} value={v.id}>{v.vehicleNumber} ({v.plateNumber})</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Driver</Label>
+                      <Select value={l.driverId} onValueChange={(v) => setLeg(i, { driverId: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>{drivers.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5"><Label>Start</Label><Input type="datetime-local" value={l.start} onChange={(e) => setLeg(i, { start: e.target.value })} /></div>
+                    <div className="space-y-1.5"><Label>End</Label><Input type="datetime-local" value={l.end} onChange={(e) => setLeg(i, { end: e.target.value })} /></div>
+                    <div className="space-y-1.5"><Label>Distance (km)</Label><Input inputMode="decimal" value={l.mileage} onChange={(e) => setLeg(i, { mileage: e.target.value })} /></div>
+                  </div>
+                </div>
+              ))}
+
+              {legs.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  {legs.length} trips will be created against the same order. The detail fields below apply to a single
+                  vehicle only — add the rest per trip afterwards.
+                </p>
+              )}
             </div>
 
+            {legs.length === 1 && (<>
             <FormSection title="Vehicle & Crew">
               <div className="space-y-1.5"><Label>Trailer / Container ID</Label><Input value={extra.trailerId} onChange={(e) => setX({ trailerId: e.target.value })} /></div>
               <div className="space-y-1.5">
@@ -235,6 +299,7 @@ export function TripsManager({ orders, drivers, vehicles }: { orders: OrderOpt[]
               <div className="space-y-1.5"><Label>Seal Numbers</Label><Input value={extra.sealNumbers} onChange={(e) => setX({ sealNumbers: e.target.value })} /></div>
               <div className="space-y-1.5 md:col-span-2"><Label>Incident Notes</Label><Input placeholder="Breakdowns / accidents / delays" value={extra.incidentNotes} onChange={(e) => setX({ incidentNotes: e.target.value })} /></div>
             </FormSection>
+            </>)}
           </div>
           <DialogFooter><Button onClick={createTrip}>Create</Button></DialogFooter>
         </DialogContent>
