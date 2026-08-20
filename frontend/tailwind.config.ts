@@ -1,4 +1,7 @@
 import type { Config } from "tailwindcss";
+// Imported rather than require()'d: this file uses `import`/`export default`, so
+// Node 22+ loads it as a real ES module where `require` does not exist.
+import animate from "tailwindcss-animate";
 
 const config: Config = {
   darkMode: ["class"],
@@ -72,7 +75,7 @@ const config: Config = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [animate],
 };
 
 export default config;
