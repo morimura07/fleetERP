@@ -13,7 +13,6 @@
     "declaration": false,
     "outDir": "./dist",
     "rootDir": "./src",
-    "baseUrl": ".",
     "paths": {
       "@backend/*": ["./src/*"]
     }
