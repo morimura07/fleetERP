@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { otifPct, avgInvoiceProcessingDays, vehicleTco, avgTcoPerVehicle } from "@backend/services/dashboard-kpi";
+import { otifPct, avgInvoiceProcessingDays, vehicleTco, avgTcoPerVehicle, tcoCoverage } from "@backend/services/dashboard-kpi";
 
 const at = (iso: string) => new Date(iso);
 
@@ -90,5 +90,30 @@ describe("total cost of ownership", () => {
 
   it("does not divide by an empty fleet", () => {
     expect(avgTcoPerVehicle("12000", 0)).toBe("0.00");
+  });
+
+  it("includes depreciation from the linked asset register entry", () => {
+    const operating = vehicleTco({ maintenance: "1000", fuel: "0", tolls: "500", other: "0" });
+    const owned = vehicleTco({ maintenance: "1000", fuel: "0", tolls: "500", other: "0", depreciation: "2500" });
+    expect(operating.toFixed(2)).toBe("1500.00");
+    expect(owned.toFixed(2)).toBe("4000.00"); // ownership costs more than running
+  });
+
+  it("treats a truck with no asset row as zero depreciation, not an error", () => {
+    expect(vehicleTco({ maintenance: "100", fuel: 0, tolls: 0, other: 0 }).toFixed(2)).toBe("100.00");
+  });
+});
+
+describe("TCO coverage", () => {
+  it("reports what share of the fleet has a linked asset row", () => {
+    // TCO understates cost for every unlinked truck, so the figure is published
+    // alongside it rather than hidden.
+    expect(tcoCoverage(3, 4)).toBe(75);
+    expect(tcoCoverage(4, 4)).toBe(100);
+  });
+
+  it("is 0 when nothing is linked, and safe with no fleet at all", () => {
+    expect(tcoCoverage(0, 10)).toBe(0);
+    expect(tcoCoverage(0, 0)).toBe(0);
   });
 });

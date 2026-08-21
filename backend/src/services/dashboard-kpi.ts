@@ -78,23 +78,40 @@ export function avgInvoiceProcessingDays(
 }
 
 /**
- * Total cost of ownership for one vehicle over the period.
+ * Total cost of ownership for one vehicle, or for the fleet.
  *
- * Sums what the fleet actually spends to run a truck: maintenance and workshop
- * work, plus the fuel, tolls and incidental costs recorded against its trips.
+ * Sums what it actually costs to own and run the truck: maintenance and workshop
+ * work, the fuel, tolls and incidental costs recorded against its trips, and the
+ * depreciation charged on the linked asset-register entry.
  *
- * **Depreciation is not included.** The client's definition asks for it, but
- * `FixedAsset` has no link to `Vehicle`, so there is no way to attribute an
- * asset's depreciation to a specific truck. Adding `FixedAsset.vehicleId` would
- * close that gap; until then this is operating cost, and the dashboard says so.
+ * `depreciation` is whatever has accumulated on the `FixedAsset` pointing at the
+ * vehicle. A truck with no asset row contributes zero there — that is a missing
+ * link in the register rather than a free truck, so `tcoCoverage()` reports how
+ * much of the fleet is actually accounted for.
  */
 export function vehicleTco(costs: {
   maintenance: Prisma.Decimal.Value;
   fuel: Prisma.Decimal.Value;
   tolls: Prisma.Decimal.Value;
   other: Prisma.Decimal.Value;
+  depreciation?: Prisma.Decimal.Value;
 }): Prisma.Decimal {
-  return D(costs.maintenance).plus(costs.fuel).plus(costs.tolls).plus(costs.other);
+  return D(costs.maintenance)
+    .plus(costs.fuel)
+    .plus(costs.tolls)
+    .plus(costs.other)
+    .plus(costs.depreciation ?? 0);
+}
+
+/**
+ * Share of the fleet whose depreciation is actually known, as a percentage.
+ *
+ * TCO is only trustworthy to the extent that trucks are linked to the asset
+ * register. Reporting the number without this would quietly understate cost
+ * whenever somebody forgets to link a new vehicle.
+ */
+export function tcoCoverage(linkedVehicles: number, totalVehicles: number): number {
+  return pct(linkedVehicles, totalVehicles);
 }
 
 /** Fleet-wide TCO per vehicle — total operating cost ÷ number of vehicles. */

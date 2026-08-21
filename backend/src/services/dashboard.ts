@@ -6,7 +6,7 @@ import {
   fuelEfficiencyKmPerL, maintenanceCostPerKm, breakdownRate,
   driverTurnoverPct, billingAccuracyPct, arRecoveryPct,
   avgTurnaroundHours, damageRatePct, avgCsat, computeNps,
-  otifPct, avgInvoiceProcessingDays, vehicleTco, avgTcoPerVehicle,
+  otifPct, avgInvoiceProcessingDays, vehicleTco, avgTcoPerVehicle, tcoCoverage,
 } from "@backend/services/dashboard-kpi";
 import { computePlanVsActual } from "@backend/services/planning";
 
@@ -213,7 +213,7 @@ export interface KpiDashboard {
 
 export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard> {
   const now = new Date();
-  const [orders, trips, maint, drivers, invoices, vehicles, dockEvents, damageReports, feedback] = await Promise.all([
+  const [orders, trips, maint, vehicleAssets, drivers, invoices, vehicles, dockEvents, damageReports, feedback] = await Promise.all([
     prisma.order.findMany({
       where: { dataAreaId, status: { not: "CANCELLED" } },
       select: {
@@ -235,6 +235,11 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
       },
     }),
     prisma.vehicleMaintenance.findMany({ where: { dataAreaId }, select: { cost: true } }),
+    // Depreciation is only attributable where an asset row points at a vehicle.
+    prisma.fixedAsset.findMany({
+      where: { dataAreaId, vehicleId: { not: null } },
+      select: { accumulatedDepreciation: true },
+    }),
     prisma.driver.findMany({ where: { dataAreaId }, select: { status: true } }),
     prisma.customerInvoice.findMany({ where: { dataAreaId, status: { in: ["POSTED", "PARTIALLY_PAID", "PAID"] } }, select: { total: true, paidAmount: true, disputeStatus: true } }),
     prisma.vehicle.count({ where: { dataAreaId } }),
@@ -298,7 +303,15 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
     ),
     new Prisma.Decimal(0),
   );
-  const fleetTco = vehicleTco({ maintenance: maintCost, fuel: 0, tolls: tripRunningCost, other: 0 });
+  const fleetDepreciation = vehicleAssets.reduce(
+    (s, a) => s.plus(a.accumulatedDepreciation),
+    new Prisma.Decimal(0),
+  );
+  const fleetTco = vehicleTco({
+    maintenance: maintCost, fuel: 0, tolls: tripRunningCost, other: 0,
+    depreciation: fleetDepreciation,
+  });
+  const tcoLinked = tcoCoverage(vehicleAssets.length, vehicles);
   // Fill rate: Σ order gross weight vs Σ payload of vehicles that ran a laden trip.
   const totalOrderWeight = orders.reduce((s, o) => s.plus(o.grossWeightKg), new Prisma.Decimal(0));
   const totalPayload = trips.reduce((s, t) => s.plus(t.orderId ? (t.vehicle?.payloadKg ?? 0) : 0), new Prisma.Decimal(0));
@@ -351,7 +364,7 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
         { key: "fuel", label: "Fuel Efficiency", value: fuelEfficiencyKmPerL(totalKm, totalLitres), unit: "km/L", href: "/vehicles", hint: "Distance ÷ litres consumed" },
         { key: "maintkm", label: "Maintenance / km", value: maintenanceCostPerKm(maintCost, totalKm), unit: "USD", href: "/service", hint: "Maintenance cost ÷ distance" },
         { key: "breakdown", label: "Breakdown Rate", value: breakdownRate(maint.length, totalKm), unit: "/10k km", href: "/service", hint: "Maintenance events per 10,000 km" },
-        { key: "tco", label: "Operating Cost / Vehicle", value: avgTcoPerVehicle(fleetTco, vehicles), unit: "USD", href: "/vehicles", hint: "Maintenance + tolls + trip expenses ÷ fleet size (excludes depreciation)" },
+        { key: "tco", label: "Cost of Ownership / Vehicle", value: avgTcoPerVehicle(fleetTco, vehicles), unit: "USD", href: "/assets", hint: `Maintenance + tolls + trip expenses + depreciation ÷ fleet size (${tcoLinked}% of trucks linked to the asset register)` },
       ],
     },
     {

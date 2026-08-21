@@ -46,6 +46,8 @@ export const resetPasswordSchema = z
 
 // ───────── Driver ─────────
 const os = (max: number) => z.string().max(max).optional().or(z.literal(""));
+// Like `os` but also accepts null (forms send null for empty optional fields).
+const optText = (max: number) => z.string().max(max).nullish().or(z.literal(""));
 
 export const driverSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -924,6 +926,9 @@ export const fixedAssetSchema = z.object({
   code: z.string().min(1, "Asset tag is required").max(40),
   name: z.string().min(1, "Name is required").max(150),
   category: z.enum(["VEHICLE", "EQUIPMENT", "FURNITURE", "BUILDING", "IT", "OTHER"]).default("EQUIPMENT"),
+  // Set when the asset IS a truck, so its depreciation counts toward that
+  // vehicle's cost of ownership.
+  vehicleId: z.string().nullish(),
   acquisitionCost: z.coerce.number().positive("Acquisition cost must be positive"),
   residualValue: z.coerce.number().min(0, "Residual value cannot be negative").default(0),
   usefulLifeMonths: z.coerce.number().int().positive("Useful life must be a positive number of months"),
@@ -932,6 +937,8 @@ export const fixedAssetSchema = z.object({
   assetAccountCode: z.string().max(20).default("1500"),
   accumDepCode: z.string().max(20).default("1510"),
   expenseCode: z.string().max(20).default("5200"),
+  warrantyProvider: optText(120),
+  warrantyExpiresAt: z.coerce.date().optional().nullable(),
 }).refine((a) => a.residualValue < a.acquisitionCost, {
   message: "Residual value must be less than acquisition cost",
   path: ["residualValue"],

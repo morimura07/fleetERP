@@ -161,12 +161,21 @@ lookups.get("/vehicle-form", requireAuth, requirePermission("vehicle:read"), asy
 /** Active employees for the asset-custody assign dialog (asset permission). */
 lookups.get("/asset-form", requireAuth, requirePermission("asset:read"), async (c) => {
   const user = c.get("user");
-  const employees = await prisma.employee.findMany({
-    where: { ...areaScope(user), status: { not: "TERMINATED" } },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
-  return ok(c, { employees });
+  const [employees, vehicles] = await Promise.all([
+    prisma.employee.findMany({
+      where: { ...areaScope(user), status: { not: "TERMINATED" } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    // Only trucks with no asset row yet — the link is one-to-one, so offering an
+    // already-linked vehicle would just fail the unique constraint on save.
+    prisma.vehicle.findMany({
+      where: { ...areaScope(user), fixedAsset: null },
+      select: { id: true, vehicleNumber: true, plateNumber: true },
+      orderBy: { vehicleNumber: "asc" },
+    }),
+  ]);
+  return ok(c, { employees, vehicles });
 });
 
 /** Active units of measure for inventory/quantity forms (grouped by dimension). */

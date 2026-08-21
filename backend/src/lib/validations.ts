@@ -982,6 +982,9 @@ export const fixedAssetSchema = z.object({
   code: z.string().min(1, "Asset tag is required").max(40),
   name: z.string().min(1, "Name is required").max(150),
   category: z.enum(["VEHICLE", "EQUIPMENT", "FURNITURE", "BUILDING", "IT", "OTHER"]).default("EQUIPMENT"),
+  // Set when the asset IS a truck, so its depreciation counts toward that
+  // vehicle's cost of ownership.
+  vehicleId: z.string().nullish(),
   acquisitionCost: z.coerce.number().positive("Acquisition cost must be positive"),
   residualValue: z.coerce.number().min(0, "Residual value cannot be negative").default(0),
   usefulLifeMonths: z.coerce.number().int().positive("Useful life must be a positive number of months"),

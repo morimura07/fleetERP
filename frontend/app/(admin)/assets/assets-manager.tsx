@@ -24,20 +24,23 @@ const thisMonth = () => new Date().toISOString().slice(0, 7);
 const today = () => new Date().toISOString().slice(0, 10);
 
 type AssetForm = {
-  code: string; name: string; category: AssetCategory;
+  code: string; name: string; category: AssetCategory; vehicleId: string;
   acquisitionCost: string; residualValue: string; usefulLifeMonths: string;
   acquisitionDate: string; inServiceDate: string;
   warrantyProvider: string; warrantyExpiresAt: string;
 };
 const emptyForm = (): AssetForm => ({
-  code: "", name: "", category: "EQUIPMENT",
+  code: "", name: "", category: "EQUIPMENT", vehicleId: "",
   acquisitionCost: "", residualValue: "0", usefulLifeMonths: "60",
   acquisitionDate: today(), inServiceDate: today(),
   warrantyProvider: "", warrantyExpiresAt: "",
 });
 
+const UNLINKED = "__none__"; // Radix Select cannot hold an empty string
+
 export function AssetsManager() {
   const { toast } = useToast();
+  const [freeVehicles, setFreeVehicles] = useState<{ id: string; vehicleNumber: string; plateNumber: string }[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
   const [runOpen, setRunOpen] = useState(false);
@@ -51,6 +54,15 @@ export function AssetsManager() {
   function setF(patch: Partial<AssetForm>) { setForm((f) => ({ ...f, ...patch })); }
   const refresh = () => setRefreshKey((k) => k + 1);
 
+  // Re-fetched whenever the dialog opens: a truck linked a moment ago should
+  // drop off the list without a page reload.
+  useEffect(() => {
+    if (!createOpen) return;
+    apiFetch<{ vehicles: { id: string; vehicleNumber: string; plateNumber: string }[] }>("/api/lookups/asset-form")
+      .then((r) => setFreeVehicles(r.vehicles ?? []))
+      .catch(() => setFreeVehicles([]));
+  }, [createOpen]);
+
   async function createAsset() {
     setBusy(true);
     try {
@@ -60,6 +72,8 @@ export function AssetsManager() {
         method: "POST",
         body: JSON.stringify({
           code: form.code, name: form.name, category: form.category,
+          // Only meaningful for a truck; the backend ignores it otherwise.
+          vehicleId: form.category === "VEHICLE" && form.vehicleId ? form.vehicleId : null,
           acquisitionCost: Number(form.acquisitionCost), residualValue: Number(form.residualValue),
           usefulLifeMonths: Number(form.usefulLifeMonths),
           acquisitionDate: form.acquisitionDate, inServiceDate: form.inServiceDate,
@@ -148,6 +162,27 @@ export function AssetsManager() {
                 <SelectContent>{Object.entries(ASSET_CATEGORY_LABEL).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            {form.category === "VEHICLE" && (
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>Linked vehicle</Label>
+                <Select
+                  value={form.vehicleId || UNLINKED}
+                  onValueChange={(v) => setF({ vehicleId: v === UNLINKED ? "" : v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Not linked" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNLINKED}>Not linked</SelectItem>
+                    {freeVehicles.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>{v.vehicleNumber} ({v.plateNumber})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Links this asset to a truck so its depreciation counts toward that vehicle&apos;s cost of ownership.
+                  Only trucks without an asset entry are listed.
+                </p>
+              </div>
+            )}
             <div className="space-y-1.5 md:col-span-2"><Label>Name</Label><Input placeholder="Isuzu FRR flatbed truck" value={form.name} onChange={(e) => setF({ name: e.target.value })} /></div>
             <div className="space-y-1.5"><Label>Acquisition cost (USD)</Label><Input type="number" step="0.01" value={form.acquisitionCost} onChange={(e) => setF({ acquisitionCost: e.target.value })} /></div>
             <div className="space-y-1.5"><Label>Residual value (USD)</Label><Input type="number" step="0.01" value={form.residualValue} onChange={(e) => setF({ residualValue: e.target.value })} /></div>

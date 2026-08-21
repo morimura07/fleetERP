@@ -878,6 +878,7 @@ model Vehicle {
   updatedAt DateTime @updatedAt
 
   maintenances  VehicleMaintenance[]
+  fixedAsset    FixedAsset?          // the asset register entry for this truck, when one exists
   serviceOrders ServiceOrder[]
   dispatches    Dispatch[]
   trips         Trip[]
@@ -2410,6 +2411,12 @@ model FixedAsset {
   name       String
   category   AssetCategory @default(EQUIPMENT)
   status     AssetStatus   @default(ACTIVE)
+
+  // The truck this asset represents, when `category` is VEHICLE. Without it a
+  // vehicle's depreciation cannot be attributed to the vehicle, which is what
+  // separates operating cost from true cost of ownership.
+  vehicleId String?  @unique
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
 
   acquisitionCost  Decimal  @db.Decimal(18, 2)
   residualValue    Decimal  @default(0) @db.Decimal(18, 2) // salvage value at end of life
