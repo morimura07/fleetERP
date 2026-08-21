@@ -1,0 +1,43 @@
+# Caddy reverse proxy for the FleetFlow VPS.
+#
+# Copy to /etc/caddy/Caddyfile on the server, then: sudo systemctl reload caddy
+#
+# Why two hostnames rather than one with a /api path rule: BOTH apps serve
+# something under /api. The web app owns /api/auth/* for NextAuth, and the API
+# owns /api/orders, /api/trips and the rest. Routing /api/* to the API would
+# break sign-in. Splitting by hostname avoids the collision entirely.
+#
+# sslip.io resolves any IP-shaped hostname back to that IP, so these are real
+# DNS names and Let's Encrypt will issue for them. No domain purchase, no DNS
+# admin. Swap in a real domain later by changing only these two lines.
+
+# ── Web app (Next.js on :3000) ───────────────────────────────────────────────
+165.22.20.55.sslip.io {
+	reverse_proxy localhost:3000
+
+	encode gzip
+
+	header {
+		# Match the headers next.config.mjs already sets, so they survive the proxy.
+		X-Frame-Options "SAMEORIGIN"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Tell browsers to refuse plain HTTP for this host from now on.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+}
+
+# ── API (Hono on :4000) ──────────────────────────────────────────────────────
+api.165.22.20.55.sslip.io {
+	reverse_proxy localhost:4000
+
+	encode gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+}
+
+# ── Proof-of-delivery uploads are served by the API at /uploads ───────────────
+# Nothing extra needed: they come through the API host above.
