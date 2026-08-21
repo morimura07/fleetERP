@@ -6,6 +6,7 @@ import {
   fuelEfficiencyKmPerL, maintenanceCostPerKm, breakdownRate,
   driverTurnoverPct, billingAccuracyPct, arRecoveryPct,
   avgTurnaroundHours, damageRatePct, avgCsat, computeNps,
+  otifPct, avgInvoiceProcessingDays, vehicleTco, avgTcoPerVehicle,
 } from "@backend/services/dashboard-kpi";
 import { computePlanVsActual } from "@backend/services/planning";
 
@@ -215,7 +216,14 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
   const [orders, trips, maint, drivers, invoices, vehicles, dockEvents, damageReports, feedback] = await Promise.all([
     prisma.order.findMany({
       where: { dataAreaId, status: { not: "CANCELLED" } },
-      select: { status: true, eta: true, freightAmount: true, demurrageAmount: true, grossWeightKg: true, trips: { select: { actualEnd: true } } },
+      select: {
+        status: true, eta: true, freightAmount: true, demurrageAmount: true, grossWeightKg: true,
+        trips: { select: { actualEnd: true } },
+        // OTIF needs to know whether anything was reported damaged against the
+        // order; invoice processing time needs when the AR entry was posted.
+        _count: { select: { damageReports: true } },
+        invoiceEntry: { select: { postingDate: true } },
+      },
     }),
     prisma.trip.findMany({
       where: { dataAreaId },
@@ -267,6 +275,30 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
       : null;
     return { eta: o.eta, actualDelivery };
   });
+
+  // OTIF reuses the same delivery timing but also requires nothing to have been
+  // reported damaged against the order.
+  const otifOrders = delivered.map((o, i) => ({
+    eta: otdOrders[i].eta,
+    actualDelivery: otdOrders[i].actualDelivery,
+    hasDamage: o._count.damageReports > 0,
+  }));
+
+  // Invoice processing time: delivery → the AR entry's posting date.
+  const invoiceLag = delivered.map((o, i) => ({
+    deliveredAt: otdOrders[i].actualDelivery,
+    invoicedAt: o.invoiceEntry?.postingDate ?? null,
+  }));
+
+  // Operating TCO across the fleet. Depreciation is excluded because FixedAsset
+  // has no link to Vehicle — see vehicleTco().
+  const tripRunningCost = trips.reduce(
+    (sum, t) => sum.plus(t.tollPermitCost).plus(t.miscExpense).plus(
+      t.expenses.reduce((e, x) => e.plus(x.amount), new Prisma.Decimal(0)),
+    ),
+    new Prisma.Decimal(0),
+  );
+  const fleetTco = vehicleTco({ maintenance: maintCost, fuel: 0, tolls: tripRunningCost, other: 0 });
   // Fill rate: Σ order gross weight vs Σ payload of vehicles that ran a laden trip.
   const totalOrderWeight = orders.reduce((s, o) => s.plus(o.grossWeightKg), new Prisma.Decimal(0));
   const totalPayload = trips.reduce((s, t) => s.plus(t.orderId ? (t.vehicle?.payloadKg ?? 0) : 0), new Prisma.Decimal(0));
@@ -295,6 +327,7 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
       key: "operational", title: "Operational & Delivery",
       tiles: [
         { key: "otd", label: "On-Time Delivery", value: String(onTimeDeliveryPct(otdOrders)), unit: "%", href: "/orders", hint: "Delivered on/before committed ETA" },
+        { key: "otif", label: "On-Time In-Full", value: String(otifPct(otifOrders)), unit: "%", href: "/orders", hint: "On time AND with nothing reported damaged" },
         { key: "transit", label: "Avg Transit Time", value: avgTransitHours(completedTrips), unit: "h", href: "/trips", hint: "Mean transit hours on completed trips" },
         { key: "fill", label: "Load Fill Rate", value: String(fillRatePct([{ cargoKg: totalOrderWeight, capacityKg: totalPayload }])), unit: "%", href: "/trips", hint: "Cargo weight vs available payload" },
         { key: "turnaround", label: "Truck Turnaround", value: turnaround, unit: "h", href: "/dock-events", hint: "Mean arrival→departure gap at facilities" },
@@ -318,6 +351,7 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
         { key: "fuel", label: "Fuel Efficiency", value: fuelEfficiencyKmPerL(totalKm, totalLitres), unit: "km/L", href: "/vehicles", hint: "Distance ÷ litres consumed" },
         { key: "maintkm", label: "Maintenance / km", value: maintenanceCostPerKm(maintCost, totalKm), unit: "USD", href: "/service", hint: "Maintenance cost ÷ distance" },
         { key: "breakdown", label: "Breakdown Rate", value: breakdownRate(maint.length, totalKm), unit: "/10k km", href: "/service", hint: "Maintenance events per 10,000 km" },
+        { key: "tco", label: "Operating Cost / Vehicle", value: avgTcoPerVehicle(fleetTco, vehicles), unit: "USD", href: "/vehicles", hint: "Maintenance + tolls + trip expenses ÷ fleet size (excludes depreciation)" },
       ],
     },
     {
@@ -333,6 +367,7 @@ export async function getKpiDashboard(dataAreaId = "HQ01"): Promise<KpiDashboard
       tiles: [
         { key: "billing", label: "Billing Accuracy", value: String(billingAccuracyPct(disputed, invoices.length)), unit: "%", href: "/receivables", hint: "Invoices with no dispute" },
         { key: "recovery", label: "AR Recovery", value: String(arRecoveryPct(paid, invoiced)), unit: "%", href: "/collections", hint: "Collected ÷ invoiced" },
+        { key: "invlag", label: "Invoice Processing Time", value: avgInvoiceProcessingDays(invoiceLag), unit: "days", href: "/receivables", hint: "Delivery → AR invoice posted" },
         { key: "outstanding", label: "Outstanding AR", value: invoiced.minus(paid).toFixed(2), unit: "USD", href: "/collections", hint: "Invoiced − collected" },
         { key: "csat", label: "CSAT", value: csat, unit: "/5", href: "/feedback", hint: "Average customer satisfaction score" },
         { key: "nps", label: "NPS", value: String(nps), href: "/feedback", hint: "Promoters − detractors (−100…100)" },

@@ -37,6 +37,72 @@ export function onTimeDeliveryPct(orders: { eta: Date | null; actualDelivery: Da
   return pct(onTime, measured.length);
 }
 
+/**
+ * OTIF — on-time **and** in-full.
+ *
+ * Stricter than on-time delivery: an order counts only if it arrived by the
+ * committed ETA *and* nothing was reported damaged or short against it. A
+ * shipment that lands on time but half-crushed is not a success, which is the
+ * whole reason the client asked for OTIF alongside OTD.
+ *
+ * Orders with no ETA are excluded — there is no commitment to measure against.
+ */
+export function otifPct(
+  orders: { eta: Date | null; actualDelivery: Date | null; hasDamage: boolean }[],
+): number {
+  const measured = orders.filter((o) => o.eta && o.actualDelivery);
+  if (measured.length === 0) return 0;
+  const good = measured.filter((o) => o.actualDelivery! <= o.eta! && !o.hasDamage).length;
+  return pct(good, measured.length);
+}
+
+/**
+ * Average days from delivery to the AR invoice being posted.
+ *
+ * Measures back-office lag, not operations: how long cash sits uninvoiced after
+ * the cargo has landed. Only orders that have both a delivery and a posted
+ * invoice are counted; anything still uninvoiced has no elapsed time yet.
+ */
+export function avgInvoiceProcessingDays(
+  orders: { deliveredAt: Date | null; invoicedAt: Date | null }[],
+): string {
+  const measured = orders.filter((o) => o.deliveredAt && o.invoicedAt);
+  if (measured.length === 0) return "0.0";
+  const totalDays = measured.reduce((sum, o) => {
+    const ms = o.invoicedAt!.getTime() - o.deliveredAt!.getTime();
+    // An invoice posted before delivery (back-dated) contributes 0 rather than
+    // a negative that would flatter the average.
+    return sum + Math.max(0, ms) / 86_400_000;
+  }, 0);
+  return (totalDays / measured.length).toFixed(1);
+}
+
+/**
+ * Total cost of ownership for one vehicle over the period.
+ *
+ * Sums what the fleet actually spends to run a truck: maintenance and workshop
+ * work, plus the fuel, tolls and incidental costs recorded against its trips.
+ *
+ * **Depreciation is not included.** The client's definition asks for it, but
+ * `FixedAsset` has no link to `Vehicle`, so there is no way to attribute an
+ * asset's depreciation to a specific truck. Adding `FixedAsset.vehicleId` would
+ * close that gap; until then this is operating cost, and the dashboard says so.
+ */
+export function vehicleTco(costs: {
+  maintenance: Prisma.Decimal.Value;
+  fuel: Prisma.Decimal.Value;
+  tolls: Prisma.Decimal.Value;
+  other: Prisma.Decimal.Value;
+}): Prisma.Decimal {
+  return D(costs.maintenance).plus(costs.fuel).plus(costs.tolls).plus(costs.other);
+}
+
+/** Fleet-wide TCO per vehicle — total operating cost ÷ number of vehicles. */
+export function avgTcoPerVehicle(total: Prisma.Decimal.Value, vehicleCount: number): string {
+  if (vehicleCount <= 0) return "0.00";
+  return D(total).dividedBy(vehicleCount).toFixed(2);
+}
+
 /** Average transit hours across completed trips (uses actual if present, else scheduled). */
 export function avgTransitHours(trips: { transitHours: Prisma.Decimal.Value }[]): string {
   if (trips.length === 0) return "0.0";
