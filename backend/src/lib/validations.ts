@@ -942,6 +942,13 @@ export const expenseLineSchema = z.object({
   amount: z.coerce.number().positive("Amount must be positive"),
   incurredAt: z.coerce.date(),
   receiptUrl: z.string().max(300).optional().nullable(),
+  // Ties the cost to the asset and run that caused it (client amendments, Aug 2026).
+  postingDate: z.coerce.date().optional().nullable(),
+  voucherRef: os(60),
+  vehicleId: z.string().nullish(),
+  tripId: z.string().nullish(),
+  odometerKm: z.coerce.number().int().min(0).nullish(),
+  taxAmount: z.coerce.number().min(0).default(0),
 });
 
 export const expenseClaimSchema = z.object({
@@ -950,6 +957,9 @@ export const expenseClaimSchema = z.object({
   title: z.string().min(1, "Title is required").max(150),
   currency: currencyCode.default("USD"),
   advanceId: z.string().optional().nullable(),
+  // Allocation (client amendments, Aug 2026).
+  costCenter: os(80),
+  branch: os(80),
   lines: z.array(expenseLineSchema).min(1, "At least one line is required"),
 });
 
@@ -1201,6 +1211,16 @@ export const dockEventSchema = z.object({
   kind: z.enum(["ARRIVAL", "DEPARTURE"]),
   eventAt: z.coerce.date(),
   note: os(500),
+  // Gate and yard detail (client amendments, Aug 2026).
+  driverId: z.string().nullish(),
+  trailerNumber: os(60),
+  dockBay: os(60),
+  activity: z.enum(["LOADING", "OFFLOADING", "CUSTOMS_INSPECTION", "CROSS_DOCKING", "OVERNIGHT_STAGING", "OTHER"]).default("OTHER"),
+  sealNumber: os(60),
+  sealIntact: z.boolean().nullish(),
+  odometerKm: z.coerce.number().int().min(0).nullish(),
+  fuelLevel: os(30),
+  source: z.enum(["MANUAL", "GEOFENCE", "GATE_SCANNER", "MOBILE_APP"]).default("MANUAL"),
 });
 
 export const damageReportSchema = z.object({
@@ -1211,6 +1231,18 @@ export const damageReportSchema = z.object({
   damageValue: z.coerce.number().min(0, "Damage value cannot be negative"),
   currency: currencyCode.optional(),
   description: os(1000),
+  // Incident detail (client amendments, Aug 2026).
+  clientId: z.string().nullish(),
+  vehicleId: z.string().nullish(),
+  driverId: z.string().nullish(),
+  incidentType: z.enum(["TRANSIT_DAMAGE", "MOISTURE_DAMAGE", "SHORTAGE_THEFT", "CONTAMINATION_SPILLAGE", "ROAD_ACCIDENT", "OTHER"]).default("TRANSIT_DAMAGE"),
+  location: os(200),
+  rootCause: z.enum(["DRIVER_NEGLIGENCE", "POOR_PACKAGING", "MECHANICAL_FAILURE", "THIRD_PARTY", "FORCE_MAJEURE", "UNDETERMINED"]).default("UNDETERMINED"),
+  liableParty: os(150),
+  insurerName: os(150),
+  claimNumber: os(80),
+  claimStatus: z.enum(["NOT_FILED", "LODGED", "UNDER_ASSESSMENT", "APPROVED", "RECOVERED", "REJECTED"]).default("NOT_FILED"),
+  settlementAmount: z.coerce.number().min(0).default(0),
 }).refine((d) => d.damageValue <= d.cargoValue, {
   message: "Damage value cannot exceed the cargo value",
   path: ["damageValue"],
@@ -1379,6 +1411,17 @@ export const updateRoleSchema = z.object({
 export const setPermissionsSchema = z.object({
   permissions: z.array(z.string()),
 });
+
+/**
+ * Approval authority for one user (client amendments, Aug 2026).
+ * A null limit removes the authority entirely rather than setting it to zero,
+ * which would read as "may approve nothing" instead of "has no authority".
+ */
+export const approvalAuthoritySchema = z.object({
+  approvalLimit: z.coerce.number().min(0).nullable(),
+  esignatory: z.boolean().default(false),
+});
+export type ApprovalAuthorityInput = z.infer<typeof approvalAuthoritySchema>;
 
 export const assignRoleSchema = z.object({
   roleKey: z.string().min(1).nullable(),

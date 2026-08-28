@@ -106,3 +106,117 @@ export async function getCorridorProfitability(dataAreaId: string): Promise<Corr
     total: serializeRow(pnl.total),
   };
 }
+
+// ── Corridor drill-down (client amendments, Aug 2026) ────────────────────────
+
+export interface CorridorOrderRow {
+  orderId: string;
+  orderCode: string;
+  client: string;
+  route: string;
+  bookingDate: string;
+  tripCount: number;
+  revenue: string;
+  cost: string;
+  profit: string;
+  marginPct: string;
+}
+
+export interface CorridorDetail {
+  corridor: CorridorType;
+  currency: string;
+  orders: CorridorOrderRow[];
+  /** Trip expenses on this corridor, grouped by type, largest first. */
+  expenseByType: { type: string; amount: string; share: number }[];
+  /** The base trip costs, which are not TripExpense rows and would otherwise be invisible. */
+  baseCosts: { driverWages: string; tollPermits: string; misc: string };
+  totals: { revenue: string; cost: string; profit: string; marginPct: string };
+}
+
+/**
+ * One corridor, broken out to the order and expense-type level.
+ *
+ * The client asked to "click into each corridor and see the details of the
+ * costing and expenses". Cost has two sources that are easy to confuse: the
+ * base costs carried on the trip itself (driver wages, tolls, misc) and the
+ * TripExpense rows logged against it. Both are reported, because a breakdown
+ * that showed only expense rows would not reconcile with the headline cost.
+ */
+export async function getCorridorDetail(dataAreaId: string, corridor: CorridorType): Promise<CorridorDetail> {
+  const orders = await prisma.order.findMany({
+    where: { dataAreaId, corridor, status: { not: "CANCELLED" } },
+    select: {
+      id: true, orderCode: true, originZone: true, destinationZone: true, bookingDate: true,
+      freightAmount: true, demurrageAmount: true,
+      client: { select: { companyName: true } },
+      trips: {
+        select: {
+          driverWages: true, tollPermitCost: true, miscExpense: true,
+          expenses: { select: { type: true, amount: true } },
+        },
+      },
+    },
+    orderBy: { bookingDate: "desc" },
+  });
+
+  const zero = new Prisma.Decimal(0);
+  const byType = new Map<string, Prisma.Decimal>();
+  let wages = zero, tolls = zero, misc = zero;
+  let totalRevenue = zero, totalCost = zero;
+
+  const rows: CorridorOrderRow[] = orders.map((o) => {
+    const { revenue, cost } = orderActuals(o);
+    totalRevenue = totalRevenue.plus(revenue);
+    totalCost = totalCost.plus(cost);
+
+    for (const t of o.trips) {
+      wages = wages.plus(t.driverWages);
+      tolls = tolls.plus(t.tollPermitCost);
+      misc = misc.plus(t.miscExpense);
+      for (const e of t.expenses) {
+        byType.set(e.type, (byType.get(e.type) ?? zero).plus(e.amount));
+      }
+    }
+
+    const profit = revenue.minus(cost);
+    return {
+      orderId: o.id,
+      orderCode: o.orderCode,
+      client: o.client?.companyName ?? "",
+      route: `${o.originZone} → ${o.destinationZone}`,
+      bookingDate: o.bookingDate.toISOString().slice(0, 10),
+      tripCount: o.trips.length,
+      revenue: revenue.toFixed(2),
+      cost: cost.toFixed(2),
+      profit: profit.toFixed(2),
+      marginPct: marginPct(profit, revenue).toFixed(2),
+    };
+  });
+
+  const expenseTotal = [...byType.values()].reduce((s, v) => s.plus(v), zero);
+  const expenseByType = [...byType.entries()]
+    .sort((a, b) => b[1].comparedTo(a[1]))
+    .map(([type, amount]) => ({
+      type,
+      amount: amount.toFixed(2),
+      // Share of logged expenses, so the bars add to 100 regardless of base costs.
+      share: expenseTotal.greaterThan(0)
+        ? Math.round(amount.dividedBy(expenseTotal).times(1000).toNumber()) / 10
+        : 0,
+    }));
+
+  const totalProfit = totalRevenue.minus(totalCost);
+  return {
+    corridor,
+    currency: "USD",
+    orders: rows,
+    expenseByType,
+    baseCosts: { driverWages: wages.toFixed(2), tollPermits: tolls.toFixed(2), misc: misc.toFixed(2) },
+    totals: {
+      revenue: totalRevenue.toFixed(2),
+      cost: totalCost.toFixed(2),
+      profit: totalProfit.toFixed(2),
+      marginPct: marginPct(totalProfit, totalRevenue).toFixed(2),
+    },
+  };
+}

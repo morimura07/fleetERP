@@ -245,10 +245,10 @@ lookups.get("/service-form", requireAuth, requirePermission("service:read"), asy
  * (dock events, damage reports, customer feedback). */
 lookups.get("/kpi-form", requireAuth, requirePermission("kpi:read"), async (c) => {
   const user = c.get("user");
-  const [vehicles, trips, orders, customers] = await Promise.all([
+  const [vehicles, trips, orders, customers, drivers, clients] = await Promise.all([
     prisma.vehicle.findMany({
       where: { ...areaScope(user) },
-      select: { id: true, plateNumber: true, model: true },
+      select: { id: true, plateNumber: true, model: true, vehicleNumber: true },
       orderBy: { plateNumber: "asc" },
     }),
     prisma.trip.findMany({
@@ -268,8 +268,18 @@ lookups.get("/kpi-form", requireAuth, requirePermission("kpi:read"), async (c) =
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
+    prisma.driver.findMany({
+      where: { ...areaScope(user), status: "ACTIVE" },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.client.findMany({
+      where: { ...areaScope(user) },
+      select: { id: true, companyName: true },
+      orderBy: { companyName: "asc" },
+    }),
   ]);
-  return ok(c, { vehicles, trips, orders, customers });
+  return ok(c, { vehicles, trips, orders, customers, drivers, clients });
 });
 
 /** Clients, open leads, and salespeople for the sales quote/lead forms (M27). */

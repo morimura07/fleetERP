@@ -519,6 +519,56 @@ enum DockEventKind {
 }
 
 // Cargo damage / loss claim lifecycle, for the damage & claim-rate KPI.
+enum IncidentType {
+  TRANSIT_DAMAGE
+  MOISTURE_DAMAGE
+  SHORTAGE_THEFT
+  CONTAMINATION_SPILLAGE
+  ROAD_ACCIDENT
+  OTHER
+}
+
+enum IncidentCause {
+  DRIVER_NEGLIGENCE
+  POOR_PACKAGING
+  MECHANICAL_FAILURE
+  THIRD_PARTY
+  FORCE_MAJEURE
+  UNDETERMINED
+}
+
+enum ClaimStatus {
+  NOT_FILED
+  LODGED
+  UNDER_ASSESSMENT
+  APPROVED
+  RECOVERED
+  REJECTED
+}
+
+enum DockActivity {
+  LOADING
+  OFFLOADING
+  CUSTOMS_INSPECTION
+  CROSS_DOCKING
+  OVERNIGHT_STAGING
+  OTHER
+}
+
+enum DockSource {
+  MANUAL
+  GEOFENCE
+  GATE_SCANNER
+  MOBILE_APP
+}
+
+enum CompanyKind {
+  OPERATING
+  CLIENT
+  VENDOR
+  PARTNER
+}
+
 enum DamageStatus {
   REPORTED
   UNDER_REVIEW
@@ -627,6 +677,14 @@ model Company {
   name           String
   baseCurrency   String        @default("USD")
   country        String        @default("TZ") // ISO country
+
+  // Commercial profile (client amendments, Aug 2026).
+  kind               CompanyKind @default(OPERATING)
+  registrationNumber String?
+  taxId              String? // TIN / VAT / GST
+  industry           String?
+  paymentTerm        PaymentTerm @default(NET_30)
+  creditLimit        Decimal?    @db.Decimal(18, 2)
   isActive       Boolean       @default(true)
   isSandbox      Boolean       @default(false) // demo/sandbox partition — safe to reset (M32)
   // Sandbox access window: after this instant every login into the partition is
@@ -766,6 +824,8 @@ model Driver {
   @@index([status])
   @@index([dataAreaId])
   @@map("drivers")
+  incidentReports DamageReport[]
+  dockEvents      DockEvent[]
 }
 
 // 稼働設定 (per weekday working hours)
@@ -892,6 +952,8 @@ model Vehicle {
   @@index([status])
   @@index([dataAreaId])
   @@map("vehicles")
+  incidentReports DamageReport[]
+  expenseLines    ExpenseLine[]
 }
 
 model VehicleMaintenance {
@@ -961,6 +1023,8 @@ model Client {
   @@index([companyName])
   @@index([dataAreaId])
   @@map("clients")
+  damageReports     DamageReport[]
+  demandForecasts   DemandForecast[]
 }
 
 // ───────────────────────── DeliveryJob (配送案件) ─────────────────────────
@@ -1399,6 +1463,7 @@ model Trip {
   @@index([status])
   @@index([reconStatus])
   @@map("trips")
+  expenseLines ExpenseLine[]
 }
 
 // A single operational cost on a trip. When posted, references its journal entry.
@@ -2171,6 +2236,7 @@ model PurchaseOrder {
   vendorInvoiceId String?
   vendorInvoice   VendorInvoice? @relation("PoVendorInvoice", fields: [vendorInvoiceId], references: [id], onDelete: SetNull)
 
+
   approvedById String?
   approvedAt   DateTime?
 
@@ -2368,6 +2434,10 @@ model ExpenseClaim {
   postingEntryId String?       @unique
   postingEntry   JournalEntry? @relation("ExpenseClaimPosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
 
+  // Allocation (client amendments, Aug 2026).
+  costCenter String?
+  branch     String?
+
   approvedById String?
   approvedAt   DateTime?
 
@@ -2395,7 +2465,20 @@ model ExpenseLine {
   incurredAt     DateTime     @db.Date
   receiptUrl     String? // uploaded proof-of-spend image (/uploads/…)
 
+  // Ties the cost to the asset and the run that caused it, which is what makes
+  // vehicle and trip profitability meaningful (client amendments, Aug 2026).
+  postingDate DateTime? @db.Date
+  voucherRef  String?
+  vehicleId   String?
+  vehicle     Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  tripId      String?
+  trip        Trip?     @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  odometerKm  Int?
+  taxAmount   Decimal   @default(0) @db.Decimal(18, 2)
+
   @@index([expenseClaimId])
+  @@index([vehicleId])
+  @@index([tripId])
   @@map("expense_lines")
 }
 
@@ -2764,6 +2847,20 @@ model DockEvent {
   eventAt    DateTime
   note       String?
 
+  // Gate and yard detail (client amendments, Aug 2026). Dwell time and the
+  // detention flag are computed by pairing arrival with departure, so neither
+  // is stored: a stored duration would go stale as soon as a time is corrected.
+  driverId     String?
+  driver       Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  trailerNumber String?
+  dockBay       String? // bay, gate or yard slot
+  activity      DockActivity @default(OTHER)
+  sealNumber    String?
+  sealIntact    Boolean?
+  odometerKm    Int?
+  fuelLevel     String? // as read at the gate, e.g. "3/4" or "180 L"
+  source        DockSource   @default(MANUAL)
+
   version     Int      @default(0)
   createdById String?
   createdAt   DateTime @default(now())
@@ -2772,6 +2869,7 @@ model DockEvent {
   @@index([dataAreaId])
   @@index([vehicleId, eventAt])
   @@index([tripId])
+  @@index([driverId])
   @@map("dock_events")
 }
 
@@ -2791,6 +2889,26 @@ model DamageReport {
   currency     String       @default("USD")
   description  String?
 
+  // Incident detail (client amendments, Aug 2026). The screen is presented as
+  // "Incident Report" because it covers loss, shortage and claims, not just damage.
+  clientId     String?
+  client       Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  vehicleId    String?
+  vehicle      Vehicle?       @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  driverId     String?
+  driver       Driver?        @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  incidentType IncidentType   @default(TRANSIT_DAMAGE)
+  location     String? // where it happened or was discovered
+  rootCause    IncidentCause  @default(UNDETERMINED)
+  liableParty  String?
+
+  // Insurance recovery. `damageRatio` is deliberately not stored: it is
+  // damageValue / cargoValue and would drift the moment either changes.
+  insurerName      String?
+  claimNumber      String?
+  claimStatus      ClaimStatus @default(NOT_FILED)
+  settlementAmount Decimal     @default(0) @db.Decimal(18, 2)
+
   version     Int      @default(0)
   createdById String?
   updatedById String?
@@ -2800,6 +2918,9 @@ model DamageReport {
   @@unique([dataAreaId, reportNumber])
   @@index([dataAreaId])
   @@index([dataAreaId, status])
+  @@index([vehicleId])
+  @@index([driverId])
+  @@index([dataAreaId, claimStatus])
   @@map("damage_reports")
 }
 
@@ -2973,6 +3094,19 @@ model DemandForecast {
   plannedDrivers Int?
   notes          String?
 
+  // Planning detail (client amendments, Aug 2026). Turnaround days is what
+  // converts a load count into a truck count, so it belongs on the forecast
+  // rather than being assumed globally.
+  clientId         String?
+  client           Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  contractName     String?
+  cargoType        String?
+  equipmentClass   EquipmentType? // flatbed, tanker, 40ft skeleton …
+  originHub        String?
+  destinationHub   String?
+  turnaroundDays   Decimal?       @db.Decimal(6, 2)
+  projectedRevenue Decimal?       @db.Decimal(18, 2)
+
   version     Int      @default(0)
   createdById String?
   updatedById String?
@@ -2983,6 +3117,7 @@ model DemandForecast {
   @@index([dataAreaId])
   @@index([dataAreaId, period])
   @@index([dataAreaId, status])
+  @@index([clientId])
   @@map("demand_forecasts")
 }
 

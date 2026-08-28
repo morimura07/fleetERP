@@ -116,3 +116,11 @@ export type PosPaymentMethod = "CASH" | "MOBILE_MONEY" | "CARD";
 export type PeriodStatus = "OPEN" | "CLOSED";
 export type AttributeDataType = "TEXT" | "NUMBER" | "BOOLEAN" | "LIST";
 export type UomDimension = "WEIGHT" | "VOLUME" | "LENGTH" | "AREA" | "COUNT" | "TIME";
+
+// ── Client amendments, Aug 2026 ──
+export type IncidentType = "TRANSIT_DAMAGE" | "MOISTURE_DAMAGE" | "SHORTAGE_THEFT" | "CONTAMINATION_SPILLAGE" | "ROAD_ACCIDENT" | "OTHER";
+export type IncidentCause = "DRIVER_NEGLIGENCE" | "POOR_PACKAGING" | "MECHANICAL_FAILURE" | "THIRD_PARTY" | "FORCE_MAJEURE" | "UNDETERMINED";
+export type ClaimStatus = "NOT_FILED" | "LODGED" | "UNDER_ASSESSMENT" | "APPROVED" | "RECOVERED" | "REJECTED";
+export type DockActivity = "LOADING" | "OFFLOADING" | "CUSTOMS_INSPECTION" | "CROSS_DOCKING" | "OVERNIGHT_STAGING" | "OTHER";
+export type DockSource = "MANUAL" | "GEOFENCE" | "GATE_SCANNER" | "MOBILE_APP";
+export type CompanyKind = "OPERATING" | "CLIENT" | "VENDOR" | "PARTNER";

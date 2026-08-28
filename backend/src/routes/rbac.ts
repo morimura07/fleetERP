@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import {
-  createRoleSchema, updateRoleSchema, setPermissionsSchema, assignRoleSchema,
+  createRoleSchema, updateRoleSchema, setPermissionsSchema, assignRoleSchema, approvalAuthoritySchema,
 } from "@backend/lib/validations";
 import {
   listRoles, listPermissions, createRole, updateRole, setRolePermissions, deleteRole, assignUserRole,
+  setApprovalAuthority,
 } from "@backend/services/rbac-admin";
 import { logActivity } from "@backend/lib/activity";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
@@ -68,5 +69,20 @@ rbac.post("/users/:id/role", requireAuth, requirePermission("user:manage"), asyn
   const body = assignRoleSchema.parse(await c.req.json());
   const result = await assignUserRole(id, body.roleKey);
   await logActivity({ userId: user.id, action: "ASSIGN_ROLE", target: `User:${id}`, detail: { roleKey: body.roleKey } });
+  return ok(c, result);
+});
+
+/** Assign or remove a user's approval authority (client amendments, Aug 2026). */
+rbac.patch("/users/:id/approval", requireAuth, requirePermission("user:manage"), async (c) => {
+  const actor = c.get("user");
+  const id = c.req.param("id");
+  const body = approvalAuthoritySchema.parse(await c.req.json());
+  const result = await setApprovalAuthority(id, body.approvalLimit, body.esignatory);
+  await logActivity({
+    userId: actor.id,
+    action: "UPDATE",
+    target: `User:${id}`,
+    detail: body.approvalLimit == null ? "approval authority removed" : `approval limit ${body.approvalLimit}`,
+  });
   return ok(c, result);
 });

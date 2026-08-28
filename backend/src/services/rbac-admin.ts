@@ -161,3 +161,23 @@ async function validPermissions(keys: string[]): Promise<string[]> {
   if (bad.length) throw new AuthError(`Unknown permission(s): ${bad.join(", ")}`, 422);
   return unique;
 }
+
+/**
+ * Grant or remove a user's approval authority.
+ *
+ * `approvalLimit: null` removes the authority. Zero is deliberately a different
+ * thing: it means the user may approve, but nothing above zero value.
+ */
+export async function setApprovalAuthority(
+  userId: string,
+  approvalLimit: number | null,
+  esignatory: boolean,
+) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!user) throw new AuthError("User not found", 404);
+  return prisma.user.update({
+    where: { id: userId },
+    data: { approvalLimit, esignatory },
+    select: { id: true, name: true, email: true, approvalLimit: true, esignatory: true },
+  });
+}
