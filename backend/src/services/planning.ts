@@ -1,4 +1,4 @@
-import { Prisma, CorridorType, ForecastStatus } from "@prisma/client";
+import { Prisma, CorridorType, ForecastStatus, EquipmentType } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { AuthError } from "@backend/lib/errors";
 
@@ -248,6 +248,15 @@ export interface ForecastInput {
   plannedDrivers?: number | null;
   notes?: string | null;
   createdById?: string | null;
+  // Planning detail (client amendments, Aug 2026).
+  clientId?: string | null;
+  contractName?: string | null;
+  cargoType?: string | null;
+  equipmentClass?: EquipmentType | null;
+  originHub?: string | null;
+  destinationHub?: string | null;
+  turnaroundDays?: Prisma.Decimal.Value | null;
+  projectedRevenue?: Prisma.Decimal.Value | null;
 }
 
 export async function createForecast(input: ForecastInput) {
@@ -266,6 +275,14 @@ export async function createForecast(input: ForecastInput) {
       plannedTrucks: input.plannedTrucks ?? null,
       plannedDrivers: input.plannedDrivers ?? null,
       notes: input.notes ?? null,
+      clientId: input.clientId ?? null,
+      contractName: input.contractName ?? null,
+      cargoType: input.cargoType ?? null,
+      equipmentClass: input.equipmentClass ?? null,
+      originHub: input.originHub ?? null,
+      destinationHub: input.destinationHub ?? null,
+      turnaroundDays: input.turnaroundDays != null ? D(input.turnaroundDays) : null,
+      projectedRevenue: input.projectedRevenue != null ? D(input.projectedRevenue) : null,
       createdById: input.createdById ?? null,
     },
   });

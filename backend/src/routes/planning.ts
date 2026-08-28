@@ -53,6 +53,14 @@ planning.post("/forecasts", requireAuth, requirePermission("planning:write"), as
     plannedTrucks: body.plannedTrucks ?? null,
     plannedDrivers: body.plannedDrivers ?? null,
     notes: body.notes || null,
+    clientId: body.clientId || null,
+    contractName: body.contractName || null,
+    cargoType: body.cargoType || null,
+    equipmentClass: body.equipmentClass ?? null,
+    originHub: body.originHub || null,
+    destinationHub: body.destinationHub || null,
+    turnaroundDays: body.turnaroundDays ?? null,
+    projectedRevenue: body.projectedRevenue ?? null,
     createdById: user.id,
   });
   await logActivity({ userId: user.id, action: "CREATE", target: `DemandForecast:${forecast.id}` });

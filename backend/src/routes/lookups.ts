@@ -27,7 +27,8 @@ lookups.get("/clients", requireAuth, requirePermission("client:read"), async (c)
 lookups.get("/accounts", requireAuth, requirePermission("account:read"), async (c) => {
   const accounts = await prisma.account.findMany({
     where: { isActive: true },
-    select: { id: true, code: true, name: true },
+    // `type` lets the client narrow to expense accounts for GL-code pickers.
+    select: { id: true, code: true, name: true, type: true },
     orderBy: { code: "asc" },
   });
   return ok(c, accounts);
@@ -102,7 +103,7 @@ lookups.get("/companies", requireAuth, requirePermission("user:manage"), async (
 /** Drivers + unreconciled advances for the expense-claim form. */
 lookups.get("/expense-form", requireAuth, requirePermission("expense:read"), async (c) => {
   const user = c.get("user");
-  const [drivers, advances] = await Promise.all([
+  const [drivers, advances, vehicles, trips] = await Promise.all([
     prisma.driver.findMany({
       where: { status: "ACTIVE" },
       select: { id: true, name: true },
@@ -115,8 +116,21 @@ lookups.get("/expense-form", requireAuth, requirePermission("expense:read"), asy
       orderBy: { transferredAt: "desc" },
       take: 100,
     }),
+    // A cost is only useful for vehicle and trip profitability if it can be
+    // attributed to the asset and the run that caused it.
+    prisma.vehicle.findMany({
+      where: { ...areaScope(user) },
+      select: { id: true, vehicleNumber: true, plateNumber: true },
+      orderBy: { vehicleNumber: "asc" },
+    }),
+    prisma.trip.findMany({
+      where: { ...areaScope(user) },
+      select: { id: true, tripCode: true },
+      orderBy: { scheduledStart: "desc" },
+      take: 200,
+    }),
   ]);
-  return ok(c, { drivers, advances });
+  return ok(c, { drivers, advances, vehicles, trips });
 });
 
 /** Active customers (with currency) for the receivables form. */

@@ -10,6 +10,8 @@ import { Label } from "@frontend/components/ui/label";
 import { CurrencySelect } from "@frontend/components/ui/currency-select";
 import { Badge } from "@frontend/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
+import { COMPANY_KIND_LABEL, PAYMENT_TERM_LABEL } from "@frontend/lib/labels";
+import type { CompanyKind, PaymentTerm } from "@frontend/lib/enums";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { useToast } from "@frontend/components/ui/toast";
 import { companySchema, type CompanyInput } from "@frontend/lib/validations";
@@ -130,6 +132,32 @@ export function CompaniesManager({
               </div>
               <div className="space-y-1.5"><Label>Base Currency</Label><CurrencySelect value={form.watch("baseCurrency")} onChange={(v) => form.setValue("baseCurrency", v)} /></div>
               <div className="space-y-1.5"><Label>Country (ISO)</Label><Input maxLength={2} {...form.register("country")} /></div>
+              <div className="space-y-1.5">
+                <Label>Company Type</Label>
+                <Select value={form.watch("kind")} onValueChange={(v) => form.setValue("kind", v as CompanyKind)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(COMPANY_KIND_LABEL) as CompanyKind[]).map((k) => (
+                      <SelectItem key={k} value={k}>{COMPANY_KIND_LABEL[k]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Payment Terms</Label>
+                <Select value={form.watch("paymentTerm")} onValueChange={(v) => form.setValue("paymentTerm", v as PaymentTerm)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(PAYMENT_TERM_LABEL) as PaymentTerm[]).map((t) => (
+                      <SelectItem key={t} value={t}>{PAYMENT_TERM_LABEL[t]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Registration No.</Label><Input {...form.register("registrationNumber")} /></div>
+              <div className="space-y-1.5"><Label>Tax ID (TIN / VAT)</Label><Input {...form.register("taxId")} /></div>
+              <div className="space-y-1.5"><Label>Industry</Label><Input placeholder="Freight forwarding" {...form.register("industry")} /></div>
+              <div className="space-y-1.5"><Label>Credit Limit</Label><Input type="number" step="0.01" {...form.register("creditLimit")} /></div>
             </div>
             <p className="text-xs text-muted-foreground">The code becomes this company&apos;s data partition and can&apos;t be changed after creation.</p>
             <DialogFooter><Button type="submit" disabled={form.formState.isSubmitting}>Create</Button></DialogFooter>

@@ -217,7 +217,7 @@ function BuildDialog({ employees, onClose, onSaved }: { employees: EmployeeOpt[]
       <DialogContent>
         <DialogHeader><DialogTitle>Build Timesheet</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">Sums the period's completed entries into regular + overtime hours (over 176h/mo is overtime), priced at the OT rate.</p>
+          <p className="text-sm text-muted-foreground">Sums the period&#39;s completed entries into regular + overtime hours (over 176h/mo is overtime), priced at the OT rate.</p>
           <div className="space-y-1.5">
             <Label>Employee</Label>
             <Select value={employeeId} onValueChange={setEmployeeId}>
@@ -300,7 +300,7 @@ function TimesheetDetail({ id, onClose, onChange }: { id: string; onClose: () =>
             </div>
 
             {sheet.status === "APPROVED" && (
-              <p className="text-sm text-muted-foreground">Approved — this timesheet's overtime pay is added to the employee's gross on the {sheet.period} pay run.</p>
+              <p className="text-sm text-muted-foreground">Approved — this timesheet&#39;s overtime pay is added to the employee&#39;s gross on the {sheet.period} pay run.</p>
             )}
 
             <DialogFooter className="gap-2">

@@ -5,6 +5,7 @@ import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
+import { AccountSelect } from "@frontend/components/ui/account-select";
 import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
@@ -21,11 +22,24 @@ interface ClaimRow {
   status: ExpenseClaimStatus; driver: { name: string } | null; _count: { lines: number };
 }
 
-type LineDraft = { expenseCode: string; description: string; amount: string; incurredAt: string; receiptUrl: string };
-const emptyLine = (): LineDraft => ({ expenseCode: "5030", description: "", amount: "", incurredAt: new Date().toISOString().slice(0, 10), receiptUrl: "" });
+type Vehicle = { id: string; vehicleNumber: string; plateNumber: string };
+type Trip = { id: string; tripCode: string };
+
+type LineDraft = {
+  expenseCode: string; description: string; amount: string; incurredAt: string; receiptUrl: string;
+  // Operational allocation (client amendments, Aug 2026).
+  postingDate: string; voucherRef: string; vehicleId: string; tripId: string;
+  odometerKm: string; taxAmount: string;
+};
+const emptyLine = (): LineDraft => ({
+  expenseCode: "5030", description: "", amount: "",
+  incurredAt: new Date().toISOString().slice(0, 10), receiptUrl: "",
+  postingDate: "", voucherRef: "", vehicleId: "", tripId: "", odometerKm: "", taxAmount: "",
+});
+const NONE = "none";
 const money = (v: string, c = "USD") => `${c} ${parseFloat(v).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
-export function ExpensesManager({ drivers, advances }: { drivers: Driver[]; advances: Advance[] }) {
+export function ExpensesManager({ drivers, advances, vehicles, trips }: { drivers: Driver[]; advances: Advance[]; vehicles: Vehicle[]; trips: Trip[] }) {
   const { toast } = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
@@ -34,11 +48,13 @@ export function ExpensesManager({ drivers, advances }: { drivers: Driver[]; adva
   const [driverId, setDriverId] = useState("");
   const [title, setTitle] = useState("");
   const [advanceId, setAdvanceId] = useState("");
+  const [costCenter, setCostCenter] = useState("");
+  const [branch, setBranch] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
   const [busy, setBusy] = useState(false);
 
   function openCreate() {
-    setDriverId(""); setTitle(""); setAdvanceId(""); setLines([emptyLine()]);
+    setDriverId(""); setTitle(""); setAdvanceId(""); setCostCenter(""); setBranch(""); setLines([emptyLine()]);
     setCreateOpen(true);
   }
   function setLine(i: number, patch: Partial<LineDraft>) {
@@ -54,9 +70,18 @@ export function ExpensesManager({ drivers, advances }: { drivers: Driver[]; adva
         driverId: driverId || null,
         title,
         advanceId: advanceId || null,
+        costCenter: costCenter || null,
+        branch: branch || null,
         lines: lines.filter((l) => l.description && Number(l.amount) > 0).map((l) => ({
           expenseCode: l.expenseCode, description: l.description, amount: Number(l.amount),
           incurredAt: l.incurredAt, receiptUrl: l.receiptUrl || null,
+          // Blank posting date falls back to the incurred date server-side.
+          postingDate: l.postingDate || null,
+          voucherRef: l.voucherRef || null,
+          vehicleId: l.vehicleId || null,
+          tripId: l.tripId || null,
+          odometerKm: l.odometerKm ? Number(l.odometerKm) : null,
+          taxAmount: l.taxAmount ? Number(l.taxAmount) : 0,
         })),
       };
       if (!payload.title) throw new ApiError("Title is required", 422);
@@ -102,6 +127,8 @@ export function ExpensesManager({ drivers, advances }: { drivers: Driver[]; adva
                   <SelectContent>{drivers.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5"><Label>Cost Centre</Label><Input placeholder="Operations / Workshop / Admin" value={costCenter} onChange={(e) => setCostCenter(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Branch</Label><Input placeholder="Dar es Salaam" value={branch} onChange={(e) => setBranch(e.target.value)} /></div>
               <div className="space-y-1.5 md:col-span-3">
                 <Label>Reconcile against advance (optional)</Label>
                 <Select value={advanceId || "none"} onValueChange={(v) => setAdvanceId(v === "none" ? "" : v)}>
@@ -119,7 +146,7 @@ export function ExpensesManager({ drivers, advances }: { drivers: Driver[]; adva
                 <Label>Expense lines</Label>
                 <Button type="button" variant="outline" size="sm" onClick={() => setLines((ls) => [...ls, emptyLine()])}><Plus className="h-3.5 w-3.5" />Add line</Button>
               </div>
-              {lines.map((l, i) => <LineRow key={i} line={l} onChange={(p) => setLine(i, p)} onRemove={() => setLines((ls) => ls.filter((_, idx) => idx !== i))} />)}
+              {lines.map((l, i) => <LineRow key={i} line={l} onChange={(p) => setLine(i, p)} onRemove={() => setLines((ls) => ls.filter((_, idx) => idx !== i))} vehicles={vehicles} trips={trips} />)}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Claim total: <span className="font-semibold text-foreground tabular-nums">{money(String(total))}</span></span>
                 {advance && (
@@ -145,7 +172,7 @@ export function ExpensesManager({ drivers, advances }: { drivers: Driver[]; adva
   );
 }
 
-function LineRow({ line, onChange, onRemove }: { line: LineDraft; onChange: (p: Partial<LineDraft>) => void; onRemove: () => void }) {
+function LineRow({ line, onChange, onRemove, vehicles, trips }: { line: LineDraft; onChange: (p: Partial<LineDraft>) => void; onRemove: () => void; vehicles: Vehicle[]; trips: Trip[] }) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -164,8 +191,9 @@ function LineRow({ line, onChange, onRemove }: { line: LineDraft; onChange: (p: 
   }
 
   return (
-    <div className="grid grid-cols-12 gap-2 rounded-md border p-2">
-      <Input className="col-span-2" placeholder="Acct" value={line.expenseCode} onChange={(e) => onChange({ expenseCode: e.target.value })} />
+    <div className="space-y-2 rounded-md border p-2">
+      <div className="grid grid-cols-12 gap-2">
+      <AccountSelect className="col-span-2 h-9" type="EXPENSE" placeholder="Acct" value={line.expenseCode} onChange={(v) => onChange({ expenseCode: v })} />
       <Input className="col-span-4" placeholder="Description" value={line.description} onChange={(e) => onChange({ description: e.target.value })} />
       <Input className="col-span-2" type="number" step="0.01" placeholder="Amount" value={line.amount} onChange={(e) => onChange({ amount: e.target.value })} />
       <Input className="col-span-2" type="date" value={line.incurredAt} onChange={(e) => onChange({ incurredAt: e.target.value })} />
@@ -176,6 +204,33 @@ function LineRow({ line, onChange, onRemove }: { line: LineDraft; onChange: (p: 
         </button>
       </div>
       <button type="button" className="col-span-1 flex items-center justify-center text-muted-foreground hover:text-destructive" onClick={onRemove}><Trash2 className="h-4 w-4" /></button>
+      </div>
+
+      {/* Ties the cost to the asset and run that caused it, which is what makes
+          vehicle and trip profitability meaningful. */}
+      <div className="grid grid-cols-12 gap-2">
+        <Select value={line.vehicleId || NONE} onValueChange={(v) => onChange({ vehicleId: v === NONE ? "" : v })}>
+          <SelectTrigger className="col-span-3 h-9"><SelectValue placeholder="Vehicle" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>— No vehicle —</SelectItem>
+            {vehicles.map((v) => <SelectItem key={v.id} value={v.id}>{v.vehicleNumber} ({v.plateNumber})</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={line.tripId || NONE} onValueChange={(v) => onChange({ tripId: v === NONE ? "" : v })}>
+          <SelectTrigger className="col-span-3 h-9"><SelectValue placeholder="Trip" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>— No trip —</SelectItem>
+            {trips.map((t) => <SelectItem key={t.id} value={t.id}>{t.tripCode}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Input className="col-span-2" placeholder="Voucher ref" value={line.voucherRef} onChange={(e) => onChange({ voucherRef: e.target.value })} />
+        <Input className="col-span-2" type="number" placeholder="Odometer" value={line.odometerKm} onChange={(e) => onChange({ odometerKm: e.target.value })} />
+        <Input className="col-span-2" type="number" step="0.01" placeholder="Tax" value={line.taxAmount} onChange={(e) => onChange({ taxAmount: e.target.value })} />
+        <div className="col-span-3 flex items-center gap-1.5">
+          <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">Posted</span>
+          <Input type="date" title="Defaults to the incurred date" value={line.postingDate} onChange={(e) => onChange({ postingDate: e.target.value })} />
+        </div>
+      </div>
     </div>
   );
 }

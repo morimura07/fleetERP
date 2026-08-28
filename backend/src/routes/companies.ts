@@ -61,6 +61,12 @@ companies.post("/", requireAuth, requirePermission("company:manage"), async (c) 
       baseCurrency: body.baseCurrency.toUpperCase(),
       country: body.country.toUpperCase(),
       isActive: body.isActive,
+      kind: body.kind,
+      registrationNumber: body.registrationNumber || null,
+      taxId: body.taxId || null,
+      industry: body.industry || null,
+      paymentTerm: body.paymentTerm,
+      creditLimit: body.creditLimit ?? null,
       createdById: user.id,
     },
   });
@@ -89,6 +95,12 @@ companies.patch("/:id", requireAuth, requirePermission("company:manage"), async 
     baseCurrency: body.baseCurrency?.toUpperCase(),
     country: body.country?.toUpperCase(),
     isActive: body.isActive,
+    kind: body.kind,
+    registrationNumber: body.registrationNumber,
+    taxId: body.taxId,
+    industry: body.industry,
+    paymentTerm: body.paymentTerm,
+    creditLimit: body.creditLimit,
     // `code` is the partition key of existing data — not editable after creation.
     // `organizationId` is deliberately not editable either: moving a company
     // between parents would move its entire data history across a tenant line.
