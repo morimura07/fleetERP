@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
+import { AccountSelect } from "@frontend/components/ui/account-select";
 import { CurrencySelect } from "@frontend/components/ui/currency-select";
 import { Badge } from "@frontend/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
@@ -209,7 +210,7 @@ function TransfersTab() {
                 {form.formState.errors.amount && <p className="text-xs text-destructive">{form.formState.errors.amount.message}</p>}
               </div>
               <div className="space-y-1.5"><Label>Currency</Label><CurrencySelect value={form.watch("currency")} onChange={(v) => form.setValue("currency", v)} /></div>
-              <div className="space-y-1.5"><Label>Expense GL Code</Label><Input placeholder="5030" {...form.register("expenseCode")} /></div>
+              <div className="space-y-1.5"><Label>Expense GL Code</Label><AccountSelect type="EXPENSE" value={form.watch("expenseCode")} onChange={(v) => form.setValue("expenseCode", v)} /></div>
               <div className="space-y-1.5"><Label>Date</Label><Input type="date" {...form.register("transferredAt")} /></div>
               <div className="space-y-1.5"><Label>External Ref (M-Pesa/Airtel)</Label><Input {...form.register("externalRef")} /></div>
             </div>

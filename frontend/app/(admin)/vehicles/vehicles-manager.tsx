@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
+import { OptionSelect } from "@frontend/components/ui/option-select";
 import { Badge } from "@frontend/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@frontend/components/ui/dialog";
@@ -18,6 +19,9 @@ import { VEHICLE_STATUS_LABEL, OWNERSHIP_STATUS_LABEL, FUEL_TYPE_LABEL } from "@
 import { formatDate, formatYen } from "@frontend/lib/utils";
 import type { VehicleStatus, OwnershipStatus, FuelType } from "@frontend/lib/enums";
 import { z } from "zod";
+
+// The two methods the depreciation engine implements (services/fixed-assets).
+const DEPRECIATION_METHODS = ["Straight Line", "Reducing Balance"] as const;
 
 const OWNERSHIPS = Object.keys(OWNERSHIP_STATUS_LABEL) as OwnershipStatus[];
 const FUEL_TYPES = Object.keys(FUEL_TYPE_LABEL) as FuelType[];
@@ -214,7 +218,15 @@ export function VehiclesManager({ drivers }: { drivers: DriverOption[] }) {
               <div className="space-y-1.5"><Label>Asset Account Code</Label><Input placeholder="1500" {...form.register("assetAccountCode")} /></div>
               <div className="space-y-1.5"><Label>Purchase Date</Label><Input type="date" {...form.register("purchaseDate")} /></div>
               <div className="space-y-1.5"><Label>Purchase Price</Label><Input inputMode="decimal" {...form.register("purchasePrice")} /></div>
-              <div className="space-y-1.5"><Label>Depreciation Method</Label><Input placeholder="straight-line" {...form.register("depreciationMethod")} /></div>
+              <div className="space-y-1.5">
+                <Label>Depreciation Method</Label>
+                <OptionSelect
+                  value={form.watch("depreciationMethod")}
+                  onChange={(v) => form.setValue("depreciationMethod", v)}
+                  options={DEPRECIATION_METHODS}
+                  placeholder="Select"
+                />
+              </div>
             </FormSection>
 
             <DialogFooter><Button type="submit" disabled={form.formState.isSubmitting}>Save</Button></DialogFooter>

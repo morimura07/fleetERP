@@ -426,6 +426,14 @@ cp .env.example .env
 npm run dev          # → http://localhost:3000
 ```
 
+> **The web app must serve the port `AUTH_URL` names.** NextAuth treats `AUTH_URL`
+> as the canonical origin, and `next dev` quietly moves to 3001 when 3000 is busy.
+> The two then disagree, and sign-in redirects to whatever else is listening on
+> 3000 — which presents as "a different application opened", not as a port
+> conflict. `npm run dev` refuses to start in that situation and names the port;
+> use `npm run dev:any-port` if the conflict is deliberate, and set `AUTH_URL`
+> plus the backend's `CORS_ORIGIN` to the port you actually use.
+
 ### Seeded logins
 | Role | Email | Password |
 |------|-------|----------|

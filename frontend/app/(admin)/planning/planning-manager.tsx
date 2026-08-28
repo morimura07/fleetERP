@@ -12,6 +12,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@frontend/components/ui/select";
 import { useToast } from "@frontend/components/ui/toast";
 import { forecastSchema, type ForecastInput } from "@frontend/lib/validations";
+import { FormSection } from "@frontend/components/ui/form-section";
+import { EQUIPMENT_TYPE_LABEL } from "@frontend/lib/labels";
+import type { EquipmentType } from "@frontend/lib/enums";
 import { FORECAST_STATUS_LABEL, FORECAST_STATUS_VARIANT, CORRIDOR_LABEL } from "@frontend/lib/labels";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 import type { ForecastStatus, CorridorType } from "@frontend/lib/enums";
@@ -59,7 +62,12 @@ export function PlanningManager() {
   const refresh = () => setRefreshKey((k) => k + 1);
 
   function openCreate() {
-    form.reset({ period: "", corridor: "NORTHERN", forecastLoads: 0, forecastTonnes: 0, plannedTrucks: null, plannedDrivers: null, notes: "" });
+    form.reset({
+      period: "", corridor: "NORTHERN", forecastLoads: 0, forecastTonnes: 0,
+      plannedTrucks: null, plannedDrivers: null, notes: "",
+      contractName: "", cargoType: "", equipmentClass: null,
+      originHub: "", destinationHub: "", turnaroundDays: null, projectedRevenue: null,
+    });
     setOpen(true);
   }
 
@@ -143,6 +151,43 @@ export function PlanningManager() {
               </div>
               <div className="space-y-1.5 md:col-span-2"><Label>Notes</Label><Input {...form.register("notes")} /></div>
             </div>
+
+            <FormSection title="Demand detail">
+              <div className="space-y-1.5">
+                <Label>Customer / Contract</Label>
+                <Input placeholder="TotalEnergies fuel haulage" {...form.register("contractName")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Cargo Type</Label>
+                <Input placeholder="Bulk fuel / containerised / break-bulk" {...form.register("cargoType")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Equipment Class</Label>
+                <Select
+                  value={form.watch("equipmentClass") ?? "none"}
+                  onValueChange={(v) => form.setValue("equipmentClass", v === "none" ? null : (v as EquipmentType))}
+                >
+                  <SelectTrigger><SelectValue placeholder="Any" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Any —</SelectItem>
+                    {(Object.keys(EQUIPMENT_TYPE_LABEL) as EquipmentType[]).map((e) => (
+                      <SelectItem key={e} value={e}>{EQUIPMENT_TYPE_LABEL[e]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Turnaround (days per round trip)</Label>
+                <Input type="number" step="0.5" min={0} {...form.register("turnaroundDays")} />
+                <p className="text-xs text-muted-foreground">What converts a load count into a truck count.</p>
+              </div>
+              <div className="space-y-1.5"><Label>Origin Hub</Label><Input placeholder="Dar es Salaam" {...form.register("originHub")} /></div>
+              <div className="space-y-1.5"><Label>Destination Hub</Label><Input placeholder="Lubumbashi" {...form.register("destinationHub")} /></div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>Projected Revenue</Label>
+                <Input type="number" step="0.01" min={0} {...form.register("projectedRevenue")} />
+              </div>
+            </FormSection>
             <p className="text-xs text-muted-foreground">One forecast per period + corridor. Confirmed forecasts feed the capacity plan above.</p>
             <DialogFooter><Button type="submit" disabled={form.formState.isSubmitting}>Save</Button></DialogFooter>
           </form>

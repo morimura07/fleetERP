@@ -920,6 +920,13 @@ export const companySchema = z.object({
   // Parent organization. Honoured only for SUPER_ADMIN — an ADMIN always creates
   // inside their own parent, so the field is ignored rather than trusted.
   organizationId: z.string().cuid().optional(),
+  // Commercial profile (client amendments, Aug 2026).
+  kind: z.enum(["OPERATING", "CLIENT", "VENDOR", "PARTNER"]).default("OPERATING"),
+  registrationNumber: os(60),
+  taxId: os(60),
+  industry: os(80),
+  paymentTerm: z.enum(["NET_30", "NET_60", "COD"]).default("NET_30"),
+  creditLimit: z.coerce.number().min(0).nullish(),
 });
 export type CompanyInput = z.infer<typeof companySchema>;
 
@@ -1257,6 +1264,16 @@ export const forecastSchema = z.object({
   plannedTrucks: optInt(),
   plannedDrivers: optInt(),
   notes: os(1000),
+  // Planning detail (client amendments, Aug 2026). Turnaround days is what
+  // converts a load count into a truck count.
+  clientId: z.string().nullish(),
+  contractName: os(150),
+  cargoType: os(80),
+  equipmentClass: z.enum(["FLATBED", "DRY_VAN", "REEFER", "TANKER", "CONTAINER_20FT", "CONTAINER_40FT", "CURTAIN_SIDE", "LTL", "OTHER"]).nullish(),
+  originHub: os(120),
+  destinationHub: os(120),
+  turnaroundDays: z.coerce.number().min(0).nullish(),
+  projectedRevenue: z.coerce.number().min(0).nullish(),
 });
 
 export const forecastUpdateSchema = z.object({
