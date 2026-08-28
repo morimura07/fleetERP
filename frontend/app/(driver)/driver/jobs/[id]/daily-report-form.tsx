@@ -62,7 +62,7 @@ export function DailyReportForm({ jobId }: { jobId: string }) {
       <div className="space-y-1.5">
         <Label>Proof of Delivery (image)</Label>
         <Input type="file" accept="image/*" onChange={handleUpload} disabled={uploading} />
-        {proofUrl && /* eslint-disable-next-line @next/next/no-img-element */ <img src={proofUrl} alt="Proof" className="mt-2 max-h-48 rounded-md border" />}
+        {proofUrl && /* eslint-disable-line @next/next/no-img-element */ <img src={proofUrl} alt="Proof" className="mt-2 max-h-48 rounded-md border" />}
       </div>
       <Button type="submit" disabled={isSubmitting || uploading}>Submit Report (complete job)</Button>
     </form>

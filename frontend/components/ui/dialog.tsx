@@ -34,8 +34,15 @@ const POPPER_SELECTOR =
   "[data-radix-popper-content-wrapper],[data-radix-select-viewport],[data-radix-menu-content],[data-radix-popover-content]";
 let lastPopperPointerDown = 0;
 
-if (typeof document !== "undefined" && !(window as any).__dlgPopperGuard) {
-  (window as any).__dlgPopperGuard = true;
+declare global {
+  interface Window {
+    /** Set once the capture-phase listener below is installed, so it is not added twice. */
+    __dlgPopperGuard?: boolean;
+  }
+}
+
+if (typeof document !== "undefined" && !window.__dlgPopperGuard) {
+  window.__dlgPopperGuard = true;
   document.addEventListener(
     "pointerdown",
     () => {

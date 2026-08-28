@@ -104,7 +104,7 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
             </div>
-            <p className="text-xs text-muted-foreground">A custom role replaces the system role's permissions. ADMIN/DRIVER special behaviors still follow the system role.</p>
+            <p className="text-xs text-muted-foreground">A custom role replaces the system role&#39;s permissions. ADMIN/DRIVER special behaviors still follow the system role.</p>
           </div>
         </DialogContent>
       </Dialog>
