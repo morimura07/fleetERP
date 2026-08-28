@@ -190,6 +190,12 @@ export function RolesManager() {
         )}
       </div>
 
+      {/* Approval authority — who may approve, and up to what value.
+          Placed here at the client's request: it is an authority question, and
+          the user form can only set it at creation, never change it after. */}
+      <ApprovalAuthorityPanel />
+
+
       <CreateRoleDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={(k) => { setSelectedKey(k); load(); }} />
     </>
   );
@@ -238,5 +244,124 @@ function CreateRoleDialog({ open, onClose, onCreated }: { open: boolean; onClose
         <DialogFooter><Button onClick={submit} disabled={busy || !name.trim() || !key.trim()}>Create Role</Button></DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface AuthorityUser {
+  id: string; name: string; email: string; role: string;
+  approvalLimit: string | null; esignatory: boolean;
+}
+
+function ApprovalAuthorityPanel() {
+  const { toast } = useToast();
+  const [users, setUsers] = useState<AuthorityUser[]>([]);
+  const [editing, setEditing] = useState<AuthorityUser | null>(null);
+  const [limit, setLimit] = useState("");
+  const [signatory, setSignatory] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setUsers(await apiFetch<AuthorityUser[]>("/api/users?pageSize=100"));
+    } catch { /* the panel is secondary; the role matrix still works */ }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  function open(u: AuthorityUser) {
+    setEditing(u);
+    setLimit(u.approvalLimit ?? "");
+    setSignatory(u.esignatory);
+  }
+
+  async function save() {
+    if (!editing) return;
+    setBusy(true);
+    try {
+      // Blank removes the authority; 0 means "may approve, but nothing above zero".
+      const approvalLimit = limit.trim() === "" ? null : Number(limit);
+      await apiFetch(`/api/rbac/users/${editing.id}/approval`, {
+        method: "PATCH",
+        body: JSON.stringify({ approvalLimit, esignatory: signatory }),
+      });
+      toast({ title: approvalLimit == null ? "Approval authority removed" : "Approval authority updated", variant: "success" });
+      setEditing(null);
+      await load();
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof ApiError ? e.message : "Failed", variant: "destructive" });
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="mt-6 rounded-xl border border-border bg-card/50 p-5">
+      <h2 className="text-sm font-semibold text-foreground">
+        Approval Authority <span className="font-normal text-muted-foreground">— who may approve, and up to what value</span>
+      </h2>
+
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+              <th className="pb-1.5 font-medium">User</th>
+              <th className="pb-1.5 font-medium">Role</th>
+              <th className="pb-1.5 text-right font-medium">Approval limit</th>
+              <th className="pb-1.5 text-center font-medium">E-signatory</th>
+              <th className="pb-1.5" />
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((u) => (
+              <tr key={u.id} className="border-b border-border/50 last:border-0">
+                <td className="py-2">
+                  <div className="font-medium">{u.name}</div>
+                  <div className="text-xs text-muted-foreground">{u.email}</div>
+                </td>
+                <td className="py-2 text-xs text-muted-foreground">{u.role}</td>
+                <td className="py-2 text-right tabular-nums">
+                  {u.approvalLimit == null
+                    ? <span className="text-muted-foreground">No authority</span>
+                    : `USD ${parseFloat(u.approvalLimit).toLocaleString()}`}
+                </td>
+                <td className="py-2 text-center">
+                  {u.esignatory ? <Badge variant="success">Yes</Badge> : <span className="text-xs text-muted-foreground">—</span>}
+                </td>
+                <td className="py-2 text-right">
+                  <Button variant="ghost" size="sm" onClick={() => open(u)}>Edit</Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Approval authority — {editing?.name}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Approval limit (USD)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="Leave blank to remove authority"
+                value={limit}
+                onChange={(e) => setLimit(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                The most this user may approve on a single freight or procurement item.
+                Leave blank to remove their authority entirely.
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={signatory} onChange={(e) => setSignatory(e.target.checked)} />
+              E-signature signatory (can sign freight bills, LRs and PODs)
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button disabled={busy} onClick={save}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

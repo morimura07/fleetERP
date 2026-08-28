@@ -44,6 +44,8 @@ expenses.post("/", requireAuth, requirePermission("expense:write"), async (c) =>
     title: body.title,
     currency: body.currency,
     advanceId: body.advanceId ?? null,
+    costCenter: body.costCenter || null,
+    branch: body.branch || null,
     lines: body.lines.map((l) => ({ ...l, receiptUrl: l.receiptUrl ?? null })),
     createdById: user.id,
   });

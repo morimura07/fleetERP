@@ -1,69 +1,5 @@
 import type {
-  JobStatus,
-  DriverStatus,
-  DriverType,
-  OwnershipStatus,
-  FuelType,
-  FacilityType,
-  VehicleStatus,
-  Role,
-  ContractType,
-  AccountType,
-  AccountSubType,
-  PostingType,
-  JournalDocType,
-  JournalStatus,
-  OrderStatus,
-  TripStatus,
-  CorridorType,
-  EquipmentType,
-  TripExpenseType,
-  InvoiceStatus,
-  PaymentTerm,
-  VendorGroup,
-  PaymentMethod,
-  CustomerAccountGroup,
-  PartyStatus,
-  DunningLevel,
-  DisputeStatus,
-  CollectionActivityType,
-  RateType,
-  BankAccountType,
-  DisbursementType,
-  TransferStatus,
-  BudgetKind,
-  BudgetControl,
-  DriverDocType,
-  ReconStatus,
-  StockCategory,
-  StockUnit,
-  PurchaseOrderStatus,
-  MatchStatus,
-  EmployeeStatus,
-  PayRunStatus,
-  ExpenseClaimStatus,
-  AssetCategory,
-  AssetStatus,
-  ServiceOrderStatus,
-  ServiceKind,
-  EmploymentType,
-  ContractStatus,
-  LeaveType,
-  LeaveStatus,
-  EmployeeDocType,
-  AttendanceSource,
-  TimesheetStatus,
-  DockEventKind,
-  DamageStatus,
-  LeadStage,
-  QuoteStatus,
-  ProjectStatus,
-  ForecastStatus,
-  PosSaleStatus,
-  PosPaymentMethod,
-  PeriodStatus,
-  AttributeDataType,
-  UomDimension,
+  JobStatus, DriverStatus, DriverType, OwnershipStatus, FuelType, FacilityType, VehicleStatus, Role, ContractType, AccountType, AccountSubType, PostingType, JournalDocType, JournalStatus, OrderStatus, TripStatus, CorridorType, EquipmentType, TripExpenseType, InvoiceStatus, PaymentTerm, VendorGroup, PaymentMethod, CustomerAccountGroup, PartyStatus, DunningLevel, DisputeStatus, CollectionActivityType, RateType, BankAccountType, DisbursementType, TransferStatus, BudgetKind, BudgetControl, DriverDocType, ReconStatus, StockCategory, StockUnit, PurchaseOrderStatus, MatchStatus, EmployeeStatus, PayRunStatus, ExpenseClaimStatus, AssetCategory, AssetStatus, ServiceOrderStatus, ServiceKind, EmploymentType, ContractStatus, LeaveType, LeaveStatus, EmployeeDocType, AttendanceSource, TimesheetStatus, DockEventKind, DamageStatus, LeadStage, QuoteStatus, ProjectStatus, ForecastStatus, PosSaleStatus, PosPaymentMethod, PeriodStatus, AttributeDataType, UomDimension, IncidentType, IncidentCause, ClaimStatus, DockActivity, DockSource, CompanyKind,
 } from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
@@ -807,3 +743,62 @@ export const COUNT_METHOD_OPTIONS = ["Annual", "Cycle counting", "Continuous"] a
 export const GENDER_OPTIONS = ["Male", "Female", "Other"] as const;
 export const PAY_FREQUENCY_OPTIONS = ["Weekly", "Bi-weekly", "Monthly"] as const;
 export const EMPLOYMENT_TYPE_OPTIONS = ["Full-time", "Part-time", "Contract", "Agency"] as const;
+
+export const INCIDENT_TYPE_LABEL: Record<IncidentType, string> = {
+  TRANSIT_DAMAGE: "Transit Damage",
+  MOISTURE_DAMAGE: "Wet / Moisture Damage",
+  SHORTAGE_THEFT: "Shortage / Theft",
+  CONTAMINATION_SPILLAGE: "Contamination / Spillage",
+  ROAD_ACCIDENT: "Road Accident",
+  OTHER: "Other",
+};
+
+export const INCIDENT_CAUSE_LABEL: Record<IncidentCause, string> = {
+  DRIVER_NEGLIGENCE: "Driver Negligence",
+  POOR_PACKAGING: "Poor Packaging",
+  MECHANICAL_FAILURE: "Mechanical / Chiller Failure",
+  THIRD_PARTY: "Third-Party Accident",
+  FORCE_MAJEURE: "Force Majeure",
+  UNDETERMINED: "Undetermined",
+};
+
+export const CLAIM_STATUS_LABEL: Record<ClaimStatus, string> = {
+  NOT_FILED: "Not Filed",
+  LODGED: "Claim Lodged",
+  UNDER_ASSESSMENT: "Under Assessment",
+  APPROVED: "Approved",
+  RECOVERED: "Recovered",
+  REJECTED: "Rejected",
+};
+
+export const CLAIM_STATUS_VARIANT: Record<ClaimStatus, "default" | "secondary" | "success" | "warning" | "destructive" | "info"> = {
+  NOT_FILED: "secondary",
+  LODGED: "info",
+  UNDER_ASSESSMENT: "warning",
+  APPROVED: "info",
+  RECOVERED: "success",
+  REJECTED: "destructive",
+};
+
+export const DOCK_ACTIVITY_LABEL: Record<DockActivity, string> = {
+  LOADING: "Loading",
+  OFFLOADING: "Offloading",
+  CUSTOMS_INSPECTION: "Customs Inspection",
+  CROSS_DOCKING: "Cross-Docking",
+  OVERNIGHT_STAGING: "Overnight Staging",
+  OTHER: "Other",
+};
+
+export const DOCK_SOURCE_LABEL: Record<DockSource, string> = {
+  MANUAL: "Manual Entry",
+  GEOFENCE: "Geofence Auto-Trigger",
+  GATE_SCANNER: "RFID / ANPR Gate",
+  MOBILE_APP: "Mobile Driver App",
+};
+
+export const COMPANY_KIND_LABEL: Record<CompanyKind, string> = {
+  OPERATING: "Operating Entity",
+  CLIENT: "Client (Shipper / Consignee)",
+  VENDOR: "Vendor (Broker / Sub-contractor)",
+  PARTNER: "Partner (3PL / Branch)",
+};

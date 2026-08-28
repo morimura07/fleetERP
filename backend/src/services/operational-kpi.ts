@@ -1,4 +1,4 @@
-import { Prisma, DockEventKind, DamageStatus } from "@prisma/client";
+import { Prisma, DockEventKind, DamageStatus, IncidentType, IncidentCause, ClaimStatus, DockActivity, DockSource } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { AuthError } from "@backend/lib/errors";
 
@@ -25,6 +25,16 @@ export interface DockEventInput {
   eventAt: Date;
   note?: string | null;
   createdById?: string | null;
+  // Gate and yard detail (client amendments, Aug 2026).
+  driverId?: string | null;
+  trailerNumber?: string | null;
+  dockBay?: string | null;
+  activity?: DockActivity;
+  sealNumber?: string | null;
+  sealIntact?: boolean | null;
+  odometerKm?: number | null;
+  fuelLevel?: string | null;
+  source?: DockSource;
 }
 
 export async function recordDockEvent(input: DockEventInput) {
@@ -43,6 +53,15 @@ export async function recordDockEvent(input: DockEventInput) {
       eventAt: input.eventAt,
       note: input.note ?? null,
       createdById: input.createdById ?? null,
+      driverId: input.driverId ?? null,
+      trailerNumber: input.trailerNumber ?? null,
+      dockBay: input.dockBay ?? null,
+      activity: input.activity ?? "OTHER",
+      sealNumber: input.sealNumber ?? null,
+      sealIntact: input.sealIntact ?? null,
+      odometerKm: input.odometerKm ?? null,
+      fuelLevel: input.fuelLevel ?? null,
+      source: input.source ?? "MANUAL",
     },
   });
 }
@@ -64,6 +83,18 @@ export interface DamageReportInput {
   currency?: string;
   description?: string | null;
   createdById?: string | null;
+  // Incident detail (client amendments, Aug 2026).
+  clientId?: string | null;
+  vehicleId?: string | null;
+  driverId?: string | null;
+  incidentType?: IncidentType;
+  location?: string | null;
+  rootCause?: IncidentCause;
+  liableParty?: string | null;
+  insurerName?: string | null;
+  claimNumber?: string | null;
+  claimStatus?: ClaimStatus;
+  settlementAmount?: Prisma.Decimal.Value;
 }
 
 export async function createDamageReport(input: DamageReportInput) {
@@ -81,6 +112,17 @@ export async function createDamageReport(input: DamageReportInput) {
       damageValue: D(input.damageValue),
       currency: input.currency ?? "USD",
       description: input.description ?? null,
+      clientId: input.clientId ?? null,
+      vehicleId: input.vehicleId ?? null,
+      driverId: input.driverId ?? null,
+      incidentType: input.incidentType ?? "TRANSIT_DAMAGE",
+      location: input.location ?? null,
+      rootCause: input.rootCause ?? "UNDETERMINED",
+      liableParty: input.liableParty ?? null,
+      insurerName: input.insurerName ?? null,
+      claimNumber: input.claimNumber ?? null,
+      claimStatus: input.claimStatus ?? "NOT_FILED",
+      settlementAmount: D(input.settlementAmount ?? 0),
       createdById: input.createdById ?? null,
     },
   });
@@ -127,4 +169,110 @@ export async function recordFeedback(input: FeedbackInput) {
       createdById: input.createdById ?? null,
     },
   });
+}
+
+/**
+ * Damage ratio for an incident, as a percentage of the shipment's value.
+ *
+ * Derived rather than stored: it is damageValue / cargoValue, and a stored copy
+ * would go wrong the moment either figure is corrected during assessment.
+ * A shipment with no recorded value yields 0 rather than a division by zero.
+ */
+export function damageRatioPct(cargoValue: Prisma.Decimal.Value, damageValue: Prisma.Decimal.Value): number {
+  const cargo = D(cargoValue);
+  if (cargo.lessThanOrEqualTo(0)) return 0;
+  return Math.round(D(damageValue).dividedBy(cargo).times(1000).toNumber()) / 10;
+}
+
+/** Share of an incident's loss actually recovered from insurer or liable party. */
+export function recoveryPct(damageValue: Prisma.Decimal.Value, settlementAmount: Prisma.Decimal.Value): number {
+  const loss = D(damageValue);
+  if (loss.lessThanOrEqualTo(0)) return 0;
+  return Math.round(D(settlementAmount).dividedBy(loss).times(1000).toNumber()) / 10;
+}
+
+// ── Dwell time and detention (client amendments, Aug 2026) ───────────────────
+
+/**
+ * Hours a truck spent at the dock, and whether that exceeded the free period.
+ *
+ * Neither value is stored. Dwell is the gap between an arrival and its paired
+ * departure, so a stored copy would go stale the moment either timestamp is
+ * corrected, and the free period is a policy that can change retrospectively.
+ */
+export const DEFAULT_FREE_HOURS = 4;
+
+export interface DwellResult {
+  /** Hours at the dock, or null while the truck is still inside. */
+  dwellHours: number | null;
+  /** Hours beyond the free period. 0 when inside it, null while still on site. */
+  detentionHours: number | null;
+}
+
+export function dwellFor(
+  arrivalAt: Date | null,
+  departureAt: Date | null,
+  freeHours = DEFAULT_FREE_HOURS,
+): DwellResult {
+  if (!arrivalAt || !departureAt) return { dwellHours: null, detentionHours: null };
+  // A departure recorded before its arrival is a data-entry error, not negative
+  // dwell; report zero rather than a number that would flatter the average.
+  const hours = Math.max(0, (departureAt.getTime() - arrivalAt.getTime()) / 3_600_000);
+  return {
+    dwellHours: Math.round(hours * 10) / 10,
+    detentionHours: Math.round(Math.max(0, hours - freeHours) * 10) / 10,
+  };
+}
+
+/** "3h 45m", or "—" while the truck has not left yet. */
+export function formatDwell(hours: number | null): string {
+  if (hours == null) return "—";
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+export interface DockEventRow {
+  id: string;
+  vehicleId: string;
+  kind: "ARRIVAL" | "DEPARTURE";
+  eventAt: Date;
+}
+
+/**
+ * Attach dwell and detention to each ARRIVAL by pairing it with the next
+ * DEPARTURE for the same vehicle.
+ *
+ * A second arrival with no departure between them supersedes the first: the
+ * truck plainly left without being logged out, and pairing across that gap
+ * would report a dwell of days.
+ */
+export function withDwell<T extends DockEventRow>(
+  events: T[],
+  freeHours = DEFAULT_FREE_HOURS,
+): (T & DwellResult)[] {
+  const byVehicle = new Map<string, T[]>();
+  for (const e of events) {
+    if (!byVehicle.has(e.vehicleId)) byVehicle.set(e.vehicleId, []);
+    byVehicle.get(e.vehicleId)!.push(e);
+  }
+
+  const paired = new Map<string, DwellResult>();
+  for (const list of byVehicle.values()) {
+    const ordered = [...list].sort((a, b) => a.eventAt.getTime() - b.eventAt.getTime());
+    let openArrival: T | null = null;
+    for (const ev of ordered) {
+      if (ev.kind === "ARRIVAL") {
+        openArrival = ev; // a prior unmatched arrival is dropped on purpose
+      } else if (openArrival) {
+        paired.set(openArrival.id, dwellFor(openArrival.eventAt, ev.eventAt, freeHours));
+        openArrival = null;
+      }
+    }
+  }
+
+  return events.map((e) => ({
+    ...e,
+    ...(paired.get(e.id) ?? { dwellHours: null, detentionHours: null }),
+  }));
 }

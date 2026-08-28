@@ -46,6 +46,8 @@ export const resetPasswordSchema = z
 
 // ───────── Driver ─────────
 const os = (max: number) => z.string().max(max).optional().or(z.literal(""));
+// Like `os` but also accepts null (forms send null for empty optional fields).
+const optText = (max: number) => z.string().max(max).nullish().or(z.literal(""));
 
 export const driverSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -884,6 +886,13 @@ export const expenseLineSchema = z.object({
   amount: z.coerce.number().positive("Amount must be positive"),
   incurredAt: z.coerce.date(),
   receiptUrl: z.string().max(300).optional().nullable(),
+  // Ties the cost to the asset and run that caused it (client amendments, Aug 2026).
+  postingDate: z.coerce.date().optional().nullable(),
+  voucherRef: os(60),
+  vehicleId: z.string().nullish(),
+  tripId: z.string().nullish(),
+  odometerKm: z.coerce.number().int().min(0).nullish(),
+  taxAmount: z.coerce.number().min(0).default(0),
 });
 
 export const expenseClaimSchema = z.object({
@@ -892,6 +901,9 @@ export const expenseClaimSchema = z.object({
   title: z.string().min(1, "Title is required").max(150),
   currency: currencyCode.default("USD"),
   advanceId: z.string().optional().nullable(),
+  // Allocation (client amendments, Aug 2026).
+  costCenter: os(80),
+  branch: os(80),
   lines: z.array(expenseLineSchema).min(1, "At least one line is required"),
 });
 
@@ -924,6 +936,9 @@ export const fixedAssetSchema = z.object({
   code: z.string().min(1, "Asset tag is required").max(40),
   name: z.string().min(1, "Name is required").max(150),
   category: z.enum(["VEHICLE", "EQUIPMENT", "FURNITURE", "BUILDING", "IT", "OTHER"]).default("EQUIPMENT"),
+  // Set when the asset IS a truck, so its depreciation counts toward that
+  // vehicle's cost of ownership.
+  vehicleId: z.string().nullish(),
   acquisitionCost: z.coerce.number().positive("Acquisition cost must be positive"),
   residualValue: z.coerce.number().min(0, "Residual value cannot be negative").default(0),
   usefulLifeMonths: z.coerce.number().int().positive("Useful life must be a positive number of months"),
@@ -932,6 +947,8 @@ export const fixedAssetSchema = z.object({
   assetAccountCode: z.string().max(20).default("1500"),
   accumDepCode: z.string().max(20).default("1510"),
   expenseCode: z.string().max(20).default("5200"),
+  warrantyProvider: optText(120),
+  warrantyExpiresAt: z.coerce.date().optional().nullable(),
 }).refine((a) => a.residualValue < a.acquisitionCost, {
   message: "Residual value must be less than acquisition cost",
   path: ["residualValue"],
@@ -1095,6 +1112,16 @@ export const dockEventSchema = z.object({
   kind: z.enum(["ARRIVAL", "DEPARTURE"]),
   eventAt: z.coerce.date(),
   note: os(500),
+  // Gate and yard detail (client amendments, Aug 2026).
+  driverId: z.string().nullish(),
+  trailerNumber: os(60),
+  dockBay: os(60),
+  activity: z.enum(["LOADING", "OFFLOADING", "CUSTOMS_INSPECTION", "CROSS_DOCKING", "OVERNIGHT_STAGING", "OTHER"]).default("OTHER"),
+  sealNumber: os(60),
+  sealIntact: z.boolean().nullish(),
+  odometerKm: z.coerce.number().int().min(0).nullish(),
+  fuelLevel: os(30),
+  source: z.enum(["MANUAL", "GEOFENCE", "GATE_SCANNER", "MOBILE_APP"]).default("MANUAL"),
 });
 
 export const damageReportSchema = z.object({
@@ -1105,6 +1132,18 @@ export const damageReportSchema = z.object({
   damageValue: z.coerce.number().min(0, "Damage value cannot be negative"),
   currency: currencyCode.optional(),
   description: os(1000),
+  // Incident detail (client amendments, Aug 2026).
+  clientId: z.string().nullish(),
+  vehicleId: z.string().nullish(),
+  driverId: z.string().nullish(),
+  incidentType: z.enum(["TRANSIT_DAMAGE", "MOISTURE_DAMAGE", "SHORTAGE_THEFT", "CONTAMINATION_SPILLAGE", "ROAD_ACCIDENT", "OTHER"]).default("TRANSIT_DAMAGE"),
+  location: os(200),
+  rootCause: z.enum(["DRIVER_NEGLIGENCE", "POOR_PACKAGING", "MECHANICAL_FAILURE", "THIRD_PARTY", "FORCE_MAJEURE", "UNDETERMINED"]).default("UNDETERMINED"),
+  liableParty: os(150),
+  insurerName: os(150),
+  claimNumber: os(80),
+  claimStatus: z.enum(["NOT_FILED", "LODGED", "UNDER_ASSESSMENT", "APPROVED", "RECOVERED", "REJECTED"]).default("NOT_FILED"),
+  settlementAmount: z.coerce.number().min(0).default(0),
 }).refine((d) => d.damageValue <= d.cargoValue, {
   message: "Damage value cannot exceed the cargo value",
   path: ["damageValue"],

@@ -54,7 +54,7 @@ const GROUPS: NavGroup[] = [
     label: "Service Quality",
     items: [
       { href: "/dock-events", label: "Dock Events", icon: Anchor, perm: "kpi:read" },
-      { href: "/damage-reports", label: "Damage Reports", icon: PackageX, perm: "kpi:read" },
+      { href: "/damage-reports", label: "Incident Reports", icon: PackageX, perm: "kpi:read" },
       { href: "/feedback", label: "Customer Feedback", icon: MessageSquareHeart, perm: "kpi:read" },
     ],
   },

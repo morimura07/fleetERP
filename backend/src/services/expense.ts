@@ -66,6 +66,13 @@ export interface ClaimLineInput {
   amount: Prisma.Decimal.Value;
   incurredAt: Date;
   receiptUrl?: string | null;
+  // Operational allocation (client amendments, Aug 2026).
+  postingDate?: Date | null;
+  voucherRef?: string | null;
+  vehicleId?: string | null;
+  tripId?: string | null;
+  odometerKm?: number | null;
+  taxAmount?: Prisma.Decimal.Value;
 }
 
 export interface CreateClaimInput {
@@ -74,6 +81,8 @@ export interface CreateClaimInput {
   title: string;
   currency: string;
   advanceId?: string | null;
+  costCenter?: string | null;
+  branch?: string | null;
   lines: ClaimLineInput[];
   createdById?: string | null;
 }
@@ -92,6 +101,8 @@ export async function createClaim(input: CreateClaimInput) {
       title: input.title,
       currency: input.currency,
       advanceId: input.advanceId ?? null,
+      costCenter: input.costCenter ?? null,
+      branch: input.branch ?? null,
       total: total.toFixed(2),
       createdById: input.createdById ?? null,
       lines: {
@@ -101,6 +112,14 @@ export async function createClaim(input: CreateClaimInput) {
           amount: D(l.amount).toFixed(2),
           incurredAt: l.incurredAt,
           receiptUrl: l.receiptUrl ?? null,
+          // Defaults to the date it was incurred, which is what a bookkeeper
+          // expects unless the claim is posted into a later period.
+          postingDate: l.postingDate ?? l.incurredAt,
+          voucherRef: l.voucherRef ?? null,
+          vehicleId: l.vehicleId ?? null,
+          tripId: l.tripId ?? null,
+          odometerKm: l.odometerKm ?? null,
+          taxAmount: D(l.taxAmount ?? 0).toFixed(2),
         })),
       },
     },

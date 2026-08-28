@@ -454,7 +454,7 @@ cd frontend && npm run build && npm start              # → :3000
 Tests live with the backend (they cover the domain services):
 ```bash
 cd backend
-npm test                 # 328 unit tests (tenancy isolation, double-entry balancing, trip P&L,
+npm test                 # 327 unit tests (tenancy isolation, double-entry balancing, trip P&L,
                          # dispatch conflicts, plan vs actual, statutory payroll, validation)
 npm run test:integration # integration tests (requires DATABASE_URL + migrate deploy)
 npm run typecheck        # type check
