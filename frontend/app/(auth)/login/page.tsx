@@ -6,6 +6,7 @@ import { signIn, signOut } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loginSchema } from "@frontend/lib/validations";
+import { loginErrorMessage } from "@frontend/lib/login-errors";
 import { clearToken } from "@frontend/lib/auth-token";
 import { z } from "zod";
 import { Button } from "@frontend/components/ui/button";
@@ -37,9 +38,19 @@ function LoginForm() {
 
   async function onSubmit(data: FormData) {
     setError(null);
-    const res = await signIn("credentials", { ...data, redirect: false });
+    let res: Awaited<ReturnType<typeof signIn>>;
+    try {
+      res = await signIn("credentials", { ...data, redirect: false });
+    } catch (e) {
+      // signIn itself failed, so Next's own route is unreachable — a different
+      // fault from the API being down, and not one the user's password can fix.
+      console.error("[login] sign-in request failed", e);
+      setError("Could not reach the sign-in service. Please reload and try again.");
+      return;
+    }
     if (res?.error) {
-      setError("Incorrect email or password");
+      // `code` carries the reason set in auth.ts; see lib/login-errors.ts.
+      setError(loginErrorMessage(res.code));
       return;
     }
     router.push(params.get("callbackUrl") ?? "/dashboard");
