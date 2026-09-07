@@ -14,7 +14,8 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "set-password": "tsx scripts/set-password.ts"
+    "set-password": "tsx scripts/set-password.ts",
+    "provision-tenant": "tsx scripts/provision-tenant.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
