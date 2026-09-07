@@ -1,11 +1,12 @@
 import { Hono } from "hono";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@backend/lib/prisma";
 import { paginationSchema } from "@backend/lib/validations";
 import { hashPassword } from "@backend/lib/password";
 import { logActivity } from "@backend/lib/activity";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
-import { areaForWrite } from "@backend/lib/scope";
+import { areaForWrite, areaScope } from "@backend/lib/scope";
 import { ok, created, pageMeta } from "@backend/lib/http";
 
 const ou = (max: number) => z.string().max(max).optional().or(z.literal(""));
@@ -29,15 +30,22 @@ const userSchema = z.object({
 export const users = new Hono();
 
 users.get("/", requireAuth, requirePermission("user:manage"), async (c) => {
+  const user = c.get("user");
   const { page, pageSize, q } = paginationSchema.parse(c.req.query());
-  const where = q
-    ? {
-        OR: [
-          { name: { contains: q, mode: "insensitive" as const } },
-          { email: { contains: q, mode: "insensitive" as const } },
-        ],
-      }
-    : {};
+  // Without this an administrator reads every account in the system, including
+  // the names, emails and roles of other tenants' staff. `POST` has always
+  // scoped writes through `areaForWrite`; the list was missed.
+  const where: Prisma.UserWhereInput = {
+    ...areaScope(user),
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" as const } },
+            { email: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
   const [items, total] = await Promise.all([
     prisma.user.findMany({
       where,

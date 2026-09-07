@@ -6,13 +6,19 @@ import { runConsolidation } from "@backend/services/consolidation";
 import { logActivity } from "@backend/lib/activity";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
 import { ok, created } from "@backend/lib/http";
+import { canReachArea } from "@backend/lib/scope";
 
 export const consolidation = new Hono();
 
 /** GET — run a consolidation report; also returns the mapping table. */
 consolidation.get("/", requireAuth, requirePermission("consolidation:read"), async (c) => {
   const sp = c.req.query();
-  const parentArea = sp.parentArea ?? "HQ01";
+  const user = c.get("user");
+  // parentArea arrives as a query parameter, so it has to be checked: without
+  // this, any authenticated holder of consolidation:read could pass another
+  // tenant's code and read their consolidated financials.
+  const requested = sp.parentArea ?? user.dataAreaId;
+  const parentArea = canReachArea(user, requested) ? requested : user.dataAreaId;
   const baseCurrency = sp.baseCurrency ?? "USD";
   const rateType = (sp.rateType && sp.rateType in RateType ? sp.rateType : "AVERAGE") as RateType;
   const asOf = sp.asOf ? new Date(sp.asOf) : undefined;

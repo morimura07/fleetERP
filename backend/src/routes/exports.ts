@@ -7,6 +7,7 @@ import { formatDate } from "@backend/lib/format";
 import { logActivity } from "@backend/lib/activity";
 import { AuthError } from "@backend/lib/errors";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
+import { areaScope } from "@backend/lib/scope";
 
 export const exports = new Hono();
 
@@ -19,7 +20,7 @@ exports.get("/dispatch-pdf", requireAuth, requirePermission("export:run"), async
   const end = new Date(dateStr + "T23:59:59");
 
   const dispatches = await prisma.dispatch.findMany({
-    where: { scheduledStart: { gte: start, lte: end }, status: { not: "CANCELLED" } },
+    where: { ...areaScope(user), scheduledStart: { gte: start, lte: end }, status: { not: "CANCELLED" } },
     include: {
       job: { include: { client: { select: { companyName: true } } } },
       driver: { select: { name: true } },
@@ -54,7 +55,7 @@ exports.get("/jobs-csv", requireAuth, requirePermission("export:run"), async (c)
   const status = c.req.query("status");
 
   const jobs = await prisma.deliveryJob.findMany({
-    where: status ? { status: status as never } : {},
+    where: { ...areaScope(user), ...(status ? { status: status as never } : {}) },
     include: { client: { select: { companyName: true } } },
     orderBy: { deliveryDate: "desc" },
   });
@@ -111,13 +112,16 @@ exports.get("/payment-pdf", requireAuth, requirePermission("export:run"), async 
 exports.get("/report-pdf/:id", requireAuth, requirePermission("report:read"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
-  const r = await prisma.dailyReport.findUniqueOrThrow({
-    where: { id },
+  // findFirst + scope, not findUniqueOrThrow: a report belonging to another
+  // tenant must read as missing rather than be rendered into a PDF.
+  const r = await prisma.dailyReport.findFirst({
+    where: { id, ...areaScope(user) },
     include: {
       driver: { select: { name: true } },
       job: { include: { client: { select: { companyName: true } } } },
     },
   });
+  if (!r) throw new AuthError("Not found", 404);
 
   const pdf = await dailyReportPdf({
     driver: r.driver.name,
