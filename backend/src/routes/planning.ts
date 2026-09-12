@@ -1,17 +1,19 @@
 import { Hono } from "hono";
-import { Prisma, CorridorType, ForecastStatus } from "@prisma/client";
+import { Prisma, CorridorType, ForecastStatus, ForecastScenario } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import {
   forecastSchema, forecastUpdateSchema, forecastStatusSchema, paginationSchema,
 } from "@backend/lib/validations";
 import {
   createForecast, updateForecast, setForecastStatus, computeCapacityPlan,
-  computePlanVsActual,
+  computePlanVsActual, computeFleetPlan, type FleetLine,
 } from "@backend/services/planning";
 import { logActivity } from "@backend/lib/activity";
 import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
 import { ok, created, pageMeta } from "@backend/lib/http";
+import { exportIfRequested } from "@backend/lib/export-http";
+import type { ExportSpec } from "@backend/services/export";
 
 export const planning = new Hono();
 
@@ -57,6 +59,7 @@ planning.post("/forecasts", requireAuth, requirePermission("planning:write"), as
     contractName: body.contractName || null,
     cargoType: body.cargoType || null,
     equipmentClass: body.equipmentClass ?? null,
+    scenario: body.scenario,
     originHub: body.originHub || null,
     destinationHub: body.destinationHub || null,
     turnaroundDays: body.turnaroundDays ?? null,
@@ -103,6 +106,53 @@ planning.get("/capacity", requireAuth, requirePermission("planning:read"), async
     lines: plan.lines.map((l) => ({ ...l, forecastTonnes: l.forecastTonnes.toFixed(2) })),
   };
   return ok(c, out);
+});
+
+/** Columns for the capacity plan export, in the order the screen shows them. */
+const FLEET_PLAN_EXPORT = {
+  title: "Capacity Plan",
+  columns: [
+    { header: "Corridor", value: (l: FleetLine) => l.corridor, width: 12 },
+    { header: "Equipment", value: (l: FleetLine) => l.equipmentClass ?? "Any", width: 15 },
+    { header: "Forecast loads", value: (l: FleetLine) => l.forecastLoads, width: 13 },
+    { header: "Forecast tonnes", value: (l: FleetLine) => l.forecastTonnes.toNumber(), width: 14 },
+    { header: "Turnaround (days)", value: (l: FleetLine) => l.turnaroundDays, width: 15 },
+    { header: "Required fleet", value: (l: FleetLine) => l.requiredFleet, width: 13 },
+    { header: "Own fleet", value: (l: FleetLine) => l.ownFleet, width: 11 },
+    { header: "In workshop", value: (l: FleetLine) => l.maintenanceFleet, width: 12 },
+    { header: "Net capacity", value: (l: FleetLine) => l.netOperationalCapacity, width: 12 },
+    { header: "Gap", value: (l: FleetLine) => l.capacityGap, width: 9 },
+    { header: "Subcontract needed", value: (l: FleetLine) => l.subcontractRequired, width: 16 },
+    { header: "Readiness %", value: (l: FleetLine) => l.readinessPct, width: 11 },
+  ],
+} satisfies ExportSpec<FleetLine>;
+
+/**
+ * Demand against the fleet that can actually serve it.
+ *
+ * Supersedes /capacity, which counts one truck per load and so ignores how long
+ * a corridor takes to turn around. The older route is left in place because the
+ * existing screen still calls it.
+ */
+planning.get("/fleet-plan", requireAuth, requirePermission("planning:read"), async (c) => {
+  const user = c.get("user");
+  const sp = c.req.query();
+  const period = sp.period;
+  if (!period) return c.json({ error: "A period query parameter is required" }, 422);
+
+  const plan = await computeFleetPlan(areaForWrite(user, undefined), period, {
+    corridor: sp.corridor && sp.corridor in CorridorType ? (sp.corridor as CorridorType) : undefined,
+    scenario:
+      sp.scenario && sp.scenario in ForecastScenario ? (sp.scenario as ForecastScenario) : undefined,
+  });
+
+  const file = await exportIfRequested(c, FLEET_PLAN_EXPORT, async () => plan.lines);
+  if (file) return file;
+
+  return ok(c, {
+    ...plan,
+    lines: plan.lines.map((l) => ({ ...l, forecastTonnes: l.forecastTonnes.toFixed(2) })),
+  });
 });
 
 // ── Plan vs actual (what was forecast against what actually moved) ───────────

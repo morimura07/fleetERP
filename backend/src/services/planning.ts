@@ -1,4 +1,4 @@
-import { Prisma, CorridorType, ForecastStatus, EquipmentType } from "@prisma/client";
+import { Prisma, CorridorType, ForecastStatus, EquipmentType, ForecastScenario } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { AuthError } from "@backend/lib/errors";
 
@@ -42,6 +42,133 @@ export function capacityLine(
   const surplus = Math.max(0, capacityLoads - forecastLoads);
   const utilizationPct = capacityLoads > 0 ? Math.round((forecastLoads / capacityLoads) * 1000) / 10 : 0;
   return { corridor, forecastLoads, forecastTonnes: D(forecastTonnes), capacityLoads, shortfall, surplus, utilizationPct };
+}
+
+// ── Fleet requirement (client requirements, Sept 2026) ───────────────────────
+
+/**
+ * Trucks needed to move a forecast within its period.
+ *
+ * The figure turns on turnaround time, which the old `capacityLine` above
+ * ignored by treating one truck as one load. On a Dar es Salaam to Lubumbashi
+ * run of twelve days a truck serves about two and a half loads a month, not
+ * thirty, so ignoring it understates the fleet needed on long corridors by an
+ * order of magnitude and overstates it on short ones.
+ *
+ *     trucks = loads ÷ (period days ÷ turnaround days)
+ *
+ * Rounded up: two thirds of a truck cannot move freight.
+ */
+export function requiredFleet(
+  forecastLoads: number,
+  turnaroundDays: number | null,
+  days: number,
+): number {
+  if (forecastLoads <= 0 || days <= 0) return 0;
+  // Without a turnaround time there is nothing to divide by. Falling back to
+  // one truck per load is the old behaviour and is flagged to the caller
+  // through `turnaroundKnown`, so the screen can say the figure is a placeholder
+  // rather than quietly presenting a guess as a plan.
+  if (turnaroundDays === null || turnaroundDays <= 0) return forecastLoads;
+  const tripsPerTruck = days / turnaroundDays;
+  return Math.ceil(forecastLoads / tripsPerTruck);
+}
+
+export interface FleetLine {
+  corridor: CorridorType;
+  equipmentClass: EquipmentType | null;
+  forecastLoads: number;
+  forecastTonnes: Prisma.Decimal;
+  turnaroundDays: number | null;
+  /** False when turnaround time is unset and requiredFleet fell back. */
+  turnaroundKnown: boolean;
+  /** Trucks needed to serve the forecast within the period. */
+  requiredFleet: number;
+  /** Company trucks of the right equipment class, whatever their state. */
+  ownFleet: number;
+  /** Of those, the ones in the workshop or otherwise off the road. */
+  maintenanceFleet: number;
+  /** Own fleet less the workshop: what can actually be dispatched. */
+  netOperationalCapacity: number;
+  /** Net capacity less requirement. Negative is a shortfall. */
+  capacityGap: number;
+  /** Third-party trucks needed to close a deficit. */
+  subcontractRequired: number;
+  /** Share of dispatchable capacity this forecast would consume. */
+  readinessPct: number;
+}
+
+export interface FleetInputs {
+  corridor: CorridorType;
+  equipmentClass: EquipmentType | null;
+  forecastLoads: number;
+  forecastTonnes: Prisma.Decimal.Value;
+  turnaroundDays: number | null;
+  ownFleet: number;
+  maintenanceFleet: number;
+}
+
+/**
+ * One corridor's demand against the fleet that can actually serve it. Pure.
+ *
+ * Readiness is requirement over net capacity rather than over the whole fleet:
+ * a yard of thirty trucks with twenty in the workshop is not 50% utilised by a
+ * job needing fifteen, it is oversubscribed.
+ */
+export function fleetLine(input: FleetInputs, days: number): FleetLine {
+  const maintenanceFleet = Math.min(input.maintenanceFleet, input.ownFleet);
+  const netOperationalCapacity = Math.max(0, input.ownFleet - maintenanceFleet);
+  const turnaroundKnown = input.turnaroundDays !== null && input.turnaroundDays > 0;
+  const required = requiredFleet(input.forecastLoads, input.turnaroundDays, days);
+  const capacityGap = netOperationalCapacity - required;
+
+  return {
+    corridor: input.corridor,
+    equipmentClass: input.equipmentClass,
+    forecastLoads: input.forecastLoads,
+    forecastTonnes: D(input.forecastTonnes),
+    turnaroundDays: input.turnaroundDays,
+    turnaroundKnown,
+    requiredFleet: required,
+    ownFleet: input.ownFleet,
+    maintenanceFleet,
+    netOperationalCapacity,
+    capacityGap,
+    subcontractRequired: Math.max(0, -capacityGap),
+    readinessPct:
+      netOperationalCapacity > 0 ? Math.round((required / netOperationalCapacity) * 1000) / 10 : 0,
+  };
+}
+
+export interface FleetPlan {
+  period: string;
+  days: number;
+  lines: FleetLine[];
+  totalRequiredFleet: number;
+  totalNetCapacity: number;
+  totalSubcontractRequired: number;
+  overallReadinessPct: number;
+  /** Lines whose requirement is a placeholder for want of a turnaround time. */
+  linesMissingTurnaround: number;
+}
+
+export function summarizeFleetPlan(period: string, days: number, lines: FleetLine[]): FleetPlan {
+  const totalRequiredFleet = lines.reduce((s, l) => s + l.requiredFleet, 0);
+  // Summed across lines, so a truck counted for two corridors is counted twice.
+  // That is the intent: the total answers "how much fleet do these plans want",
+  // not "how many distinct trucks exist".
+  const totalNetCapacity = lines.reduce((s, l) => s + l.netOperationalCapacity, 0);
+  return {
+    period,
+    days,
+    lines,
+    totalRequiredFleet,
+    totalNetCapacity,
+    totalSubcontractRequired: lines.reduce((s, l) => s + l.subcontractRequired, 0),
+    overallReadinessPct:
+      totalNetCapacity > 0 ? Math.round((totalRequiredFleet / totalNetCapacity) * 1000) / 10 : 0,
+    linesMissingTurnaround: lines.filter((l) => !l.turnaroundKnown && l.forecastLoads > 0).length,
+  };
 }
 
 export interface CapacityPlan {
@@ -95,7 +222,34 @@ export function periodRange(period: string): { start: Date; end: Date } | null {
     return { start, end: new Date(start.getTime() + 7 * 86_400_000) };
   }
 
+  // Quarterly and annual horizons (client requirements, Sept 2026): the
+  // planning screen toggles between month, quarter and year, and every one of
+  // them has to resolve to real dates for the capacity maths to divide by.
+  const quarter = /^(\d{4})-Q([1-4])$/.exec(period);
+  if (quarter) {
+    const year = Number(quarter[1]);
+    const q = Number(quarter[2]);
+    const firstMonth = (q - 1) * 3;
+    return {
+      start: new Date(Date.UTC(year, firstMonth, 1)),
+      end: new Date(Date.UTC(year, firstMonth + 3, 1)),
+    };
+  }
+
+  const annual = /^(\d{4})$/.exec(period);
+  if (annual) {
+    const year = Number(annual[1]);
+    return { start: new Date(Date.UTC(year, 0, 1)), end: new Date(Date.UTC(year + 1, 0, 1)) };
+  }
+
   return null;
+}
+
+/** Days a period label covers, or null if the label is not one we understand. */
+export function periodDays(period: string): number | null {
+  const range = periodRange(period);
+  if (!range) return null;
+  return Math.round((range.end.getTime() - range.start.getTime()) / 86_400_000);
 }
 
 export interface PlanActualLine {
@@ -257,6 +411,7 @@ export interface ForecastInput {
   destinationHub?: string | null;
   turnaroundDays?: Prisma.Decimal.Value | null;
   projectedRevenue?: Prisma.Decimal.Value | null;
+  scenario?: ForecastScenario;
 }
 
 export async function createForecast(input: ForecastInput) {
@@ -279,6 +434,7 @@ export async function createForecast(input: ForecastInput) {
       contractName: input.contractName ?? null,
       cargoType: input.cargoType ?? null,
       equipmentClass: input.equipmentClass ?? null,
+      scenario: input.scenario ?? "BASE",
       originHub: input.originHub ?? null,
       destinationHub: input.destinationHub ?? null,
       turnaroundDays: input.turnaroundDays != null ? D(input.turnaroundDays) : null,
@@ -341,6 +497,92 @@ export async function setForecastStatus(dataAreaId: string, id: string, status: 
  * when set, otherwise the live count of available trucks split evenly across the
  * period's corridors (a simple even allocation of the shared fleet).
  */
+export interface FleetPlanOptions {
+  corridor?: CorridorType;
+  scenario?: ForecastScenario;
+}
+
+/**
+ * The capacity picture the planning screen shows: demand against the fleet that
+ * can actually serve it, corridor by corridor.
+ *
+ * Own fleet is counted per equipment class, because a tanker cannot take a
+ * flatbed load. A forecast that names no class is served by the whole fleet,
+ * and a truck with no class set is counted against no class at all: guessing
+ * either way would overstate capacity, and overstating capacity is how a
+ * planner finds out they are short on the day of loading.
+ */
+export async function computeFleetPlan(
+  dataAreaId: string,
+  period: string,
+  options: FleetPlanOptions = {},
+): Promise<FleetPlan> {
+  const days = periodDays(period);
+  if (days === null) {
+    throw new AuthError(
+      `"${period}" is not a period this system understands. Use 2026-08, 2026-Q3, 2026 or 2026-W32.`,
+      422,
+    );
+  }
+
+  const forecasts = await prisma.demandForecast.findMany({
+    where: {
+      dataAreaId,
+      period,
+      status: "CONFIRMED",
+      ...(options.corridor ? { corridor: options.corridor } : {}),
+      // Absent a choice, the base case is the plan of record.
+      scenario: options.scenario ?? "BASE",
+    },
+    orderBy: [{ corridor: "asc" }, { equipmentClass: "asc" }],
+  });
+
+  // One grouped query for the whole fleet rather than one per forecast line.
+  const fleet = await prisma.vehicle.groupBy({
+    by: ["equipmentType", "status"],
+    where: { dataAreaId },
+    _count: { _all: true },
+  });
+
+  const owned = new Map<string, number>();
+  const offRoad = new Map<string, number>();
+  let ownedTotal = 0;
+  let offRoadTotal = 0;
+  for (const row of fleet) {
+    const key = row.equipmentType ?? "";
+    const n = row._count._all;
+    // A truck with no class set counts toward the fleet total but toward no
+    // particular class, so it never inflates a class it may not belong to.
+    if (key) owned.set(key, (owned.get(key) ?? 0) + n);
+    ownedTotal += n;
+    if (row.status !== "AVAILABLE") {
+      if (key) offRoad.set(key, (offRoad.get(key) ?? 0) + n);
+      offRoadTotal += n;
+    }
+  }
+
+  const lines = forecasts.map((f) => {
+    const cls = f.equipmentClass;
+    return fleetLine(
+      {
+        corridor: f.corridor,
+        equipmentClass: cls,
+        forecastLoads: f.forecastLoads,
+        forecastTonnes: f.forecastTonnes,
+        turnaroundDays: f.turnaroundDays === null ? null : Number(f.turnaroundDays),
+        // An explicit plannedTrucks overrides the live count, which is how a
+        // planner models a fleet they are about to have rather than the one
+        // they have today.
+        ownFleet: f.plannedTrucks ?? (cls ? (owned.get(cls) ?? 0) : ownedTotal),
+        maintenanceFleet: f.plannedTrucks != null ? 0 : cls ? (offRoad.get(cls) ?? 0) : offRoadTotal,
+      },
+      days,
+    );
+  });
+
+  return summarizeFleetPlan(period, days, lines);
+}
+
 export async function computeCapacityPlan(dataAreaId: string, period: string): Promise<CapacityPlan> {
   const forecasts = await prisma.demandForecast.findMany({
     where: { dataAreaId, period, status: "CONFIRMED" },

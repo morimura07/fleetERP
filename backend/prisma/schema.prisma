@@ -881,10 +881,14 @@ model Vehicle {
   status           VehicleStatus @default(AVAILABLE)
 
   // ── Identification & specs (spec: Vehicles §1) ──
-  vin         String? // VIN / chassis number
-  yearMade    Int?
-  vehicleType String? // Flatbed / Tanker / Box Van / Reefer
-  bodyType    String? // rigid / articulated tractor / trailer
+  vin           String? // VIN / chassis number
+  yearMade      Int?
+  vehicleType   String? // Flatbed / Tanker / Box Van / Reefer
+  /// Equipment class, as a fixed list rather than the free text above.
+  /// Master Planning matches a forecast to the trucks that can actually serve
+  /// it, which needs both sides drawn from the same vocabulary.
+  equipmentType EquipmentType?
+  bodyType      String? // rigid / articulated tractor / trailer
 
   // ── Physical & technical (spec: Vehicles §2) ──
   tareWeightKg     Decimal? @db.Decimal(12, 2)
@@ -3096,14 +3100,18 @@ model DemandForecast {
   // converts a load count into a truck count, so it belongs on the forecast
   // rather than being assumed globally.
   clientId         String?
-  client           Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  client           Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
   contractName     String?
   cargoType        String?
   equipmentClass   EquipmentType? // flatbed, tanker, 40ft skeleton …
   originHub        String?
   destinationHub   String?
-  turnaroundDays   Decimal?       @db.Decimal(6, 2)
-  projectedRevenue Decimal?       @db.Decimal(18, 2)
+  turnaroundDays   Decimal?         @db.Decimal(6, 2)
+  /// Which version of the future this row describes. Planners keep an
+  /// optimistic, a base and a pessimistic set side by side and switch between
+  /// them, so the scenario belongs on the row rather than on a separate plan.
+  scenario         ForecastScenario @default(BASE)
+  projectedRevenue Decimal?         @db.Decimal(18, 2)
 
   version     Int      @default(0)
   createdById String?
@@ -3375,4 +3383,12 @@ model Attachment {
   @@index([dataAreaId, entityType, entityId])
   @@index([entityType, entityId])
   @@map("attachments")
+}
+
+/// Planning scenarios kept side by side, so a corridor can hold three
+/// forecasts for the same period without one overwriting another.
+enum ForecastScenario {
+  OPTIMISTIC
+  BASE
+  PESSIMISTIC
 }

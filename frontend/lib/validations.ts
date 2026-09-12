@@ -123,6 +123,9 @@ export const vehicleSchema = z.object({
   yearMade: z.coerce.number().int().min(1900).max(2100).optional().nullable(),
   vehicleType: os(60),
   bodyType: os(60),
+  // Fixed list, unlike vehicleType above: Master Planning matches a forecast
+  // to the trucks that can serve it, which needs one shared vocabulary.
+  equipmentType: z.enum(["FLATBED", "DRY_VAN", "REEFER", "TANKER", "CONTAINER_20FT", "CONTAINER_40FT", "CURTAIN_SIDE", "LTL", "OTHER"]).nullish(),
   // Physical & technical (spec §2)
   tareWeightKg: onum(),
   gvwKg: onum(),
@@ -1270,6 +1273,9 @@ export const forecastSchema = z.object({
   contractName: os(150),
   cargoType: os(80),
   equipmentClass: z.enum(["FLATBED", "DRY_VAN", "REEFER", "TANKER", "CONTAINER_20FT", "CONTAINER_40FT", "CURTAIN_SIDE", "LTL", "OTHER"]).nullish(),
+  // Which version of the future this row describes, so a corridor can hold an
+  // optimistic, a base and a pessimistic forecast for the same period.
+  scenario: z.enum(["OPTIMISTIC", "BASE", "PESSIMISTIC"]).default("BASE"),
   originHub: os(120),
   destinationHub: os(120),
   turnaroundDays: z.coerce.number().min(0).nullish(),
