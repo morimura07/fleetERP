@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type DepreciationMethod } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { AuthError } from "@backend/lib/errors";
 import { createJournalEntry } from "@backend/services/ledger";
@@ -48,10 +48,10 @@ function endOfPeriod(period: string): Date {
 }
 
 interface AssetForDep {
-  acquisitionCost: Prisma.Decimal;
-  residualValue: Prisma.Decimal;
+  acquisitionCost: Prisma.Decimal.Value;
+  residualValue: Prisma.Decimal.Value;
   usefulLifeMonths: number;
-  accumulatedDepreciation: Prisma.Decimal;
+  accumulatedDepreciation: Prisma.Decimal.Value;
 }
 
 /**
@@ -72,6 +72,107 @@ export function monthlyDepreciation(a: AssetForDep): Prisma.Decimal {
   const straightLine = depreciableBase.dividedBy(a.usefulLifeMonths).toDecimalPlaces(2);
   // Final period: charge only what's left so we land exactly on residual.
   return Prisma.Decimal.min(straightLine, remaining);
+}
+
+// ── Alternative methods (client requirements, Sept 2026, §4) ─────────────────
+
+export interface DepreciationTerms {
+  acquisitionCost: Prisma.Decimal.Value;
+  residualValue: Prisma.Decimal.Value;
+  usefulLifeMonths: number;
+  accumulatedDepreciation: Prisma.Decimal.Value;
+  depreciationMethod: DepreciationMethod;
+  /** Annual percentage for declining balance, e.g. 25 for 25% a year. */
+  decliningRatePct?: Prisma.Decimal.Value | null;
+  /** Lifetime output for units-of-production. */
+  totalExpectedUnits?: Prisma.Decimal.Value | null;
+}
+
+/**
+ * Depreciation for one period under whichever method the asset uses.
+ *
+ * Every method shares two rules, which is what keeps the ledger honest: the
+ * charge never takes book value below residual, and the final period charges
+ * exactly the remainder so the asset lands on residual rather than near it.
+ *
+ * Straight-line delegates to `monthlyDepreciation` above, unchanged, so an
+ * asset that predates this function depreciates exactly as it always has.
+ */
+export function depreciationForPeriod(
+  terms: DepreciationTerms,
+  /** Output produced this period. Only used by units-of-production. */
+  unitsThisPeriod: Prisma.Decimal.Value = 0,
+): Prisma.Decimal {
+  const cost = D(terms.acquisitionCost);
+  const residual = D(terms.residualValue);
+  const depreciableBase = cost.minus(residual);
+  if (depreciableBase.lessThanOrEqualTo(0)) return D(0);
+
+  const accumulated = D(terms.accumulatedDepreciation);
+  const remaining = depreciableBase.minus(accumulated);
+  if (remaining.lessThanOrEqualTo(0)) return D(0);
+
+  let charge: Prisma.Decimal;
+
+  switch (terms.depreciationMethod) {
+    case "DECLINING_BALANCE": {
+      const annualRate = D(terms.decliningRatePct ?? 0);
+      // Without a rate there is nothing to decline by. Falling back to
+      // straight-line is the conservative choice: it still retires the asset
+      // over its useful life instead of charging nothing at all.
+      if (annualRate.lessThanOrEqualTo(0)) {
+        return monthlyDepreciation({ ...terms, accumulatedDepreciation: accumulated });
+      }
+      // Declining balance works on net book value, not on the depreciable base,
+      // so an asset with a residual never quite reaches it by rate alone; the
+      // cap below is what lands it exactly.
+      const netBookValue = cost.minus(accumulated);
+      charge = netBookValue.times(annualRate).dividedBy(100).dividedBy(12).toDecimalPlaces(2);
+      break;
+    }
+
+    case "UNITS_OF_PRODUCTION": {
+      const total = D(terms.totalExpectedUnits ?? 0);
+      // No expected lifetime output means no rate per unit. Straight-line again,
+      // rather than a charge of zero that would quietly never depreciate.
+      if (total.lessThanOrEqualTo(0)) {
+        return monthlyDepreciation({ ...terms, accumulatedDepreciation: accumulated });
+      }
+      const units = D(unitsThisPeriod);
+      if (units.lessThanOrEqualTo(0)) return D(0); // idle asset, no charge
+      charge = depreciableBase.times(units).dividedBy(total).toDecimalPlaces(2);
+      break;
+    }
+
+    default:
+      return monthlyDepreciation({ ...terms, accumulatedDepreciation: accumulated });
+  }
+
+  return Prisma.Decimal.min(Prisma.Decimal.max(charge, D(0)), remaining);
+}
+
+/**
+ * Output recorded against the asset that has not yet been depreciated.
+ *
+ * Units-of-production charges by use, but the register stores a lifetime meter
+ * rather than a reading per period, so the units for this run are the gap
+ * between what the meter says and what the accumulated charge implies. Anyone
+ * updating the meter therefore gets the catch-up charge on the next run, which
+ * is the behaviour a workshop expects when a reading is entered late.
+ */
+export function unitsNotYetCharged(
+  unitsProduced: Prisma.Decimal.Value,
+  totalExpectedUnits: Prisma.Decimal.Value | null,
+  accumulatedDepreciation: Prisma.Decimal.Value,
+  acquisitionCost: Prisma.Decimal.Value,
+  residualValue: Prisma.Decimal.Value,
+): Prisma.Decimal {
+  const total = D(totalExpectedUnits ?? 0);
+  const base = D(acquisitionCost).minus(residualValue);
+  if (total.lessThanOrEqualTo(0) || base.lessThanOrEqualTo(0)) return D(0);
+  // Units already paid for, implied by what has been charged so far.
+  const unitsCharged = D(accumulatedDepreciation).times(total).dividedBy(base);
+  return Prisma.Decimal.max(D(unitsProduced).minus(unitsCharged), D(0));
 }
 
 /** Net book value = cost − accumulated depreciation. */
@@ -122,7 +223,15 @@ export async function runDepreciation(
       continue;
     }
 
-    const amount = monthlyDepreciation(asset);
+    // Units-of-production charges against output, which is metered rather than
+    // elapsed time. `unitsProduced` is the running lifetime total, so the units
+    // for this period are whatever has not yet been depreciated against.
+    const unitsThisPeriod =
+      asset.depreciationMethod === "UNITS_OF_PRODUCTION"
+        ? unitsNotYetCharged(asset.unitsProduced, asset.totalExpectedUnits, asset.accumulatedDepreciation, asset.acquisitionCost, asset.residualValue)
+        : 0;
+
+    const amount = depreciationForPeriod(asset, unitsThisPeriod);
     if (amount.lessThanOrEqualTo(0)) {
       // Fully depreciated already — flip status so future runs ignore it.
       await prisma.fixedAsset.update({

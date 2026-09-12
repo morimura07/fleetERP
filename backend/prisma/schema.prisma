@@ -1544,6 +1544,7 @@ model Vendor {
   version        Int             @default(0) // optimistic concurrency (PRD §7.1)
   createdById    String? // audit: creator user id
   updatedById    String? // audit: last-modifier user id
+  fixedAssets    FixedAsset[]
 
   @@unique([dataAreaId, code])
   @@index([group])
@@ -2245,11 +2246,12 @@ model PurchaseOrder {
   lines    PurchaseOrderLine[]
   receipts GoodsReceipt[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  version     Int      @default(0) // optimistic concurrency (PRD §7.1)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  version     Int          @default(0) // optimistic concurrency (PRD §7.1)
   createdById String?
   updatedById String?
+  fixedAssets FixedAsset[]
 
   @@unique([dataAreaId, poNumber])
   @@index([vendorId])
@@ -2526,6 +2528,72 @@ model FixedAsset {
   // Warranty schedule (M19).
   warrantyProvider  String?
   warrantyExpiresAt DateTime? @db.Date
+
+  // ── Identification (client requirements, Sept 2026, §1) ──
+  /// Sub-group within the category, e.g. "Heavy Duty Trucks" under VEHICLE.
+  assetGroup      String?
+  /// Physical tag stuck on the item, which is rarely the same as `code`.
+  inventoryNumber String?
+  serialNumber    String? // serial or chassis number from the manufacturer
+
+  // ── Operational specification (§2) ──
+  /// Registration for an asset that carries one but is not a fleet Vehicle,
+  /// such as a yard forklift. When `vehicleId` is set the plate on the
+  /// vehicle record is authoritative and this stays empty.
+  registrationNumber String?
+  make               String?
+  model              String?
+  yearMade           Int?
+  fuelType           String?
+  /// Expected consumption in the unit the fleet already uses, km per litre.
+  standardKmPerL     Decimal?   @db.Decimal(8, 2)
+  /// Payload, gross weight or seats. Descriptive and deliberately free text:
+  /// it means different things per category, and the numeric fleet figures
+  /// live on the linked Vehicle where they can be calculated with.
+  capacity           String?
+  meterReading       Decimal?   @db.Decimal(12, 2) // reading when first entered
+  meterUnit          MeterUnit?
+  /// GPS or ELD unit fitted to this asset.
+  telematicsUnitId   String?
+
+  // ── Acquisition (§3) ──
+  /// Who it was bought from. A link rather than a name, so the asset appears
+  /// in the vendor's history and a rename cannot orphan it.
+  vendorId           String?
+  vendor             Vendor?        @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  purchaseOrderId    String?
+  purchaseOrder      PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  /// When it went on the balance sheet, which can differ from both the
+  /// purchase date and the date it entered service.
+  capitalizationDate DateTime?      @db.Date
+
+  // ── Depreciation parameters (§4) ──
+  depreciationMethod    DepreciationMethod @default(STRAIGHT_LINE)
+  /// Annual rate for declining balance, as a percentage.
+  decliningRatePct      Decimal?           @db.Decimal(6, 2)
+  /// Lifetime output for units-of-production, in `meterUnit`.
+  totalExpectedUnits    Decimal?           @db.Decimal(14, 2)
+  /// Output recorded so far, which drives the units-of-production charge.
+  unitsProduced         Decimal            @default(0) @db.Decimal(14, 2)
+  /// When depreciation starts, if not the in-service date.
+  depreciationStartDate DateTime?          @db.Date
+
+  // ── Assignment and location (§5) ──
+  costCenter String?
+  location   String? // depot, yard or terminal it is normally stationed at
+  projectId  String?
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  // ── Compliance and insurance (§6) ──
+  insuranceProvider     String?
+  insurancePolicyNumber String?
+  insuredValue          Decimal?  @db.Decimal(18, 2)
+  insuranceExpiresAt    DateTime? @db.Date
+  /// Next statutory inspection or licence renewal.
+  inspectionDueAt       DateTime? @db.Date
+
+  // ── Origin (§7) ──
+  condition AssetCondition @default(NEW)
 
   entries     DepreciationEntry[]
   assignments AssetAssignment[]
@@ -3067,7 +3135,8 @@ model Project {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  orders Order[]
+  orders      Order[]
+  fixedAssets FixedAsset[]
 
   @@unique([dataAreaId, projectCode])
   @@index([dataAreaId])
@@ -3391,4 +3460,23 @@ enum ForecastScenario {
   OPTIMISTIC
   BASE
   PESSIMISTIC
+}
+
+/// What a meter on an asset counts. A truck runs on distance, a generator on
+/// hours, and units-of-production depreciation needs to know which.
+enum MeterUnit {
+  KILOMETRES
+  HOURS
+}
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+  DECLINING_BALANCE
+  UNITS_OF_PRODUCTION
+}
+
+enum AssetCondition {
+  NEW
+  USED
+  RECONDITIONED
 }

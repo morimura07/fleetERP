@@ -1015,6 +1015,49 @@ export const fixedAssetSchema = z.object({
   expenseCode: z.string().max(20).default("5200"),
   warrantyProvider: optText(120),
   warrantyExpiresAt: z.coerce.date().optional().nullable(),
+
+  // ── Identification (client requirements, Sept 2026, §1) ──
+  assetGroup: optText(120),
+  inventoryNumber: optText(60),
+  serialNumber: optText(80),
+
+  // ── Operational specification (§2) ──
+  registrationNumber: optText(40),
+  make: optText(80),
+  model: optText(80),
+  yearMade: z.coerce.number().int().min(1900).max(2100).optional().nullable(),
+  fuelType: optText(40),
+  standardKmPerL: z.coerce.number().min(0).optional().nullable(),
+  capacity: optText(120),
+  meterReading: z.coerce.number().min(0).optional().nullable(),
+  meterUnit: z.enum(["KILOMETRES", "HOURS"]).nullish(),
+  telematicsUnitId: optText(60),
+
+  // ── Acquisition (§3) ──
+  vendorId: z.string().nullish(),
+  purchaseOrderId: z.string().nullish(),
+  capitalizationDate: z.coerce.date().optional().nullable(),
+
+  // ── Depreciation parameters (§4) ──
+  depreciationMethod: z.enum(["STRAIGHT_LINE", "DECLINING_BALANCE", "UNITS_OF_PRODUCTION"]).default("STRAIGHT_LINE"),
+  decliningRatePct: z.coerce.number().min(0).max(100).optional().nullable(),
+  totalExpectedUnits: z.coerce.number().min(0).optional().nullable(),
+  depreciationStartDate: z.coerce.date().optional().nullable(),
+
+  // ── Assignment and location (§5) ──
+  costCenter: optText(80),
+  location: optText(120),
+  projectId: z.string().nullish(),
+
+  // ── Compliance and insurance (§6) ──
+  insuranceProvider: optText(120),
+  insurancePolicyNumber: optText(80),
+  insuredValue: z.coerce.number().min(0).optional().nullable(),
+  insuranceExpiresAt: z.coerce.date().optional().nullable(),
+  inspectionDueAt: z.coerce.date().optional().nullable(),
+
+  // ── Origin (§7) ──
+  condition: z.enum(["NEW", "USED", "RECONDITIONED"]).default("NEW"),
 }).refine((a) => a.residualValue < a.acquisitionCost, {
   message: "Residual value must be less than acquisition cost",
   path: ["residualValue"],
