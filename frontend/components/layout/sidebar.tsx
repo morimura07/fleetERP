@@ -11,8 +11,7 @@ import {
   ShieldCheck, MapPin, Boxes, ShoppingCart, BadgeDollarSign, Warehouse, Receipt, Scale, Tags, Ruler,
   Building, Wrench, UserCog, Clock,
   Anchor, PackageX, MessageSquareHeart,
-  Target, FileSignature, FolderKanban, CalendarRange, ShoppingBag, Network,
-} from "lucide-react";
+  Target, FileSignature, FolderKanban, CalendarRange, ShoppingBag, Network, FileUp } from "lucide-react";
 import { cn } from "@frontend/lib/utils";
 import { can, type Permission, type Role } from "@frontend/lib/rbac";
 
@@ -56,6 +55,7 @@ const GROUPS: NavGroup[] = [
       { href: "/dock-events", label: "Dock Events", icon: Anchor, perm: "kpi:read" },
       { href: "/damage-reports", label: "Incident Reports", icon: PackageX, perm: "kpi:read" },
       { href: "/feedback", label: "Customer Feedback", icon: MessageSquareHeart, perm: "kpi:read" },
+      { href: "/imports", label: "Data Import", icon: FileUp, perm: "vehicle:write" },
     ],
   },
   {
