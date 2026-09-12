@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "lucide-react";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
+import { KpiRibbon } from "@frontend/components/data/kpi-ribbon";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
@@ -55,6 +56,27 @@ function damageRatio(row: IncidentRow): string {
   return `${Math.round((parseFloat(row.damageValue) / cargo) * 1000) / 10}%`;
 }
 
+interface IncidentSummary {
+  currency: string | null;
+  damageRatePct: number;
+  totalIncurredLoss: string;
+  totalClaimedYtd: string;
+  recoveryRatePct: number;
+  reports: number;
+  excludedOtherCurrency: number;
+}
+
+const STATUS_TABS = [
+  { value: NONE, label: "All" },
+  ...STATUSES.map((s) => ({ value: s as string, label: DAMAGE_STATUS_LABEL[s] })),
+];
+
+const CORRIDORS = [
+  { value: "NORTHERN", label: "Northern" },
+  { value: "CENTRAL", label: "Central" },
+  { value: "DOMESTIC", label: "Domestic" },
+];
+
 export function IncidentReportsManager({
   orders, trips, vehicles, drivers, clients,
 }: {
@@ -64,7 +86,22 @@ export function IncidentReportsManager({
   const [open, setOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [claimFilter, setClaimFilter] = useState<string>(NONE);
+  const [statusTab, setStatusTab] = useState<string>(NONE);
+  const [corridor, setCorridor] = useState<string>(NONE);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const form = useForm<DamageReportInput>({ resolver: zodResolver(damageReportSchema) });
+
+  const filters = useMemo(
+    () => ({
+      ...(claimFilter !== NONE ? { claimStatus: claimFilter } : {}),
+      ...(statusTab !== NONE ? { status: statusTab } : {}),
+      ...(corridor !== NONE ? { corridor } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    }),
+    [claimFilter, statusTab, corridor, from, to],
+  );
 
   function openCreate() {
     form.reset({
@@ -118,15 +155,71 @@ export function IncidentReportsManager({
     { key: "status", header: "Status", render: (r) => <Badge variant={DAMAGE_STATUS_VARIANT[r.status]}>{DAMAGE_STATUS_LABEL[r.status]}</Badge> },
   ];
 
-  const endpoint = claimFilter === NONE
-    ? "/api/operational-kpi/damage-reports"
-    : `/api/operational-kpi/damage-reports?claimStatus=${claimFilter}`;
-
   return (
     <>
+      <KpiRibbon<IncidentSummary>
+        endpoint="/api/operational-kpi/damage-reports/summary"
+        filters={filters}
+        refreshKey={refreshKey}
+        tiles={(s) => [
+          {
+            label: "Damage & claim rate",
+            value: s ? `${s.damageRatePct}%` : "—",
+            hint: "of cargo value carried",
+            tone: s && s.damageRatePct > 5 ? "warn" : "default",
+          },
+          {
+            label: "Total incurred loss",
+            value: s?.currency ? money(s.totalIncurredLoss, s.currency) : "—",
+            // Mixed-currency incidents cannot be added, so say what was left out
+            // rather than showing a total that quietly spans two currencies.
+            hint: s?.excludedOtherCurrency
+              ? `${s.excludedOtherCurrency} report${s.excludedOtherCurrency === 1 ? "" : "s"} in other currencies excluded`
+              : `across ${s?.reports ?? 0} report${s?.reports === 1 ? "" : "s"}`,
+            tone: "danger",
+          },
+          {
+            label: "Total claimed YTD",
+            value: s?.currency ? money(s.totalClaimedYtd, s.currency) : "—",
+            hint: "assessed loss on filed claims",
+          },
+          {
+            label: "Recovery rate",
+            value: s ? `${s.recoveryRatePct}%` : "—",
+            hint: "settled against loss",
+            tone: s && s.recoveryRatePct < 50 ? "warn" : "default",
+          },
+        ]}
+      />
+
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        {STATUS_TABS.map((t) => (
+          <Button
+            key={t.value}
+            size="sm"
+            variant={statusTab === t.value ? "default" : "outline"}
+            onClick={() => setStatusTab(t.value)}
+          >
+            {t.label}
+          </Button>
+        ))}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Select value={corridor} onValueChange={setCorridor}>
+            <SelectTrigger className="h-9 w-[10rem]"><SelectValue placeholder="All corridors" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>All corridors</SelectItem>
+              {CORRIDORS.map((v) => <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 w-[150px]" aria-label="Reported from" />
+          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 w-[150px]" aria-label="Reported to" />
+        </div>
+      </div>
+
       <DataTable<IncidentRow>
-        endpoint={endpoint}
+        endpoint="/api/operational-kpi/damage-reports"
         columns={columns}
+        filters={filters}
         searchPlaceholder="Search report no. or description"
         refreshKey={refreshKey}
         toolbar={

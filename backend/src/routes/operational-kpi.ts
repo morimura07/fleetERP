@@ -1,11 +1,12 @@
 import { Hono } from "hono";
-import { Prisma, DamageStatus, ClaimStatus, IncidentType, DockEventKind, DockActivity } from "@prisma/client";
+import { Prisma, DamageStatus, ClaimStatus, IncidentType, DockEventKind, DockActivity, CorridorType } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import {
   dockEventSchema, damageReportSchema, damageStatusSchema, feedbackSchema, paginationSchema,
 } from "@backend/lib/validations";
 import {
   recordDockEvent, createDamageReport, setDamageStatus, recordFeedback, withDwell,
+  summarizeDock, summarizeIncidents, shiftWindows, openArrivalIds,
 } from "@backend/services/operational-kpi";
 import { logActivity } from "@backend/lib/activity";
 import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
@@ -16,17 +17,106 @@ export const operationalKpi = new Hono();
 
 // ── Dock events (truck-turnaround capture) ───────────────────────────────────
 
+/** A date-only query parameter, read as the whole day it names. */
+function dayBound(value: string | undefined, endOfDay = false): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(endOfDay ? `${value}T23:59:59.999Z` : `${value}T00:00:00.000Z`);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+/**
+ * Every filter the dock events screen offers, in one place.
+ *
+ * The list, the KPI ribbon and the CSV export all build their query from this,
+ * so a ribbon can never describe a different set of rows than the table beneath
+ * it. `view=INSIDE` is the exception and is applied by the caller, because it
+ * needs the pairing pass rather than a predicate.
+ */
+async function dockFilters(
+  c: { req: { query: () => Record<string, string> } },
+  user: Parameters<typeof areaScope>[0],
+): Promise<Prisma.DockEventWhereInput> {
+  const sp = c.req.query();
+  const q = sp.q;
+  const from = dayBound(sp.from);
+  const to = dayBound(sp.to, true);
+  const facilities = (sp.facility ?? "").split(",").map((f) => f.trim()).filter(Boolean);
+  const view = sp.view;
+  const shift = sp.shift === "DAY" || sp.shift === "NIGHT" ? sp.shift : undefined;
+
+  // A shift is a band of local hours, which needs one window per day; bound it
+  // to the requested range, or to the last 30 days when none was given.
+  const shiftRange = shift
+    ? shiftWindows(from ?? new Date(Date.now() - 30 * 86_400_000), to ?? new Date(), shift)
+    : null;
+
+  // Both the search and the shift filter are disjunctions, and a bare object
+  // can only carry one OR. They are combined through AND so that searching
+  // while filtering by shift applies both instead of silently dropping one.
+  const and: Prisma.DockEventWhereInput[] = [];
+  if (q) {
+    and.push({
+      OR: [
+        { facility: { contains: q, mode: "insensitive" } },
+        { note: { contains: q, mode: "insensitive" } },
+        { trailerNumber: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (shiftRange) and.push({ OR: shiftRange.map((w) => ({ eventAt: w })) });
+
+  return {
+    ...areaScope(user),
+    ...(sp.kind && sp.kind in DockEventKind ? { kind: sp.kind as DockEventKind } : {}),
+    ...(sp.activity && sp.activity in DockActivity ? { activity: sp.activity as DockActivity } : {}),
+    ...(view === "ARRIVALS" ? { kind: DockEventKind.ARRIVAL } : {}),
+    ...(view === "DEPARTURES" ? { kind: DockEventKind.DEPARTURE } : {}),
+    ...(facilities.length ? { facility: { in: facilities } } : {}),
+    ...(from || to ? { eventAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
+    ...(and.length ? { AND: and } : {}),
+  };
+}
+
+/** Distinct facilities seen in this tenant, for the filter's multi-select. */
+operationalKpi.get("/dock-events/facilities", requireAuth, requirePermission("kpi:read"), async (c) => {
+  const user = c.get("user");
+  const rows = await prisma.dockEvent.findMany({
+    where: { ...areaScope(user), facility: { not: null } },
+    select: { facility: true },
+    distinct: ["facility"],
+    orderBy: { facility: "asc" },
+  });
+  return ok(c, rows.map((r) => r.facility).filter((f): f is string => Boolean(f)));
+});
+
+/** The KPI ribbon above the table. Same filters as the list beneath it. */
+operationalKpi.get("/dock-events/summary", requireAuth, requirePermission("kpi:read"), async (c) => {
+  const user = c.get("user");
+  const where = await dockFilters(c, user);
+  // Pairing needs whole visits, so the summary reads the filtered set rather
+  // than a page of it. Bounded in practice by the date filter.
+  const events = await prisma.dockEvent.findMany({
+    where,
+    select: { id: true, vehicleId: true, kind: true, eventAt: true },
+  });
+  return ok(c, summarizeDock(events));
+});
+
 operationalKpi.get("/dock-events", requireAuth, requirePermission("kpi:read"), async (c) => {
   const user = c.get("user");
-  const { page, pageSize, q } = paginationSchema.parse(c.req.query());
-  const kind = c.req.query("kind");
-  const activity = c.req.query("activity");
-  const where: Prisma.DockEventWhereInput = {
-    ...areaScope(user),
-    ...(q ? { OR: [{ facility: { contains: q, mode: "insensitive" } }, { note: { contains: q, mode: "insensitive" } }, { trailerNumber: { contains: q, mode: "insensitive" } }] } : {}),
-    ...(kind && kind in DockEventKind ? { kind: kind as DockEventKind } : {}),
-    ...(activity && activity in DockActivity ? { activity: activity as DockActivity } : {}),
-  };
+  const { page, pageSize } = paginationSchema.parse(c.req.query());
+  const base = await dockFilters(c, user);
+
+  // "Currently inside" is a property of the event sequence, not of a row, so it
+  // resolves to a set of arrival ids before the page is taken.
+  let where = base;
+  if (c.req.query("view") === "INSIDE") {
+    const all = await prisma.dockEvent.findMany({
+      where: { ...areaScope(user) },
+      select: { id: true, vehicleId: true, kind: true, eventAt: true },
+    });
+    where = { ...base, id: { in: openArrivalIds(all) } };
+  }
   const [items, total] = await Promise.all([
     prisma.dockEvent.findMany({
       where,
@@ -88,18 +178,53 @@ operationalKpi.post("/dock-events", requireAuth, requirePermission("kpi:write"),
 
 // ── Damage reports (damage & claim rate capture) ─────────────────────────────
 
+/**
+ * Every filter the incident screen offers.
+ *
+ * Corridor lives on the order, not the incident, so filtering by it necessarily
+ * drops incidents that were never linked to one. That is the honest result: an
+ * unlinked incident has no corridor to belong to.
+ */
+function incidentFilters(
+  sp: Record<string, string>,
+  user: Parameters<typeof areaScope>[0],
+): Prisma.DamageReportWhereInput {
+  const q = sp.q;
+  const from = dayBound(sp.from);
+  const to = dayBound(sp.to, true);
+  return {
+    ...areaScope(user),
+    ...(q
+      ? {
+          OR: [
+            { reportNumber: { contains: q, mode: "insensitive" as const } },
+            { description: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+    ...(sp.status && sp.status in DamageStatus ? { status: sp.status as DamageStatus } : {}),
+    ...(sp.claimStatus && sp.claimStatus in ClaimStatus ? { claimStatus: sp.claimStatus as ClaimStatus } : {}),
+    ...(sp.incidentType && sp.incidentType in IncidentType ? { incidentType: sp.incidentType as IncidentType } : {}),
+    ...(sp.corridor && sp.corridor in CorridorType ? { order: { corridor: sp.corridor as CorridorType } } : {}),
+    ...(from || to ? { reportedAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
+  };
+}
+
+/** The KPI ribbon above the incident table. Same filters as the list. */
+operationalKpi.get("/damage-reports/summary", requireAuth, requirePermission("kpi:read"), async (c) => {
+  const user = c.get("user");
+  const rows = await prisma.damageReport.findMany({
+    where: incidentFilters(c.req.query(), user),
+    select: { currency: true, cargoValue: true, damageValue: true, settlementAmount: true, claimStatus: true, reportedAt: true },
+  });
+  return ok(c, summarizeIncidents(rows));
+});
+
 operationalKpi.get("/damage-reports", requireAuth, requirePermission("kpi:read"), async (c) => {
   const user = c.get("user");
   const sp = c.req.query();
-  const { page, pageSize, q } = paginationSchema.parse(sp);
-  const status = sp.status;
-  const where: Prisma.DamageReportWhereInput = {
-    ...areaScope(user),
-    ...(q ? { OR: [{ reportNumber: { contains: q, mode: "insensitive" } }, { description: { contains: q, mode: "insensitive" } }] } : {}),
-    ...(status && status in DamageStatus ? { status: status as DamageStatus } : {}),
-    ...(sp.claimStatus && sp.claimStatus in ClaimStatus ? { claimStatus: sp.claimStatus as ClaimStatus } : {}),
-    ...(sp.incidentType && sp.incidentType in IncidentType ? { incidentType: sp.incidentType as IncidentType } : {}),
-  };
+  const { page, pageSize } = paginationSchema.parse(sp);
+  const where = incidentFilters(sp, user);
   const [items, total] = await Promise.all([
     prisma.damageReport.findMany({
       where,

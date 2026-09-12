@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "lucide-react";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
+import { KpiRibbon } from "@frontend/components/data/kpi-ribbon";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
@@ -42,6 +43,8 @@ function dwell(hours: number | null): string {
 }
 
 const KINDS: DockEventKind[] = ["ARRIVAL", "DEPARTURE"];
+// Mirrors DEFAULT_FREE_HOURS on the server; shown so the figure explains itself.
+const FREE_HOURS = 4;
 const fmt = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 // datetime-local wants "YYYY-MM-DDTHH:mm" in local time.
 function nowLocal() {
@@ -86,11 +89,59 @@ const columns: Column<DockEventRow>[] = [
   { key: "source", header: "Source", render: (r) => <span className="text-xs text-muted-foreground">{DOCK_SOURCE_LABEL[r.source]}</span> },
 ];
 
+interface DockSummary {
+  avgDwellHours: number | null;
+  activeAtDocks: number;
+  detentionAlerts: number;
+  onTimeGatePassesPct: number | null;
+  closedVisits: number;
+}
+
+const VIEWS = [
+  { value: "ALL", label: "All events" },
+  { value: "INSIDE", label: "Currently inside" },
+  { value: "ARRIVALS", label: "Arrivals only" },
+  { value: "DEPARTURES", label: "Departures only" },
+] as const;
+
+const SHIFTS = [
+  { value: "ALL", label: "All shifts" },
+  { value: "DAY", label: "Day shift" },
+  { value: "NIGHT", label: "Night shift" },
+] as const;
+
 export function DockEventsManager({ vehicles, trips, drivers }: { vehicles: Vehicle[]; trips: Trip[]; drivers: Driver[] }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [view, setView] = useState<string>("ALL");
+  const [shift, setShift] = useState<string>("ALL");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [facility, setFacility] = useState<string>("ALL");
+  const [facilities, setFacilities] = useState<string[]>([]);
   const form = useForm<DockEventInput>({ resolver: zodResolver(dockEventSchema) });
+
+  // Facilities are whatever has actually been recorded, so the filter can never
+  // offer a yard with no events behind it.
+  useEffect(() => {
+    let live = true;
+    apiFetch<string[]>("/api/operational-kpi/dock-events/facilities")
+      .then((f) => { if (live) setFacilities(f); })
+      .catch(() => { if (live) setFacilities([]); });
+    return () => { live = false; };
+  }, [refreshKey]);
+
+  const filters = useMemo(
+    () => ({
+      ...(view !== "ALL" ? { view } : {}),
+      ...(shift !== "ALL" ? { shift } : {}),
+      ...(facility !== "ALL" ? { facility } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    }),
+    [view, shift, facility, from, to],
+  );
 
   function openCreate() {
     form.reset({
@@ -115,10 +166,84 @@ export function DockEventsManager({ vehicles, trips, drivers }: { vehicles: Vehi
 
   return (
     <>
+      <KpiRibbon<DockSummary>
+        endpoint="/api/operational-kpi/dock-events/summary"
+        filters={filters}
+        refreshKey={refreshKey}
+        tiles={(s) => [
+          {
+            label: "Average dwell time",
+            value: dwell(s?.avgDwellHours ?? null),
+            hint: s ? `across ${s.closedVisits} completed visit${s.closedVisits === 1 ? "" : "s"}` : "",
+          },
+          {
+            label: "Active at docks",
+            value: String(s?.activeAtDocks ?? 0),
+            hint: "arrived, not yet departed",
+          },
+          {
+            label: "Detention alerts",
+            value: String(s?.detentionAlerts ?? 0),
+            hint: `past the ${FREE_HOURS}h free period`,
+            tone: (s?.detentionAlerts ?? 0) > 0 ? "danger" : "default",
+          },
+          {
+            label: "On-time gate passes",
+            value: s?.onTimeGatePassesPct == null ? "—" : `${s.onTimeGatePassesPct}%`,
+            hint: "cleared within the free period",
+            tone: s?.onTimeGatePassesPct != null && s.onTimeGatePassesPct < 80 ? "warn" : "default",
+          },
+        ]}
+      />
+
+      <div className="mb-3 flex flex-wrap items-end gap-2">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">View</Label>
+          <Select value={view} onValueChange={setView}>
+            <SelectTrigger className="w-[168px]"><SelectValue /></SelectTrigger>
+            <SelectContent>{VIEWS.map((v) => <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Shift</Label>
+          <Select value={shift} onValueChange={setShift}>
+            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+            <SelectContent>{SHIFTS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Facility</Label>
+          <Select value={facility} onValueChange={setFacility}>
+            <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All facilities</SelectItem>
+              {facilities.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">From</Label>
+          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-[150px]" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">To</Label>
+          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-[150px]" />
+        </div>
+        {Object.keys(filters).length > 0 && (
+          <Button
+            variant="ghost"
+            onClick={() => { setView("ALL"); setShift("ALL"); setFacility("ALL"); setFrom(""); setTo(""); }}
+          >
+            Clear filters
+          </Button>
+        )}
+      </div>
+
       <DataTable<DockEventRow>
         endpoint="/api/operational-kpi/dock-events"
         columns={columns}
-        searchPlaceholder="Search facility or note"
+        filters={filters}
+        searchPlaceholder="Search facility, trailer or note"
         refreshKey={refreshKey}
         toolbar={<Button onClick={openCreate}><Plus className="h-4 w-4" />Record Event</Button>}
       />
