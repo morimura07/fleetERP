@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Contact } from "lucide-react";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
+import { PartyProfilePanel } from "@frontend/components/data/party-profile-panel";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
@@ -22,6 +23,15 @@ import { apiFetch, ApiError } from "@frontend/lib/fetcher";
 const CLIENT_STATUSES = Object.keys(PARTY_STATUS_LABEL) as PartyStatus[];
 const CLIENT_TERMS = Object.keys(PAYMENT_TERM_LABEL) as PaymentTerm[];
 
+const TRANSPORT_MODES = [
+  ["FTL", "Full truckload"], ["LTL", "Less than truckload"], ["RAIL", "Rail"],
+  ["OCEAN", "Ocean"], ["AIR", "Air"], ["INTERMODAL", "Intermodal"],
+] as const;
+
+const INCOTERMS = ["EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS", "FOB", "CFR", "CIF"] as const;
+/** Radix Select has no empty value, so "not specified" needs a sentinel. */
+const NO_INCOTERM = "__none__";
+
 interface Client extends ClientInput { id: string; version: number; }
 
 const columns: Column<Client>[] = [
@@ -33,6 +43,7 @@ const columns: Column<Client>[] = [
 
 export function ClientsManager() {
   const { toast } = useToast();
+  const [profileFor, setProfileFor] = useState<Client | null>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -78,6 +89,9 @@ export function ClientsManager() {
         toolbar={<Button onClick={openCreate}><Plus className="h-4 w-4" />New</Button>}
         rowActions={(row) => (
           <div className="flex justify-end gap-1">
+            <Button variant="ghost" size="icon" title="Locations and contacts" onClick={() => setProfileFor(row)}>
+              <Contact className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={() => openEdit(row)}><Pencil className="h-4 w-4" /></Button>
             <Button variant="ghost" size="icon" onClick={() => onDelete(row)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
           </div>
@@ -141,10 +155,62 @@ export function ClientsManager() {
               </label>
             </FormSection>
 
+            <FormSection title="Banking & Tax">
+              <div className="space-y-1.5"><Label>Tax Jurisdiction</Label><Input placeholder="TZ-DSM" {...form.register("taxJurisdiction")} /></div>
+              <div className="space-y-1.5"><Label>Bank Name</Label><Input {...form.register("bankName")} /></div>
+              <div className="space-y-1.5"><Label>Account Number</Label><Input {...form.register("bankAccountNumber")} /></div>
+              <div className="space-y-1.5"><Label>SWIFT</Label><Input {...form.register("bankSwift")} /></div>
+              <div className="space-y-1.5"><Label>IBAN</Label><Input {...form.register("bankIban")} /></div>
+            </FormSection>
+
+            <FormSection title="Logistics & Contract">
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>Preferred Modes</Label>
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-1">
+                  {TRANSPORT_MODES.map(([v, l]) => (
+                    <label key={v} className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <input type="checkbox" value={v} {...form.register("preferredModes")} /> {l}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Incoterm</Label>
+                <Select value={form.watch("incoterm") ?? NO_INCOTERM}
+                  onValueChange={(v) => form.setValue("incoterm", v === NO_INCOTERM ? null : (v as ClientInput["incoterm"]))}>
+                  <SelectTrigger><SelectValue placeholder="Not specified" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_INCOTERM}>Not specified</SelectItem>
+                    {INCOTERMS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Service Areas</Label><Input placeholder="Dar, Mwanza, Mbeya" {...form.register("serviceAreas")} /></div>
+              <div className="space-y-1.5 md:col-span-2"><Label>Delivery Windows</Label><Input placeholder="08:00-17:00 weekdays; no weekend offload" {...form.register("deliveryWindows")} /></div>
+            </FormSection>
+
+            <FormSection title="Customs & Portal">
+              <div className="space-y-1.5"><Label>Safety Rating</Label><Input {...form.register("safetyRating")} /></div>
+              <div className="space-y-1.5"><Label>Customs Broker Code</Label><Input {...form.register("customsBrokerCode")} /></div>
+              <div className="space-y-1.5"><Label>Customs Bond Number</Label><Input {...form.register("customsBondNumber")} /></div>
+              <div className="space-y-1.5"><Label>Portal URL</Label><Input placeholder="https://…" {...form.register("portalUrl")} /></div>
+              <div className="space-y-1.5"><Label>Portal Username</Label><Input {...form.register("portalUsername")} /></div>
+              <p className="col-span-2 text-xs text-muted-foreground">
+                The password is deliberately not stored: keeping another company&apos;s credentials
+                recoverable is not worth the convenience.
+              </p>
+            </FormSection>
+
             <DialogFooter>
               <Button type="submit" disabled={form.formState.isSubmitting}>Save</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={profileFor !== null} onOpenChange={(o) => !o && setProfileFor(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader><DialogTitle>{profileFor?.companyName}</DialogTitle></DialogHeader>
+          {profileFor && <PartyProfilePanel partyType="clients" partyId={profileFor.id} />}
         </DialogContent>
       </Dialog>
     </>
