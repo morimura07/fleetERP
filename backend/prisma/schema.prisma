@@ -1582,6 +1582,7 @@ model Vendor {
   fixedAssets    FixedAsset[]
   partySites     PartySite[]
   partyContacts  PartyContact[]
+  expenseLines   ExpenseLine[]
 
   @@unique([dataAreaId, code])
   @@index([group])
@@ -2517,9 +2518,53 @@ model ExpenseLine {
   odometerKm  Int?
   taxAmount   Decimal   @default(0) @db.Decimal(18, 2)
 
+  // ── Cost type and its detail (client requirements, Sept 2026, §3) ──
+  /// What kind of cost this is. Decides which groups below apply, and is what
+  /// makes a fuel report possible without inferring it from the account code
+  /// or the wording of the description.
+  kind ExpenseKind @default(GENERAL)
+
+  // Fuel
+  fuelVolume     Decimal?  @db.Decimal(12, 3)
+  fuelUnit       FuelUnit?
+  fuelCardNumber String?
+  fuelStation    String?
+  /// Price per litre or gallon, kept alongside the total so the two can be
+  /// reconciled: a volume and a rate that do not multiply to the amount is
+  /// the first sign of a pilferage or keying problem.
+  ratePerUnit    Decimal?  @db.Decimal(12, 4)
+
+  // Tolls and permits
+  gateLocation String?
+  permitType   PermitType?
+
+  // Repairs and maintenance
+  /// The workshop job this cost belongs to. A link rather than a number, so
+  /// the parts and labour recorded there are not re-keyed here.
+  serviceOrderId String?
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
+  partsCost      Decimal?      @db.Decimal(18, 2)
+  labourCost     Decimal?      @db.Decimal(18, 2)
+
+  // Driver per-diem and advances
+  travelDays       Int?
+  mealAllowance    Decimal? @db.Decimal(18, 2)
+  lodgingAllowance Decimal? @db.Decimal(18, 2)
+  /// Cash already advanced to the driver and recovered against this line.
+  advanceDeducted  Decimal? @db.Decimal(18, 2)
+
+  // Subcontracted transport
+  carrierVendorId String?
+  carrierVendor   Vendor?  @relation(fields: [carrierVendorId], references: [id], onDelete: SetNull)
+  bolReference    String?
+  agreedRate      Decimal? @db.Decimal(18, 2)
+
   @@index([expenseClaimId])
   @@index([vehicleId])
   @@index([tripId])
+  @@index([serviceOrderId])
+  @@index([carrierVendorId])
+  @@index([kind])
   @@map("expense_lines")
 }
 
@@ -2713,11 +2758,12 @@ model ServiceOrder {
   parts ServicePart[]
   labor ServiceLabor[]
 
-  version     Int      @default(0)
-  createdById String?
-  updatedById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  version      Int           @default(0)
+  createdById  String?
+  updatedById  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  expenseLines ExpenseLine[]
 
   @@unique([dataAreaId, orderNumber])
   @@index([dataAreaId])
@@ -3641,4 +3687,30 @@ model PartyContact {
   @@index([dataAreaId, clientId])
   @@index([dataAreaId, vendorId])
   @@map("party_contacts")
+}
+
+/// The kinds of cost a transport operation actually incurs. Each carries its
+/// own detail on ExpenseLine; GENERAL carries none and is the default, so
+/// every existing line stays valid.
+enum ExpenseKind {
+  GENERAL
+  FUEL
+  TOLL_PERMIT
+  REPAIR
+  PER_DIEM
+  SUBCONTRACT
+}
+
+enum FuelUnit {
+  LITRE
+  GALLON
+}
+
+enum PermitType {
+  ROAD_TOLL
+  WEIGHBRIDGE
+  CROSS_BORDER
+  OVERWEIGHT
+  LATRA
+  OTHER
 }

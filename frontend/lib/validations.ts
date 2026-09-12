@@ -950,6 +950,31 @@ export const expenseLineSchema = z.object({
   tripId: z.string().nullish(),
   odometerKm: z.coerce.number().int().min(0).nullish(),
   taxAmount: z.coerce.number().min(0).default(0),
+
+  // ── Cost type and its detail (client requirements, Sept 2026, §3) ──
+  kind: z.enum(["GENERAL", "FUEL", "TOLL_PERMIT", "REPAIR", "PER_DIEM", "SUBCONTRACT"]).default("GENERAL"),
+  // Fuel
+  fuelVolume: z.coerce.number().positive().nullish(),
+  fuelUnit: z.enum(["LITRE", "GALLON"]).nullish(),
+  fuelCardNumber: os(60),
+  fuelStation: os(150),
+  ratePerUnit: z.coerce.number().positive().nullish(),
+  // Tolls and permits
+  gateLocation: os(150),
+  permitType: z.enum(["ROAD_TOLL", "WEIGHBRIDGE", "CROSS_BORDER", "OVERWEIGHT", "LATRA", "OTHER"]).nullish(),
+  // Repairs
+  serviceOrderId: z.string().nullish(),
+  partsCost: z.coerce.number().min(0).nullish(),
+  labourCost: z.coerce.number().min(0).nullish(),
+  // Per-diem and advances
+  travelDays: z.coerce.number().int().positive().nullish(),
+  mealAllowance: z.coerce.number().min(0).nullish(),
+  lodgingAllowance: z.coerce.number().min(0).nullish(),
+  advanceDeducted: z.coerce.number().min(0).nullish(),
+  // Subcontracted transport
+  carrierVendorId: z.string().nullish(),
+  bolReference: os(80),
+  agreedRate: z.coerce.number().min(0).nullish(),
 });
 
 export const expenseClaimSchema = z.object({

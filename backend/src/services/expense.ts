@@ -1,7 +1,9 @@
 import { Prisma } from "@prisma/client";
+import type { ExpenseKind, FuelUnit, PermitType } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { AuthError } from "@backend/lib/errors";
 import { createJournalEntry } from "@backend/services/ledger";
+import { validateExpenseKind } from "@backend/services/expense-kind";
 
 /**
  * Expense management (M23) — trip cash-sheets / expense claims.
@@ -19,6 +21,8 @@ import { createJournalEntry } from "@backend/services/ledger";
  */
 
 const D = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v);
+/** Optional decimal, kept null rather than coerced to zero. */
+const dec = (v: Prisma.Decimal.Value | null | undefined) => (v === null || v === undefined ? null : D(v));
 
 const DRIVER_ADVANCES = "1200"; // ASSET
 const ACCRUED = "2300"; // LIABILITY (net owed to the driver)
@@ -73,6 +77,26 @@ export interface ClaimLineInput {
   tripId?: string | null;
   odometerKm?: number | null;
   taxAmount?: Prisma.Decimal.Value;
+
+  // Cost type and its detail (client requirements, Sept 2026, §3).
+  kind?: ExpenseKind;
+  fuelVolume?: Prisma.Decimal.Value | null;
+  fuelUnit?: FuelUnit | null;
+  fuelCardNumber?: string | null;
+  fuelStation?: string | null;
+  ratePerUnit?: Prisma.Decimal.Value | null;
+  gateLocation?: string | null;
+  permitType?: PermitType | null;
+  serviceOrderId?: string | null;
+  partsCost?: Prisma.Decimal.Value | null;
+  labourCost?: Prisma.Decimal.Value | null;
+  travelDays?: number | null;
+  mealAllowance?: Prisma.Decimal.Value | null;
+  lodgingAllowance?: Prisma.Decimal.Value | null;
+  advanceDeducted?: Prisma.Decimal.Value | null;
+  carrierVendorId?: string | null;
+  bolReference?: string | null;
+  agreedRate?: Prisma.Decimal.Value | null;
 }
 
 export interface CreateClaimInput {
@@ -90,6 +114,15 @@ export interface CreateClaimInput {
 /** Create a DRAFT claim with its lines; total is derived. */
 export async function createClaim(input: CreateClaimInput) {
   if (input.lines.length === 0) throw new AuthError("A claim needs at least one line", 422);
+
+  // Per-kind rules. Reported with the line number, because a claim can carry a
+  // dozen lines and "travelDays is required" on its own says nothing about which.
+  const problems = input.lines.flatMap((l, i) =>
+    validateExpenseKind({ ...l, kind: l.kind ?? "GENERAL" }).map(
+      (issue) => `Line ${i + 1}: ${issue.field} - ${issue.message}`
+    ),
+  );
+  if (problems.length > 0) throw new AuthError(problems.join("; "), 422);
   const total = input.lines.reduce((s, l) => s.plus(l.amount), new Prisma.Decimal(0));
   const claimNumber = await nextClaimNumber(input.dataAreaId);
 
@@ -120,6 +153,25 @@ export async function createClaim(input: CreateClaimInput) {
           tripId: l.tripId ?? null,
           odometerKm: l.odometerKm ?? null,
           taxAmount: D(l.taxAmount ?? 0).toFixed(2),
+
+          kind: l.kind ?? "GENERAL",
+          fuelVolume: dec(l.fuelVolume),
+          fuelUnit: l.fuelUnit ?? null,
+          fuelCardNumber: l.fuelCardNumber || null,
+          fuelStation: l.fuelStation || null,
+          ratePerUnit: dec(l.ratePerUnit),
+          gateLocation: l.gateLocation || null,
+          permitType: l.permitType ?? null,
+          serviceOrderId: l.serviceOrderId || null,
+          partsCost: dec(l.partsCost),
+          labourCost: dec(l.labourCost),
+          travelDays: l.travelDays ?? null,
+          mealAllowance: dec(l.mealAllowance),
+          lodgingAllowance: dec(l.lodgingAllowance),
+          advanceDeducted: dec(l.advanceDeducted),
+          carrierVendorId: l.carrierVendorId || null,
+          bolReference: l.bolReference || null,
+          agreedRate: dec(l.agreedRate),
         })),
       },
     },
