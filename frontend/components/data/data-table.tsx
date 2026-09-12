@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, type ReactNode } from "react";
+import { useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import { Search, Inbox } from "lucide-react";
 import { Input } from "@frontend/components/ui/input";
 import { Button } from "@frontend/components/ui/button";
@@ -25,16 +25,27 @@ interface Props<T> {
   rowActions?: (row: T) => ReactNode;
   /** bump this number to force a reload (after create/edit/delete) */
   refreshKey?: number;
+  /**
+   * Called with each page of rows as it loads.
+   *
+   * Lets a screen act on what is currently displayed without owning the fetch:
+   * counting attachments for the visible records, or exporting exactly the rows
+   * on screen. Deliberately not part of the reload dependencies, so passing an
+   * inline arrow here cannot cause a refetch loop.
+   */
+  onRows?: (rows: T[]) => void;
 }
 
 export function DataTable<T extends { id: string }>({
-  endpoint, columns, searchPlaceholder, filters, toolbar, rowActions, refreshKey = 0,
+  endpoint, columns, searchPlaceholder, filters, toolbar, rowActions, refreshKey = 0, onRows,
 }: Props<T>) {
   const [rows, setRows] = useState<T[]>([]);
   const [meta, setMeta] = useState<Meta>({ page: 1, pageSize: 20, total: 0, totalPages: 1 });
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const onRowsRef = useRef(onRows);
+  onRowsRef.current = onRows;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,6 +60,7 @@ export function DataTable<T extends { id: string }>({
         { returnRaw: true },
       );
       setRows(body.data ?? []);
+      onRowsRef.current?.(body.data ?? []);
       if (body.meta) setMeta(body.meta);
     } catch {
       setRows([]);
