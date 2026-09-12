@@ -276,3 +276,227 @@ export function withDwell<T extends DockEventRow>(
     ...(paired.get(e.id) ?? { dwellHours: null, detentionHours: null }),
   }));
 }
+
+// ── KPI ribbons (client requirements, Sept 2026) ─────────────────────────────
+
+export interface DockSummary {
+  /** Mean hours across visits that have closed; null before any has. */
+  avgDwellHours: number | null;
+  /** Trucks whose arrival has no departure yet, i.e. on site now. */
+  activeAtDocks: number;
+  /** Closed visits that ran past the free period. */
+  detentionAlerts: number;
+  /**
+   * Share of closed visits that cleared inside the free period.
+   *
+   * "On time" is defined against the same free period detention bills from, so
+   * the two figures always agree: every visit is either on time or an alert.
+   */
+  onTimeGatePassesPct: number | null;
+  closedVisits: number;
+}
+
+interface PairedVisits {
+  /** One entry per arrival that has been closed out by a departure. */
+  closed: DwellResult[];
+  /** Arrivals with no departure after them: the trucks on site right now. */
+  openArrivalIds: string[];
+}
+
+/**
+ * Single pairing pass behind every dwell-derived figure.
+ *
+ * Pairs exactly as `withDwell` does, so a truck the table shows as still inside
+ * is the same truck the ribbon counts and the "currently inside" filter
+ * returns. Keeping one implementation is what stops those three disagreeing.
+ */
+function pairVisits(events: DockEventRow[], freeHours: number): PairedVisits {
+  const byVehicle = new Map<string, DockEventRow[]>();
+  for (const e of events) {
+    if (!byVehicle.has(e.vehicleId)) byVehicle.set(e.vehicleId, []);
+    byVehicle.get(e.vehicleId)!.push(e);
+  }
+
+  const closed: DwellResult[] = [];
+  const openArrivalIds: string[] = [];
+
+  for (const list of byVehicle.values()) {
+    const ordered = [...list].sort((a, b) => a.eventAt.getTime() - b.eventAt.getTime());
+    let openArrival: DockEventRow | null = null;
+    for (const ev of ordered) {
+      if (ev.kind === "ARRIVAL") {
+        openArrival = ev; // a prior unmatched arrival is superseded, as in withDwell
+      } else if (openArrival) {
+        closed.push(dwellFor(openArrival.eventAt, ev.eventAt, freeHours));
+        openArrival = null;
+      }
+    }
+    if (openArrival) openArrivalIds.push(openArrival.id);
+  }
+  return { closed, openArrivalIds };
+}
+
+/**
+ * Arrivals with no departure logged after them, i.e. the trucks on site.
+ *
+ * Backs the "Currently inside" filter. It has to be an id list rather than a
+ * query predicate because being inside is a property of the sequence of events,
+ * not of any single row.
+ */
+export function openArrivalIds(events: DockEventRow[]): string[] {
+  return pairVisits(events, DEFAULT_FREE_HOURS).openArrivalIds;
+}
+
+/** The four figures above the dock events table. */
+export function summarizeDock(events: DockEventRow[], freeHours = DEFAULT_FREE_HOURS): DockSummary {
+  const { closed, openArrivalIds: open } = pairVisits(events, freeHours);
+  const detentionAlerts = closed.filter((v) => (v.detentionHours ?? 0) > 0).length;
+  const dwellTotal = closed.reduce((sum, v) => sum + (v.dwellHours ?? 0), 0);
+
+  return {
+    avgDwellHours: closed.length === 0 ? null : Math.round((dwellTotal / closed.length) * 10) / 10,
+    activeAtDocks: open.length,
+    detentionAlerts,
+    onTimeGatePassesPct:
+      closed.length === 0 ? null : Math.round(((closed.length - detentionAlerts) / closed.length) * 1000) / 10,
+    closedVisits: closed.length,
+  };
+}
+
+/**
+ * East Africa Time, which the whole operating region keeps and which has no
+ * daylight saving. Timestamps are stored in UTC, so a shift boundary quoted in
+ * local hours has to be shifted by this to match.
+ */
+export const OPERATING_UTC_OFFSET_HOURS = 3;
+
+/** Local hour a day shift starts and ends. Night is everything outside it. */
+export const DAY_SHIFT_START_HOUR = 6;
+export const DAY_SHIFT_END_HOUR = 18;
+
+const DAY_MS = 86_400_000;
+
+/** Longest span a shift filter may cover, to bound the generated windows. */
+export const MAX_SHIFT_FILTER_DAYS = 92;
+
+export type Shift = "DAY" | "NIGHT";
+
+/**
+ * Time windows matching a shift across a date range.
+ *
+ * Postgres can test the hour of a timestamp but Prisma's query builder cannot,
+ * and dropping to raw SQL here would lose the tenant scope that every other
+ * filter goes through. Generating one window per day keeps the whole query in
+ * the builder; the range is bounded so the OR list stays small.
+ */
+export function shiftWindows(from: Date, to: Date, shift: Shift): { gte: Date; lt: Date }[] {
+  const offset = OPERATING_UTC_OFFSET_HOURS * 3_600_000;
+  // Work in local time by shifting the clock, slice on local day boundaries,
+  // then shift back so the windows are the UTC instants actually stored.
+  const startDay = Math.floor((from.getTime() + offset) / DAY_MS);
+  const endDay = Math.floor((to.getTime() + offset) / DAY_MS);
+  if (endDay < startDay) return [];
+  if (endDay - startDay + 1 > MAX_SHIFT_FILTER_DAYS) {
+    throw new AuthError(`A shift filter covers at most ${MAX_SHIFT_FILTER_DAYS} days`, 422);
+  }
+
+  const windows: { gte: Date; lt: Date }[] = [];
+  const utc = (day: number, hour: number) => new Date(day * DAY_MS + hour * 3_600_000 - offset);
+
+  for (let day = startDay; day <= endDay; day++) {
+    if (shift === "DAY") {
+      windows.push({ gte: utc(day, DAY_SHIFT_START_HOUR), lt: utc(day, DAY_SHIFT_END_HOUR) });
+    } else {
+      // A night shift straddles midnight, so it is two pieces of the local day.
+      windows.push({ gte: utc(day, 0), lt: utc(day, DAY_SHIFT_START_HOUR) });
+      windows.push({ gte: utc(day, DAY_SHIFT_END_HOUR), lt: utc(day + 1, 0) });
+    }
+  }
+  return windows;
+}
+
+export interface IncidentRow {
+  currency: string;
+  cargoValue: Prisma.Decimal.Value;
+  damageValue: Prisma.Decimal.Value;
+  settlementAmount: Prisma.Decimal.Value;
+  claimStatus: ClaimStatus;
+  reportedAt: Date;
+}
+
+export interface IncidentSummary {
+  /** Currency the money figures are stated in; null when there are no reports. */
+  currency: string | null;
+  damageRatePct: number;
+  totalIncurredLoss: Prisma.Decimal;
+  totalClaimedYtd: Prisma.Decimal;
+  recoveryRatePct: number;
+  reports: number;
+  /** Reports left out because they are booked in a different currency. */
+  excludedOtherCurrency: number;
+}
+
+/**
+ * The four figures above the incident table.
+ *
+ * Amounts in different currencies cannot be added, and this system runs
+ * cross-border by design, so the summary reports on whichever currency carries
+ * the most cargo value and says how many reports that leaves out. Converting
+ * would need a rate and a date for every incident, and a total quietly mixing
+ * shillings into dollars is worse than one that names its scope.
+ *
+ * "Claimed YTD" counts the assessed loss on reports where a claim has actually
+ * been filed, not the settlement, which is what gets recovered later.
+ */
+export function summarizeIncidents(rows: IncidentRow[], now = new Date()): IncidentSummary {
+  const empty: IncidentSummary = {
+    currency: null,
+    damageRatePct: 0,
+    totalIncurredLoss: D(0),
+    totalClaimedYtd: D(0),
+    recoveryRatePct: 0,
+    reports: 0,
+    excludedOtherCurrency: 0,
+  };
+  if (rows.length === 0) return empty;
+
+  const buckets = new Map<string, IncidentRow[]>();
+  for (const r of rows) {
+    if (!buckets.has(r.currency)) buckets.set(r.currency, []);
+    buckets.get(r.currency)!.push(r);
+  }
+
+  const sum = (list: IncidentRow[], pick: (r: IncidentRow) => Prisma.Decimal.Value) =>
+    list.reduce((total, r) => total.plus(D(pick(r))), D(0));
+
+  let currency = "";
+  let primary: IncidentRow[] = [];
+  let largest = D(-1);
+  for (const [code, list] of buckets) {
+    const cargo = sum(list, (r) => r.cargoValue);
+    if (cargo.greaterThan(largest)) {
+      largest = cargo;
+      currency = code;
+      primary = list;
+    }
+  }
+
+  const cargo = sum(primary, (r) => r.cargoValue);
+  const damage = sum(primary, (r) => r.damageValue);
+  const settled = sum(primary, (r) => r.settlementAmount);
+  const yearStart = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+  const claimedYtd = sum(
+    primary.filter((r) => r.claimStatus !== "NOT_FILED" && r.reportedAt >= yearStart),
+    (r) => r.damageValue,
+  );
+
+  return {
+    currency,
+    damageRatePct: damageRatioPct(cargo, damage),
+    totalIncurredLoss: damage,
+    totalClaimedYtd: claimedYtd,
+    recoveryRatePct: recoveryPct(damage, settled),
+    reports: primary.length,
+    excludedOtherCurrency: rows.length - primary.length,
+  };
+}
