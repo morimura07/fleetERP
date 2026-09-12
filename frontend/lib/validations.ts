@@ -241,6 +241,24 @@ export const clientSchema = z.object({
   insuranceRequirement: z.string().max(200).optional().or(z.literal("")),
   slaExpiry: z.coerce.date().optional().nullable(),
   accountManager: z.string().max(120).optional().or(z.literal("")),
+
+  // ── Commercial profile (client requirements, Sept 2026) ──
+  taxJurisdiction: os(120),
+  bankName: os(120),
+  bankAccountNumber: os(60),
+  bankSwift: os(20),
+  bankIban: os(40),
+  /// Most customers ship by more than one mode, so this is a list.
+  preferredModes: z.array(z.enum(["FTL", "LTL", "RAIL", "OCEAN", "AIR", "INTERMODAL"])).default([]),
+  incoterm: z.enum(["EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS", "FOB", "CFR", "CIF"]).nullish(),
+  serviceAreas: os(300),
+  deliveryWindows: os(300),
+  safetyRating: os(80),
+  customsBrokerCode: os(60),
+  customsBondNumber: os(60),
+  portalUrl: os(300),
+  /// Account name only. A password would need storing reversibly to be usable.
+  portalUsername: os(120),
 });
 
 // ───────── DeliveryJob ─────────
@@ -545,6 +563,42 @@ export const vendorSchema = z.object({
   fleetSize: z.coerce.number().int().min(0).optional().nullable(),
   rateAgreement: optStr(300),
   ediEndpoint: optStr(200),
+
+  // ── Commercial profile (client requirements, Sept 2026) ──
+  creditLimit: z.coerce.number().min(0).optional().nullable(),
+  taxJurisdiction: optStr(120),
+  safetyRating: optStr(80),
+  customsBrokerCode: optStr(60),
+  customsBondNumber: optStr(60),
+});
+
+// ── Trading-partner sites and contacts (client requirements, Sept 2026) ──
+
+export const partySiteSchema = z.object({
+  name: z.string().min(1, "Name is required").max(150),
+  kind: z.enum(["HEADQUARTERS", "BRANCH", "WAREHOUSE", "FACTORY", "PORT", "YARD", "OTHER"]).default("BRANCH"),
+  street: os(200),
+  city: os(120),
+  region: os(120),
+  postalCode: os(20),
+  country: z.string().length(2, "Use the 2-letter country code").optional().or(z.literal("")),
+  phone: os(40),
+  email: z.string().email().optional().or(z.literal("")),
+  isPrimary: z.boolean().default(false),
+  notes: os(500),
+});
+
+export const partyContactSchema = z.object({
+  name: z.string().min(1, "Name is required").max(120),
+  title: os(120),
+  phone: os(40),
+  mobile: os(40),
+  email: z.string().email().optional().or(z.literal("")),
+  role: z.enum(["PRIMARY", "BILLING", "OPERATIONS", "CLAIMS", "OTHER"]).default("OTHER"),
+  isPrimary: z.boolean().default(false),
+  notifyDeliveryStatus: z.boolean().default(false),
+  notifyInvoices: z.boolean().default(false),
+  notes: os(500),
 });
 
 export const vendorInvoiceSchema = z.object({

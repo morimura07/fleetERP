@@ -956,6 +956,8 @@ model Vehicle {
   @@index([defaultDriverId])
   @@index([status])
   @@index([dataAreaId])
+  // Capacity is always counted per equipment class within one tenant.
+  @@index([dataAreaId, equipmentType])
   @@map("vehicles")
 }
 
@@ -1012,6 +1014,30 @@ model Client {
   slaExpiry            DateTime? @db.Date
   accountManager       String? // sales rep / account owner
 
+  // ── Commercial profile (client requirements, Sept 2026) ──
+  /// Where tax is assessed. Distinct from taxExempt: a customer can be exempt
+  /// in one jurisdiction and liable in another.
+  taxJurisdiction   String?
+  bankName          String?
+  bankAccountNumber String?
+  bankSwift         String?
+  bankIban          String?
+  /// Modes this customer ships by. A list, because most use more than one.
+  preferredModes    TransportMode[]
+  /// Delivery terms deciding who carries cost and risk at each leg.
+  incoterm          Incoterm?
+  serviceAreas      String?
+  /// e.g. "no deliveries before 08:00; no weekend offload".
+  deliveryWindows   String?
+  safetyRating      String?
+  customsBrokerCode String?
+  customsBondNumber String?
+  /// Customer portal we upload to. URL and account name only: a password
+  /// would have to be stored reversibly to be usable, and holding another
+  /// company's credentials recoverably is not a risk worth taking.
+  portalUrl         String?
+  portalUsername    String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1024,6 +1050,8 @@ model Client {
   updatedById     String? // audit: last-modifier user id
   damageReports   DamageReport[]
   demandForecasts DemandForecast[]
+  partySites      PartySite[]
+  partyContacts   PartyContact[]
 
   @@index([companyName])
   @@index([dataAreaId])
@@ -1535,6 +1563,13 @@ model Vendor {
   rateAgreement  String? // default rates / FSC formula / lane pricing note
   ediEndpoint    String? // EDI profile / webhook URL
 
+  // ── Commercial profile (client requirements, Sept 2026) ──
+  creditLimit       Decimal? @db.Decimal(18, 2) // our exposure limit with them
+  taxJurisdiction   String?
+  safetyRating      String? // carrier safety rating or compliance grade
+  customsBrokerCode String?
+  customsBondNumber String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1545,6 +1580,8 @@ model Vendor {
   createdById    String? // audit: creator user id
   updatedById    String? // audit: last-modifier user id
   fixedAssets    FixedAsset[]
+  partySites     PartySite[]
+  partyContacts  PartyContact[]
 
   @@unique([dataAreaId, code])
   @@index([group])
@@ -2607,6 +2644,12 @@ model FixedAsset {
   @@unique([dataAreaId, code])
   @@index([dataAreaId])
   @@index([dataAreaId, status])
+  @@index([vendorId])
+  @@index([purchaseOrderId])
+  @@index([projectId])
+  // Expiry sweeps: what falls due in the next thirty days, per tenant.
+  @@index([dataAreaId, insuranceExpiresAt])
+  @@index([dataAreaId, inspectionDueAt])
   @@map("fixed_assets")
 }
 
@@ -3479,4 +3522,123 @@ enum AssetCondition {
   NEW
   USED
   RECONDITIONED
+}
+
+/// What a location is used for. Drives nothing yet; it is how an operator
+/// tells two addresses apart when picking a delivery point.
+enum SiteKind {
+  HEADQUARTERS
+  BRANCH
+  WAREHOUSE
+  FACTORY
+  PORT
+  YARD
+  OTHER
+}
+
+enum ContactRole {
+  PRIMARY
+  BILLING
+  OPERATIONS
+  CLAIMS
+  OTHER
+}
+
+enum TransportMode {
+  FTL // full truckload
+  LTL // less than truckload
+  RAIL
+  OCEAN
+  AIR
+  INTERMODAL
+}
+
+/// Incoterms 2020.
+enum Incoterm {
+  EXW
+  FCA
+  CPT
+  CIP
+  DAP
+  DPU
+  DDP
+  FAS
+  FOB
+  CFR
+  CIF
+}
+
+/// A trading partner's location: head office, depot, port or delivery point.
+///
+/// One table with two nullable foreign keys rather than a polymorphic owner
+/// column, because an address that outlives the company it belongs to is a
+/// worse problem than a slightly wider table. A database check constraint
+/// enforces that exactly one of them is set.
+model PartySite {
+  id         String @id @default(cuid())
+  dataAreaId String @default("HQ01")
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  name       String // "Mwanza depot"
+  kind       SiteKind @default(BRANCH)
+  street     String?
+  city       String?
+  region     String? // state, province or region
+  postalCode String?
+  country    String? // ISO 2-letter
+  phone      String?
+  email      String?
+  /// The registered or main address, as opposed to a branch.
+  isPrimary  Boolean  @default(false)
+  notes      String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId, clientId])
+  @@index([dataAreaId, vendorId])
+  @@map("party_sites")
+}
+
+/// A named person at a trading partner, and what they want to hear about.
+model PartyContact {
+  id         String @id @default(cuid())
+  dataAreaId String @default("HQ01")
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  name      String
+  title     String?
+  phone     String?
+  mobile    String?
+  email     String?
+  role      ContactRole @default(OTHER)
+  isPrimary Boolean     @default(false)
+
+  // ── Communication preferences ──
+  /// Automated delivery status notifications.
+  notifyDeliveryStatus Boolean @default(false)
+  /// Where invoices are routed.
+  notifyInvoices       Boolean @default(false)
+  notes                String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId, clientId])
+  @@index([dataAreaId, vendorId])
+  @@map("party_contacts")
 }
