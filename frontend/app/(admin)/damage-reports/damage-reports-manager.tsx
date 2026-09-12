@@ -6,6 +6,7 @@ import { Paperclip, Plus } from "lucide-react";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { KpiRibbon } from "@frontend/components/data/kpi-ribbon";
 import { AttachmentsPanel } from "@frontend/components/data/attachments-panel";
+import { ExportMenu } from "@frontend/components/data/export-menu";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
@@ -262,6 +263,7 @@ export function IncidentReportsManager({
                 ))}
               </SelectContent>
             </Select>
+            <ExportMenu endpoint="/api/operational-kpi/damage-reports" filters={filters} />
             <Button onClick={openCreate}><Plus className="h-4 w-4" />Log Incident</Button>
           </div>
         }

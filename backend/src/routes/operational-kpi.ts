@@ -6,12 +6,14 @@ import {
 } from "@backend/lib/validations";
 import {
   recordDockEvent, createDamageReport, setDamageStatus, recordFeedback, withDwell,
-  summarizeDock, summarizeIncidents, shiftWindows, openArrivalIds,
+  summarizeDock, summarizeIncidents, shiftWindows, openArrivalIds, damageRatioPct, recoveryPct,
 } from "@backend/services/operational-kpi";
 import { logActivity } from "@backend/lib/activity";
 import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
 import { ok, created, pageMeta } from "@backend/lib/http";
+import { exportIfRequested } from "@backend/lib/export-http";
+import type { ExportSpec } from "@backend/services/export";
 
 export const operationalKpi = new Hono();
 
@@ -102,6 +104,42 @@ operationalKpi.get("/dock-events/summary", requireAuth, requirePermission("kpi:r
   return ok(c, summarizeDock(events));
 });
 
+/** Columns for a dock events export. Mirrors the table on screen. */
+const DOCK_EXPORT = {
+  title: "Dock Events",
+  columns: [
+    { header: "When", value: (r: DockEventExportRow) => r.eventAt, width: 18 },
+    { header: "Vehicle", value: (r: DockEventExportRow) => r.vehicle?.vehicleNumber ?? "", width: 14 },
+    { header: "Trailer", value: (r: DockEventExportRow) => r.trailerNumber ?? "", width: 14 },
+    { header: "Trip", value: (r: DockEventExportRow) => r.trip?.tripCode ?? "", width: 14 },
+    { header: "Driver", value: (r: DockEventExportRow) => r.driver?.name ?? "", width: 18 },
+    { header: "Event", value: (r: DockEventExportRow) => r.kind, width: 11 },
+    { header: "Activity", value: (r: DockEventExportRow) => r.activity, width: 16 },
+    { header: "Facility", value: (r: DockEventExportRow) => r.facility ?? "", width: 20 },
+    { header: "Bay / Gate", value: (r: DockEventExportRow) => r.dockBay ?? "", width: 12 },
+    { header: "Seal", value: (r: DockEventExportRow) => r.sealNumber ?? "", width: 14 },
+    { header: "Seal intact", value: (r: DockEventExportRow) => (r.sealIntact === null ? "" : r.sealIntact ? "Yes" : "No"), width: 10 },
+    { header: "Odometer (km)", value: (r: DockEventExportRow) => r.odometerKm, width: 12 },
+    { header: "Source", value: (r: DockEventExportRow) => r.source, width: 13 },
+  ],
+} satisfies ExportSpec<DockEventExportRow>;
+
+interface DockEventExportRow {
+  eventAt: Date;
+  kind: DockEventKind;
+  activity: DockActivity;
+  facility: string | null;
+  trailerNumber: string | null;
+  dockBay: string | null;
+  sealNumber: string | null;
+  sealIntact: boolean | null;
+  odometerKm: number | null;
+  source: string;
+  vehicle: { vehicleNumber: string } | null;
+  driver: { name: string } | null;
+  trip: { tripCode: string } | null;
+}
+
 operationalKpi.get("/dock-events", requireAuth, requirePermission("kpi:read"), async (c) => {
   const user = c.get("user");
   const { page, pageSize } = paginationSchema.parse(c.req.query());
@@ -117,6 +155,21 @@ operationalKpi.get("/dock-events", requireAuth, requirePermission("kpi:read"), a
     });
     where = { ...base, id: { in: openArrivalIds(all) } };
   }
+
+  // Same `where`, so the file holds exactly the rows the screen would show.
+  const file = await exportIfRequested(c, DOCK_EXPORT, (take) =>
+    prisma.dockEvent.findMany({
+      where,
+      include: {
+        vehicle: { select: { vehicleNumber: true } },
+        driver: { select: { name: true } },
+        trip: { select: { tripCode: true } },
+      },
+      orderBy: { eventAt: "desc" },
+      take,
+    }),
+  );
+  if (file) return file;
   const [items, total] = await Promise.all([
     prisma.dockEvent.findMany({
       where,
@@ -220,11 +273,77 @@ operationalKpi.get("/damage-reports/summary", requireAuth, requirePermission("kp
   return ok(c, summarizeIncidents(rows));
 });
 
+interface IncidentExportRow {
+  reportNumber: string;
+  reportedAt: Date;
+  status: DamageStatus;
+  incidentType: IncidentType;
+  rootCause: string;
+  location: string | null;
+  liableParty: string | null;
+  currency: string;
+  cargoValue: Prisma.Decimal;
+  damageValue: Prisma.Decimal;
+  settlementAmount: Prisma.Decimal;
+  claimStatus: ClaimStatus;
+  claimNumber: string | null;
+  insurerName: string | null;
+  client: { companyName: string } | null;
+  vehicle: { vehicleNumber: string } | null;
+  driver: { name: string } | null;
+  trip: { tripCode: string } | null;
+  order: { orderCode: string } | null;
+}
+
+const INCIDENT_EXPORT = {
+  title: "Incident Reports",
+  columns: [
+    { header: "Report", value: (r: IncidentExportRow) => r.reportNumber, width: 14 },
+    { header: "Date", value: (r: IncidentExportRow) => r.reportedAt, width: 12 },
+    { header: "Customer", value: (r: IncidentExportRow) => r.client?.companyName ?? "", width: 22 },
+    { header: "Order", value: (r: IncidentExportRow) => r.order?.orderCode ?? "", width: 14 },
+    { header: "Vehicle", value: (r: IncidentExportRow) => r.vehicle?.vehicleNumber ?? "", width: 14 },
+    { header: "Trip", value: (r: IncidentExportRow) => r.trip?.tripCode ?? "", width: 14 },
+    { header: "Driver", value: (r: IncidentExportRow) => r.driver?.name ?? "", width: 18 },
+    { header: "Type", value: (r: IncidentExportRow) => r.incidentType, width: 18 },
+    { header: "Location", value: (r: IncidentExportRow) => r.location ?? "", width: 20 },
+    { header: "Root cause", value: (r: IncidentExportRow) => r.rootCause, width: 18 },
+    { header: "Liable party", value: (r: IncidentExportRow) => r.liableParty ?? "", width: 16 },
+    { header: "Currency", value: (r: IncidentExportRow) => r.currency, width: 9 },
+    // Decimals go out as numbers so a spreadsheet can total the column.
+    { header: "Cargo value", value: (r: IncidentExportRow) => r.cargoValue.toNumber(), width: 13 },
+    { header: "Loss", value: (r: IncidentExportRow) => r.damageValue.toNumber(), width: 13 },
+    { header: "Damage ratio %", value: (r: IncidentExportRow) => damageRatioPct(r.cargoValue, r.damageValue), width: 12 },
+    { header: "Settled", value: (r: IncidentExportRow) => r.settlementAmount.toNumber(), width: 13 },
+    { header: "Recovery %", value: (r: IncidentExportRow) => recoveryPct(r.damageValue, r.settlementAmount), width: 11 },
+    { header: "Claim status", value: (r: IncidentExportRow) => r.claimStatus, width: 16 },
+    { header: "Claim no.", value: (r: IncidentExportRow) => r.claimNumber ?? "", width: 14 },
+    { header: "Insurer", value: (r: IncidentExportRow) => r.insurerName ?? "", width: 18 },
+    { header: "Status", value: (r: IncidentExportRow) => r.status, width: 14 },
+  ],
+} satisfies ExportSpec<IncidentExportRow>;
+
 operationalKpi.get("/damage-reports", requireAuth, requirePermission("kpi:read"), async (c) => {
   const user = c.get("user");
   const sp = c.req.query();
   const { page, pageSize } = paginationSchema.parse(sp);
   const where = incidentFilters(sp, user);
+
+  const file = await exportIfRequested(c, INCIDENT_EXPORT, (take) =>
+    prisma.damageReport.findMany({
+      where,
+      include: {
+        order: { select: { orderCode: true } },
+        client: { select: { companyName: true } },
+        vehicle: { select: { vehicleNumber: true } },
+        driver: { select: { name: true } },
+        trip: { select: { tripCode: true } },
+      },
+      orderBy: { reportedAt: "desc" },
+      take,
+    }),
+  );
+  if (file) return file;
   const [items, total] = await Promise.all([
     prisma.damageReport.findMany({
       where,
