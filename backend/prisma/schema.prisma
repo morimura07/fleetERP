@@ -647,7 +647,6 @@ enum PosPaymentMethod {
  * Tenant boundary (parent company). An Organization owns a group of legal
  * entities; two organizations on the same database must never see each other,
  * and each has its own ADMIN. Only SUPER_ADMIN sees across organizations.
- *
  * Isolation is still carried by `dataAreaId` on every business record — the
  * organization simply decides *which* dataAreaIds a user may reach, resolved in
  * `lib/scope.ts`. No business table changes.
@@ -670,13 +669,13 @@ model Organization {
 }
 
 model Company {
-  id             String        @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  code           String        @unique // = dataAreaId (e.g. HQ01, KE01)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  code           String       @unique // = dataAreaId (e.g. HQ01, KE01)
   name           String
-  baseCurrency   String        @default("USD")
-  country        String        @default("TZ") // ISO country
+  baseCurrency   String       @default("USD")
+  country        String       @default("TZ") // ISO country
 
   // Commercial profile (client amendments, Aug 2026).
   kind               CompanyKind @default(OPERATING)
@@ -685,13 +684,13 @@ model Company {
   industry           String?
   paymentTerm        PaymentTerm @default(NET_30)
   creditLimit        Decimal?    @db.Decimal(18, 2)
-  isActive       Boolean       @default(true)
-  isSandbox      Boolean       @default(false) // demo/sandbox partition — safe to reset (M32)
+  isActive           Boolean     @default(true)
+  isSandbox          Boolean     @default(false) // demo/sandbox partition — safe to reset (M32)
   // Sandbox access window: after this instant every login into the partition is
   // refused. Null = no expiry. Only meaningful when `isSandbox`.
-  sandboxExpiresAt DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  sandboxExpiresAt   DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
   version     Int     @default(0)
   createdById String?
@@ -805,27 +804,27 @@ model Driver {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  availability      DriverAvailability[]
-  holidays          Holiday[]
-  dispatches        Dispatch[]
-  dailyReports      DailyReport[]
-  payments          Payment[]
-  trips             Trip[]
-  secondDriverTrips Trip[]               @relation("TripSecondDriver")
-  defaultForVehicles Vehicle[]           @relation("VehicleDefaultDriver")
-  transfers         MoneyTransfer[]
-  documents         DriverDocument[]
-  employee          Employee?
-  expenseClaims     ExpenseClaim[]
-  version           Int                  @default(0) // optimistic concurrency (PRD §7.1)
-  createdById       String? // audit: creator user id
-  updatedById       String? // audit: last-modifier user id
+  availability       DriverAvailability[]
+  holidays           Holiday[]
+  dispatches         Dispatch[]
+  dailyReports       DailyReport[]
+  payments           Payment[]
+  trips              Trip[]
+  secondDriverTrips  Trip[]               @relation("TripSecondDriver")
+  defaultForVehicles Vehicle[]            @relation("VehicleDefaultDriver")
+  transfers          MoneyTransfer[]
+  documents          DriverDocument[]
+  employee           Employee?
+  expenseClaims      ExpenseClaim[]
+  version            Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById        String? // audit: creator user id
+  updatedById        String? // audit: last-modifier user id
+  incidentReports    DamageReport[]
+  dockEvents         DockEvent[]
 
   @@index([status])
   @@index([dataAreaId])
   @@map("drivers")
-  incidentReports DamageReport[]
-  dockEvents      DockEvent[]
 }
 
 // 稼働設定 (per weekday working hours)
@@ -916,7 +915,7 @@ model Vehicle {
   // The driver normally paired with this truck. Pre-fills the trip form when the
   // vehicle is picked, so dispatch confirms rather than retypes (client review).
   defaultDriverId String?
-  defaultDriver   Driver? @relation("VehicleDefaultDriver", fields: [defaultDriverId], references: [id], onDelete: SetNull)
+  defaultDriver   Driver?         @relation("VehicleDefaultDriver", fields: [defaultDriverId], references: [id], onDelete: SetNull)
 
   // ── Maintenance & workshop (spec: Vehicles §5) ──
   odometerKm      Int?
@@ -937,23 +936,23 @@ model Vehicle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  maintenances  VehicleMaintenance[]
-  fixedAsset    FixedAsset?          // the asset register entry for this truck, when one exists
-  serviceOrders ServiceOrder[]
-  dispatches    Dispatch[]
-  trips         Trip[]
-  position      VehiclePosition?
-  dockEvents    DockEvent[]
-  version       Int                  @default(0) // optimistic concurrency (PRD §7.1)
-  createdById   String? // audit: creator user id
-  updatedById   String? // audit: last-modifier user id
+  maintenances    VehicleMaintenance[]
+  fixedAsset      FixedAsset? // the asset register entry for this truck, when one exists
+  serviceOrders   ServiceOrder[]
+  dispatches      Dispatch[]
+  trips           Trip[]
+  position        VehiclePosition?
+  dockEvents      DockEvent[]
+  version         Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById     String? // audit: creator user id
+  updatedById     String? // audit: last-modifier user id
+  incidentReports DamageReport[]
+  expenseLines    ExpenseLine[]
 
   @@index([defaultDriverId])
   @@index([status])
   @@index([dataAreaId])
   @@map("vehicles")
-  incidentReports DamageReport[]
-  expenseLines    ExpenseLine[]
 }
 
 model VehicleMaintenance {
@@ -1012,19 +1011,19 @@ model Client {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  jobs        DeliveryJob[]
-  orders      Order[]
-  quotes      SalesQuote[]
-  projects    Project[]
-  version     Int           @default(0) // optimistic concurrency (PRD §7.1)
-  createdById String? // audit: creator user id
-  updatedById String? // audit: last-modifier user id
+  jobs            DeliveryJob[]
+  orders          Order[]
+  quotes          SalesQuote[]
+  projects        Project[]
+  version         Int              @default(0) // optimistic concurrency (PRD §7.1)
+  createdById     String? // audit: creator user id
+  updatedById     String? // audit: last-modifier user id
+  damageReports   DamageReport[]
+  demandForecasts DemandForecast[]
 
   @@index([companyName])
   @@index([dataAreaId])
   @@map("clients")
-  damageReports     DamageReport[]
-  demandForecasts   DemandForecast[]
 }
 
 // ───────────────────────── DeliveryJob (配送案件) ─────────────────────────
@@ -1456,6 +1455,7 @@ model Trip {
   damageReports DamageReport[]
   version       Int            @default(0) // optimistic concurrency (PRD §7.1)
   updatedById   String? // audit: last-modifier user id
+  expenseLines  ExpenseLine[]
 
   @@index([driverId, scheduledStart])
   @@index([vehicleId, scheduledStart])
@@ -1463,7 +1463,6 @@ model Trip {
   @@index([status])
   @@index([reconStatus])
   @@map("trips")
-  expenseLines ExpenseLine[]
 }
 
 // A single operational cost on a trip. When posted, references its journal entry.
@@ -2236,7 +2235,6 @@ model PurchaseOrder {
   vendorInvoiceId String?
   vendorInvoice   VendorInvoice? @relation("PoVendorInvoice", fields: [vendorInvoiceId], references: [id], onDelete: SetNull)
 
-
   approvedById String?
   approvedAt   DateTime?
 
@@ -2850,8 +2848,8 @@ model DockEvent {
   // Gate and yard detail (client amendments, Aug 2026). Dwell time and the
   // detention flag are computed by pairing arrival with departure, so neither
   // is stored: a stored duration would go stale as soon as a time is corrected.
-  driverId     String?
-  driver       Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  driverId      String?
+  driver        Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
   trailerNumber String?
   dockBay       String? // bay, gate or yard slot
   activity      DockActivity @default(OTHER)
@@ -2892,14 +2890,14 @@ model DamageReport {
   // Incident detail (client amendments, Aug 2026). The screen is presented as
   // "Incident Report" because it covers loss, shortage and claims, not just damage.
   clientId     String?
-  client       Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  client       Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
   vehicleId    String?
-  vehicle      Vehicle?       @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   driverId     String?
-  driver       Driver?        @relation(fields: [driverId], references: [id], onDelete: SetNull)
-  incidentType IncidentType   @default(TRANSIT_DAMAGE)
+  driver       Driver?       @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  incidentType IncidentType  @default(TRANSIT_DAMAGE)
   location     String? // where it happened or was discovered
-  rootCause    IncidentCause  @default(UNDETERMINED)
+  rootCause    IncidentCause @default(UNDETERMINED)
   liableParty  String?
 
   // Insurance recovery. `damageRatio` is deliberately not stored: it is
@@ -3328,4 +3326,53 @@ model AssetAssignment {
   @@index([assetId])
   @@index([assetId, returnedAt])
   @@map("asset_assignments")
+}
+
+/// What a document is, so a list of ten files is readable at a glance and a
+/// compliance view can ask for "the insurance policy" rather than guessing.
+enum AttachmentKind {
+  RECEIPT
+  INVOICE
+  PHOTO
+  CONTRACT
+  CERTIFICATE
+  POLICE_REPORT
+  SURVEY_REPORT
+  PROOF_OF_DELIVERY
+  LICENCE
+  OTHER
+}
+
+/// A file hung off any business record.
+///
+/// The client asked for document upload on every related field. One table
+/// polymorphic over the owner beats a nullable FK per model: the alternative is
+/// twelve columns here, or an attachment table per module, and either way adding
+/// the thirteenth attachable record means a migration.
+///
+/// `entityType` is a plain string with no foreign key, because Postgres cannot
+/// reference twelve tables from one column. What keeps it honest is the
+/// allowlist in `services/attachment.ts`, which also checks the owning record is
+/// inside the caller's tenant before the row is written.
+model Attachment {
+  id         String @id @default(cuid())
+  dataAreaId String @default("HQ01")
+
+  /// Prisma model name of the owner, e.g. "FixedAsset". Validated on write.
+  entityType String
+  entityId   String
+
+  fileName  String
+  fileUrl   String
+  mimeType  String
+  sizeBytes Int
+  kind      AttachmentKind @default(OTHER)
+  note      String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([dataAreaId, entityType, entityId])
+  @@index([entityType, entityId])
+  @@map("attachments")
 }
