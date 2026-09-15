@@ -44,7 +44,7 @@ const GROUPS: NavGroup[] = [
       { href: "/jobs", label: "Delivery Jobs", icon: Package, perm: "job:read" },
       { href: "/projects", label: "Projects", icon: FolderKanban, perm: "project:read" },
       { href: "/waypoints", label: "GPS Waypoints", icon: MapPin, perm: "waypoint:read" },
-      { href: "/reports", label: "Daily Reports", icon: FileText, perm: "report:read" },
+      { href: "/reports", label: "Reports", icon: FileText, perm: "report:read" },
     ],
   },
   {
