@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { areaScope } from "@backend/lib/scope";
 import { defineReport } from "@backend/services/report-registry";
-import { costPerKm, revenuePerKm, otifPct, pct } from "@backend/services/dashboard-kpi";
+import { costPerKm, revenuePerKm, otifPct, pct, vehicleTco } from "@backend/services/dashboard-kpi";
 
 /**
  * Transport finance and executive reports.
@@ -406,4 +406,123 @@ export const otifReport = defineReport<OtifRow>({
   },
 });
 
-export const financeReports = [costPerKmReport, tripProfitabilityReport, arAgingReport, otifReport];
+export const financeReports: unknown[] = [costPerKmReport, tripProfitabilityReport, arAgingReport, otifReport];
+
+// ── Vehicle total cost of ownership ──────────────────────────────────────────
+
+interface TcoRow {
+  vehicle: string;
+  plate: string;
+  acquisitionCost: number | null;
+  depreciationToDate: number | null;
+  fuel: number;
+  maintenance: number;
+  tolls: number;
+  other: number;
+  tco: number;
+  revenue: number;
+  roiPct: number | null;
+  distanceKm: number;
+  tcoPerKm: number | null;
+}
+
+export const vehicleTcoReport = defineReport<TcoRow>({
+  key: "vehicle-tco",
+  title: "Vehicle total cost of ownership & ROI",
+  group: "FINANCE",
+  description: "What each truck has cost to own and run, against what it has earned.",
+  permission: "asset:read",
+  params: [
+    { name: "from", label: "From", kind: "date", required: true },
+    { name: "to", label: "To", kind: "date", required: true },
+  ],
+  columns: [
+    { header: "Vehicle", value: (r) => r.vehicle, width: 12 },
+    { header: "Plate", value: (r) => r.plate, width: 12 },
+    { header: "Acquisition cost", value: (r) => r.acquisitionCost, width: 14 },
+    { header: "Depreciation to date", value: (r) => r.depreciationToDate, width: 16 },
+    { header: "Fuel", value: (r) => r.fuel, width: 11 },
+    { header: "Maintenance", value: (r) => r.maintenance, width: 12 },
+    { header: "Tolls & permits", value: (r) => r.tolls, width: 13 },
+    { header: "Other", value: (r) => r.other, width: 11 },
+    { header: "TCO in window", value: (r) => r.tco, width: 13 },
+    { header: "Revenue", value: (r) => r.revenue, width: 12 },
+    { header: "ROI %", value: (r) => r.roiPct, width: 9 },
+    { header: "Distance (km)", value: (r) => r.distanceKm, width: 13 },
+    { header: "TCO per km", value: (r) => r.tcoPerKm, width: 11 },
+  ],
+  run: async (ctx) => {
+    const vehicles = await prisma.vehicle.findMany({
+      where: { dataAreaId: ctx.dataAreaId },
+      include: {
+        // The asset register link added in stage 4, which is what makes
+        // depreciation attributable to a truck at all.
+        fixedAsset: { select: { acquisitionCost: true, accumulatedDepreciation: true } },
+        trips: {
+          where: tripWindow(ctx),
+          include: {
+            expenses: { select: { amount: true, type: true } },
+            order: { select: { freightAmount: true, accessorialCharges: true, trips: { select: { id: true } } } },
+          },
+        },
+        serviceOrders: {
+          where: { ...(ctx.from || ctx.to ? { openedAt: { ...(ctx.from ? { gte: ctx.from } : {}), ...(ctx.to ? { lte: ctx.to } : {}) } } : {}) },
+          select: { totalCost: true },
+        },
+      },
+      orderBy: { vehicleNumber: "asc" },
+    });
+
+    return vehicles.map((v) => {
+      let fuel = D(0), tolls = D(0), other = D(0), revenue = D(0), distance = D(0), tripMaintenance = D(0);
+      for (const t of v.trips) {
+        for (const e of t.expenses) {
+          // Border fees travel with tolls: both are a cost of the route rather
+          // than of the truck. Trip-level maintenance joins the workshop total.
+          if (e.type === "FUEL") fuel = fuel.plus(e.amount);
+          else if (e.type === "TOLLS" || e.type === "BORDER_FEES") tolls = tolls.plus(e.amount);
+          else if (e.type === "MAINTENANCE") tripMaintenance = tripMaintenance.plus(e.amount);
+          else other = other.plus(e.amount);
+        }
+        tolls = tolls.plus(t.tollPermitCost);
+        other = other.plus(t.driverWages).plus(t.miscExpense);
+        distance = distance.plus(t.mileageKm);
+        // Same even split across legs as trip profitability, for the same reason.
+        const legs = Math.max(1, t.order.trips.length);
+        revenue = revenue.plus(D(t.order.freightAmount).plus(t.order.accessorialCharges).dividedBy(legs));
+      }
+      const maintenance = v.serviceOrders.reduce((s, o) => s.plus(o.totalCost), D(0)).plus(tripMaintenance);
+      const tco = vehicleTco({ maintenance, fuel, tolls, other });
+      const asset = v.fixedAsset;
+      return {
+        vehicle: v.vehicleNumber,
+        plate: v.plateNumber,
+        acquisitionCost: asset ? money(D(asset.acquisitionCost)) : null,
+        depreciationToDate: asset ? money(D(asset.accumulatedDepreciation)) : null,
+        fuel: money(fuel),
+        maintenance: money(maintenance),
+        tolls: money(tolls),
+        other: money(other),
+        tco: money(tco),
+        revenue: money(revenue),
+        roiPct: tco.greaterThan(0) ? Math.round(revenue.minus(tco).dividedBy(tco).times(1000).toNumber()) / 10 : null,
+        distanceKm: distance.toDecimalPlaces(2).toNumber(),
+        tcoPerKm: distance.greaterThan(0) ? Number(costPerKm(tco, distance)) : null,
+      };
+    });
+  },
+  summary: (rows) => {
+    const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    const tco = rows.reduce((s, r) => s + r.tco, 0);
+    const revenue = rows.reduce((s, r) => s + r.revenue, 0);
+    const unlinked = rows.filter((r) => r.acquisitionCost === null).length;
+    return [
+      { label: "Fleet TCO in window", value: fmt(tco) },
+      { label: "Revenue", value: fmt(revenue) },
+      { label: "Fleet ROI", value: tco > 0 ? `${Math.round(((revenue - tco) / tco) * 1000) / 10}%` : "—" },
+      { label: "No asset record", value: String(unlinked), hint: unlinked > 0 ? "depreciation unknown for these" : undefined },
+    ];
+  },
+});
+
+financeReports.push(vehicleTcoReport);

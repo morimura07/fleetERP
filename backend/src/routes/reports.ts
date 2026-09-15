@@ -14,6 +14,8 @@ import {
 } from "@backend/services/report-registry";
 // Importing the definitions is what registers them.
 import "@backend/services/reports/finance";
+import "@backend/services/reports/operations";
+import "@backend/services/reports/telematics";
 
 export const reports = new Hono();
 

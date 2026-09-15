@@ -5,6 +5,8 @@ import {
 import { ALL as ALL_PERMISSIONS } from "@backend/lib/rbac";
 // Importing the definitions is what registers them.
 import "@backend/services/reports/finance";
+import "@backend/services/reports/operations";
+import "@backend/services/reports/telematics";
 
 describe("the report catalogue", () => {
   it("has registered the finance and executive reports", () => {
@@ -93,5 +95,37 @@ describe("date bounds", () => {
     expect(dayBound(undefined)).toBeNull();
     expect(dayBound("")).toBeNull();
     expect(dayBound("last Tuesday")).toBeNull();
+  });
+});
+
+describe("the full catalogue", () => {
+  it("covers every group the requirements list", () => {
+    // The document has seven groups. A group with nothing in it would mean a
+    // whole section of the request was dropped.
+    const groups = new Set(allReports().map((r) => r.group));
+    for (const g of Object.keys(REPORT_GROUPS)) {
+      expect(groups.has(g as never), `no reports in group ${g}`).toBe(true);
+    }
+  });
+
+  it("says why an unavailable report cannot run, rather than returning nothing", () => {
+    const blocked = allReports().filter((r) => r.unavailable);
+    expect(blocked.length).toBeGreaterThan(0);
+    for (const r of blocked) {
+      expect(r.unavailable!.length, `${r.key} has no reason`).toBeGreaterThan(30);
+    }
+  });
+
+  it("has more reports that run than reports that cannot", () => {
+    const all = allReports();
+    const runnable = all.filter((r) => !r.unavailable).length;
+    expect(runnable).toBeGreaterThan(all.length - runnable);
+  });
+
+  it("never reuses a key", () => {
+    // defineReport throws on a duplicate, so reaching here proves it, but the
+    // assertion documents the guarantee.
+    const keys = allReports().map((r) => r.key);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });
