@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Pencil, Trash2, Download } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
+import { DownloadButton } from "@frontend/components/data/download-button";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
@@ -88,9 +89,7 @@ export function JobsManager({ clients }: { clients: { id: string; companyName: s
                 {Object.entries(JOB_STATUS_LABEL).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Button variant="outline" asChild>
-              <a href={`/api/exports/jobs-csv${statusFilter ? `?status=${statusFilter}` : ""}`}><Download className="h-4 w-4" />CSV</a>
-            </Button>
+            <DownloadButton variant="outline" path={`/api/exports/jobs-csv${statusFilter ? `?status=${statusFilter}` : ""}`} fileName="jobs.csv">CSV</DownloadButton>
             <Button onClick={openCreate}><Plus className="h-4 w-4" />New</Button>
           </>
         }

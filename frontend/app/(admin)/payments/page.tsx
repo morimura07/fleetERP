@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Download } from "lucide-react";
+import { DownloadButton } from "@frontend/components/data/download-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
@@ -41,7 +41,7 @@ export default function PaymentsPage() {
           <div className="flex items-center gap-2">
             <Input type="number" className="w-24" value={year} onChange={(e) => setYear(Number(e.target.value))} />
             <Input type="number" className="w-20" min={1} max={12} value={month} onChange={(e) => setMonth(Number(e.target.value))} />
-            <Button variant="outline" asChild><a href={`/api/exports/payment-pdf?year=${year}&month=${month}`}><Download className="h-4 w-4" />PDF</a></Button>
+            <DownloadButton variant="outline" path={`/api/exports/payment-pdf?year=${year}&month=${month}`} fileName={`payments-${year}-${String(month).padStart(2, "0")}.pdf`}>PDF</DownloadButton>
             <Button onClick={finalize}>Finalize</Button>
           </div>
         </CardHeader>

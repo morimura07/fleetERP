@@ -6,10 +6,8 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 } from "@frontend/components/ui/dropdown-menu";
 import { useToast } from "@frontend/components/ui/toast";
-import { getToken } from "@frontend/lib/auth-token";
-import { getActiveCompany, handleUnauthorized, describeError, SESSION_EXPIRED_MESSAGE } from "@frontend/lib/fetcher";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+import { describeError } from "@frontend/lib/fetcher";
+import { downloadFile } from "@frontend/lib/download";
 
 const FORMATS = [
   { value: "xlsx", label: "Excel (.xlsx)", icon: FileSpreadsheet },
@@ -21,9 +19,8 @@ const FORMATS = [
  * Downloads the current list as a file.
  *
  * It hits the same endpoint the table is showing, with the same filters, so the
- * file always matches what is on screen. `apiFetch` is not used because that
- * unwraps JSON; a download needs the raw body, and the bearer token has to be
- * attached by hand because a plain link cannot carry a header.
+ * file always matches what is on screen. The fetch itself is `downloadFile`,
+ * which carries the bearer token a plain link cannot.
  */
 export function ExportMenu({
   endpoint,
@@ -48,37 +45,7 @@ export function ExportMenu({
       if (search) params.set("q", search);
       for (const [k, v] of Object.entries(filters ?? {})) if (v) params.set(k, v);
 
-      const res = await fetch(`${API_BASE}${endpoint}?${params}`, {
-        headers: {
-          ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
-          ...(getActiveCompany() ? { "X-Data-Area": getActiveCompany() as string } : {}),
-        },
-      });
-
-      if (res.status === 401) {
-        handleUnauthorized();
-        throw new Error(SESSION_EXPIRED_MESSAGE);
-      }
-      if (!res.ok) {
-        // The server explains a refusal (too many rows, unknown format) in JSON.
-        const detail = await res.json().catch(() => null);
-        throw new Error(detail?.error ?? `The file could not be built (${res.status})`);
-      }
-
-      // Filename comes from Content-Disposition so the server names the file.
-      const disposition = res.headers.get("Content-Disposition") ?? "";
-      const named = /filename="?([^"]+)"?/.exec(disposition)?.[1];
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = named ?? `export.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      // Revoking immediately can cancel the download in some browsers.
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      await downloadFile(`${endpoint}?${params}`, `export.${format}`);
     } catch (e) {
       toast({
         title: "Export failed",

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
-import { Download } from "lucide-react";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
+import { DownloadButton } from "@frontend/components/data/download-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
@@ -138,7 +138,7 @@ export function DispatchManager({ undispatched }: { undispatched: UJob[] }) {
           <CardTitle>Dispatch History</CardTitle>
           <div className="flex items-center gap-2">
             <Input type="date" className="w-40" value={exportDate} onChange={(e) => setExportDate(e.target.value)} />
-            <Button variant="outline" asChild><a href={`/api/exports/dispatch-pdf?date=${exportDate}`}><Download className="h-4 w-4" />Dispatch Sheet PDF</a></Button>
+            <DownloadButton variant="outline" path={`/api/exports/dispatch-pdf?date=${exportDate}`} fileName={`dispatch-${exportDate}.pdf`}>Dispatch Sheet PDF</DownloadButton>
           </div>
         </CardHeader>
         <CardContent>
