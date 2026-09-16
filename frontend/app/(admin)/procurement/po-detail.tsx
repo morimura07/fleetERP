@@ -11,7 +11,9 @@ import { AttachmentsPanel } from "@frontend/components/data/attachments-panel";
 import { PO_STATUS_LABEL, PO_STATUS_VARIANT, MATCH_STATUS_LABEL, MATCH_STATUS_VARIANT } from "@frontend/lib/labels";
 import { apiFetch, describeError, handleUnauthorized, getActiveCompany } from "@frontend/lib/fetcher";
 import { getToken } from "@frontend/lib/auth-token";
-import type { PurchaseOrderStatus, MatchStatus } from "@frontend/lib/enums";
+import type { PurchaseOrderStatus, MatchStatus, GrnStatus } from "@frontend/lib/enums";
+import { GRN_STATUS_LABEL } from "@frontend/lib/labels";
+import { ReceiptDetail } from "./receipt-detail";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 const money = (v: string | number, c: string) => `${c} ${Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -27,7 +29,7 @@ export interface PoData {
   requisitionId: string | null; rfqId: string | null;
   vendor: { legalName: string; code: string };
   lines: Line[];
-  receipts: { id: string; receiptNumber: string; receivedAt: string }[];
+  receipts: { id: string; receiptNumber: string; receivedAt: string; status: GrnStatus; gateEntryNo: string | null }[];
   vendorInvoice: { invoiceNumber: string; subtotal: string } | null;
   approvals: Approval[];
   savings: { initial: string | null; final: string; saved: string | null; savedPct: string | null };
@@ -47,9 +49,17 @@ export function PoDetail({ id, onClose, onChange }: { id: string; onClose: () =>
   const [note, setNote] = useState("");
   const [date, setDate] = useState("");
   const [changing, setChanging] = useState(false);
+  const [receiving, setReceiving] = useState(false);
+  const [receiptId, setReceiptId] = useState<string | null>(null);
+  const [gate, setGate] = useState<{ allowed: boolean; reason: string | null } | null>(null);
 
   const load = useCallback(async () => {
-    try { setPo(await apiFetch<PoData>(`/api/procurement/${id}`)); } catch (e) { fail(e); }
+    try {
+      const data = await apiFetch<PoData>(`/api/procurement/${id}`);
+      setPo(data);
+      if (["APPROVED", "ISSUED", "ACKNOWLEDGED", "IN_PRODUCTION", "DISPATCHED", "PARTIAL"].includes(data.status)) setGate(await apiFetch(`/api/procurement/${id}/grn-gate`));
+      else setGate(null);
+    } catch (e) { fail(e); }
   }, [id, fail]);
   useEffect(() => { load(); }, [load]);
 
@@ -62,13 +72,6 @@ export function PoDetail({ id, onClose, onChange }: { id: string; onClose: () =>
       setNote(""); onChange(); await load();
     } catch (e) { fail(e); }
     finally { setBusy(false); }
-  }
-
-  async function receiveAll() {
-    if (!po) return;
-    const lines = po.lines.map((l) => ({ purchaseOrderLineId: l.id, quantity: Number(l.quantity) - Number(l.qtyReceived) })).filter((l) => l.quantity > 0);
-    if (lines.length === 0) { toast({ title: "Nothing outstanding to receive" }); return; }
-    await act("receive", "Goods received", { lines });
   }
 
   async function downloadPdf() {
@@ -149,7 +152,19 @@ export function PoDetail({ id, onClose, onChange }: { id: string; onClose: () =>
             </div>
           )}
 
-          {po.receipts.length > 0 && <p className="text-xs text-muted-foreground">Receipts: {po.receipts.map((r) => `${r.receiptNumber} (${r.receivedAt.slice(0, 10)})`).join(", ")}</p>}
+          {po.receipts.length > 0 && (
+            <div className="rounded-md border">
+              <div className="border-b px-3 py-1.5 text-xs font-medium uppercase text-muted-foreground">Goods receipts</div>
+              {po.receipts.map((r) => (
+                <button key={r.id} type="button" onClick={() => setReceiptId(r.id)} className="flex w-full items-center gap-3 border-t px-3 py-1.5 text-left text-sm hover:bg-elevated">
+                  <span className="font-mono">{r.receiptNumber}</span>
+                  <span className="text-muted-foreground">{r.receivedAt.slice(0, 10)}{r.gateEntryNo ? ` · gate ${r.gateEntryNo}` : ""}</span>
+                  <Badge variant={r.status === "COMPLETED" ? "success" : r.status === "INSPECTING" ? "warning" : "secondary"}>{GRN_STATUS_LABEL[r.status]}</Badge>
+                </button>
+              ))}
+            </div>
+          )}
+          {gate && !gate.allowed && <p className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-sm text-amber-500">{gate.reason}</p>}
           {po.vendorInvoice && <p className="text-xs text-muted-foreground">Matched against invoice {po.vendorInvoice.invoiceNumber} for {money(po.vendorInvoice.subtotal, po.currency)}</p>}
 
           <AttachmentsPanel entityType="PurchaseOrder" entityId={po.id} />
@@ -186,12 +201,14 @@ export function PoDetail({ id, onClose, onChange }: { id: string; onClose: () =>
             )}
             {po.status === "ACKNOWLEDGED" && <Button variant="outline" disabled={busy} onClick={() => act("production", "In production")}><Factory className="h-4 w-4" />In production</Button>}
             {["ACKNOWLEDGED", "IN_PRODUCTION"].includes(po.status) && <Button variant="outline" disabled={busy} onClick={() => act("dispatch", "Dispatched")}><Truck className="h-4 w-4" />Dispatched</Button>}
-            {["APPROVED", "ISSUED", "ACKNOWLEDGED", "IN_PRODUCTION", "DISPATCHED", "PARTIAL"].includes(po.status) && <Button disabled={busy} onClick={receiveAll}><PackageCheck className="h-4 w-4" />Receive all</Button>}
+            {["APPROVED", "ISSUED", "ACKNOWLEDGED", "IN_PRODUCTION", "DISPATCHED", "PARTIAL"].includes(po.status) && <Button disabled={busy || (gate ? !gate.allowed : false)} title={gate?.reason ?? undefined} onClick={() => setReceiving(true)}><PackageCheck className="h-4 w-4" />Receive goods</Button>}
             {!["PARTIAL", "RECEIVED", "CLOSED", "CANCELLED"].includes(po.status) && <Button variant="ghost" disabled={busy} onClick={() => act("cancel", "Cancelled", { reason: note })}><Ban className="h-4 w-4" />Cancel</Button>}
             <Button variant="outline" onClick={onClose}>Close</Button>
           </DialogFooter>
         </div>
         {changing && <ChangeOrderDialog po={po} onClose={() => setChanging(false)} onSaved={async () => { onChange(); await load(); }} />}
+        {receiving && <ReceiveDialog po={po} onClose={() => setReceiving(false)} onSaved={async (rid) => { onChange(); await load(); setReceiptId(rid); }} />}
+        {receiptId && <ReceiptDetail id={receiptId} onClose={() => setReceiptId(null)} onChange={async () => { onChange(); await load(); }} />}
       </DialogContent>
     </Dialog>
   );
@@ -260,5 +277,57 @@ function Fact({ label, value, hint }: { label: string; value: string; hint?: str
       <div>{value}</div>
       {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
     </div>
+  );
+}
+
+/** The dock count: gate entry, delivery note, quantities per line (outstanding by default). */
+function ReceiveDialog({ po, onClose, onSaved }: { po: PoData; onClose: () => void; onSaved: (receiptId: string) => void }) {
+  const { toast } = useToast();
+  const [gateEntryNo, setGateEntryNo] = useState("");
+  const [deliveryNoteNo, setDeliveryNoteNo] = useState("");
+  const [note, setNote] = useState("");
+  const [qty, setQty] = useState<Record<string, string>>(() => Object.fromEntries(po.lines.map((l) => [l.id, String(Math.max(0, Number(l.quantity) - Number(l.qtyReceived)))])));
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setBusy(true);
+    try {
+      const lines = po.lines.map((l) => ({ purchaseOrderLineId: l.id, quantity: Number(qty[l.id] || 0) })).filter((l) => l.quantity > 0);
+      const r = await apiFetch<{ id: string; receiptNumber: string }>(`/api/procurement/${po.id}/receive`, { method: "POST", body: JSON.stringify({ gateEntryNo: gateEntryNo || "", deliveryNoteNo: deliveryNoteNo || "", note, lines }) });
+      toast({ title: `${r.receiptNumber} recorded`, description: "Inspect each line to accept it into stock", variant: "success" });
+      onSaved(r.id); onClose();
+    } catch (e) { toast({ title: "Error", description: describeError(e), variant: "destructive" }); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader><DialogTitle>Receive goods against {po.poNumber}</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-1.5"><Label>Gate entry no.</Label><Input value={gateEntryNo} onChange={(e) => setGateEntryNo(e.target.value)} /></div>
+          <div className="space-y-1.5"><Label>Delivery note no.</Label><Input value={deliveryNoteNo} onChange={(e) => setDeliveryNoteNo(e.target.value)} /></div>
+          <div className="space-y-1.5"><Label>Note</Label><Input value={note} onChange={(e) => setNote(e.target.value)} /></div>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="p-1 text-left">Line</th><th className="p-1 text-right">Ordered</th><th className="p-1 text-right">Already received</th><th className="p-1 text-right">Counted now</th></tr></thead>
+          <tbody className="tabular-nums">
+            {po.lines.map((l) => (
+              <tr key={l.id} className="border-t">
+                <td className="p-1">{l.description}</td>
+                <td className="p-1 text-right">{Number(l.quantity)}</td>
+                <td className="p-1 text-right">{Number(l.qtyReceived)}</td>
+                <td className="p-1 w-32"><Input className="h-9 text-right" type="number" min="0" step="0.001" value={qty[l.id] ?? ""} onChange={(e) => setQty((q) => ({ ...q, [l.id]: e.target.value }))} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-xs text-muted-foreground">Over-delivery beyond the policy&#39;s tolerance is refused. Stock is updated when each line passes inspection.</p>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} disabled={busy || po.lines.every((l) => !Number(qty[l.id]))}>Record receipt</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

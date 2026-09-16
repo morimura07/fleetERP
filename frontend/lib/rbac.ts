@@ -261,6 +261,7 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/procurement", permission: "procurement:read" },
   { prefix: "/requisitions", permission: "procurement:read" },
   { prefix: "/rfqs", permission: "procurement:read" },
+  { prefix: "/shipments", permission: "procurement:read" },
   { prefix: "/payroll", permission: "payroll:read" },
   { prefix: "/expenses", permission: "expense:read" },
   { prefix: "/assets", permission: "asset:read" },
