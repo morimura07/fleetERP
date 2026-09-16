@@ -30,7 +30,8 @@ const SANDBOX_WIPE_ORDER = [
   "vehicle_positions", "vehicle_maintenances",
   "driver_documents", "driver_availabilities", "holidays",
   "employee_documents", "employment_contracts", "leave_requests", "leave_balances",
-  "time_entries", "timesheets",
+  "shift_activities", "time_entries", "timesheets", "roster_entries", "shift_codes",
+  "public_holidays", "time_policies",
   "money_transfers", "dispatches", "daily_reports",
   // transactions
   "pos_sales", "sales_quotes", "service_orders", "purchase_orders", "stock_movements",

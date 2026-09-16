@@ -154,20 +154,6 @@ defineReport<Placeholder>({
 });
 
 defineReport<Placeholder>({
-  key: "driver-hos-log",
-  title: "Driver duty & hours of service",
-  group: "DRIVER",
-  description: "Shift hours, driving time, rest breaks and compliance against the HOS rule.",
-  permission: "attendance:read",
-  params: [],
-  columns: cols(["Driver", "Date", "On duty (h)", "Driving (h)", "Rest (h)", "Rule", "Compliant"]),
-  run: never,
-  unavailable:
-    "Time entries record clock-in and clock-out only; driving time and rest breaks are not captured. " +
-    "Available once time management records duty status (stage 10), or via an ELD feed.",
-});
-
-defineReport<Placeholder>({
   key: "emissions-carbon",
   title: "Emissions & carbon footprint",
   group: "COMPLIANCE",

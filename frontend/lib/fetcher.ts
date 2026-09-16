@@ -19,7 +19,35 @@ export class ApiError extends Error {
     public details?: unknown,
   ) {
     super(message);
+    this.name = "ApiError";
   }
+}
+
+export const SESSION_EXPIRED_MESSAGE = "Your session has expired. Please sign in again.";
+
+let redirecting = false;
+
+/**
+ * What every client-side call does on a 401: drop the dead token and send
+ * the person to sign in again, once, keeping where they were. Without this a
+ * screen kept open past the token's life fails request by request with raw
+ * "Invalid or expired token" messages and no way out but a manual reload.
+ */
+export function handleUnauthorized(): void {
+  clearToken();
+  if (typeof window === "undefined" || redirecting) return;
+  if (window.location.pathname.startsWith("/login")) return;
+  redirecting = true;
+  const back = window.location.pathname + window.location.search;
+  window.location.assign(`/login?reason=expired&callbackUrl=${encodeURIComponent(back)}`);
+}
+
+/** The message a person should see for a failed call, never a raw status. */
+export function describeError(e: unknown, fallback = "Something went wrong. Please try again."): string {
+  if (e instanceof ApiError) return e.status === 401 ? SESSION_EXPIRED_MESSAGE : e.message || fallback;
+  if (e instanceof TypeError && /fetch/i.test(e.message)) return "Cannot reach the server. Check your connection and try again.";
+  if (e instanceof Error && e.message) return e.message;
+  return fallback;
 }
 
 /**
@@ -52,12 +80,16 @@ export async function apiFetch<T = unknown>(
       ...init.headers,
     },
   });
-  // A 401 means the token is missing/expired — clear it so the guard redirects.
-  if (res.status === 401) clearToken();
+  // A 401 means the token is missing or expired: back to sign-in.
+  if (res.status === 401) handleUnauthorized();
   const isJson = res.headers.get("content-type")?.includes("application/json");
-  const payload = isJson ? await res.json() : null;
+  const payload = isJson ? await res.json().catch(() => null) : null;
   if (!res.ok) {
-    throw new ApiError(payload?.error ?? "Request failed", res.status, payload?.details);
+    throw new ApiError(
+      res.status === 401 ? SESSION_EXPIRED_MESSAGE : payload?.error ?? `Request failed (${res.status})`,
+      res.status,
+      payload?.details,
+    );
   }
   // returnRaw keeps { data, meta } for paginated lists; otherwise unwrap `data`.
   return (returnRaw ? payload : payload?.data ?? payload) as T;

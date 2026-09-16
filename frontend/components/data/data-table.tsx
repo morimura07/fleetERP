@@ -1,11 +1,11 @@
 "use client";
 import { useEffect, useState, useCallback, useRef, type ReactNode } from "react";
-import { Search, Inbox } from "lucide-react";
+import { Search, Inbox, AlertTriangle } from "lucide-react";
 import { Input } from "@frontend/components/ui/input";
 import { Button } from "@frontend/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@frontend/components/ui/table";
 import { Loader } from "@frontend/components/ui/loader";
-import { apiFetch } from "@frontend/lib/fetcher";
+import { apiFetch, describeError } from "@frontend/lib/fetcher";
 
 export interface Column<T> {
   key: string;
@@ -41,6 +41,7 @@ export function DataTable<T extends { id: string }>({
 }: Props<T>) {
   const [rows, setRows] = useState<T[]>([]);
   const [meta, setMeta] = useState<Meta>({ page: 1, pageSize: 20, total: 0, totalPages: 1 });
+  const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -49,6 +50,7 @@ export function DataTable<T extends { id: string }>({
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     const params = new URLSearchParams({ page: String(page), pageSize: "20" });
     if (q) params.set("q", q);
     for (const [k, v] of Object.entries(filters ?? {})) if (v) params.set(k, v);
@@ -62,8 +64,11 @@ export function DataTable<T extends { id: string }>({
       setRows(body.data ?? []);
       onRowsRef.current?.(body.data ?? []);
       if (body.meta) setMeta(body.meta);
-    } catch {
+    } catch (e) {
+      // Say what went wrong where the rows would be, rather than showing an
+      // empty table that reads as "there is no data".
       setRows([]);
+      setError(describeError(e));
     } finally {
       setLoading(false);
     }
@@ -101,6 +106,17 @@ export function DataTable<T extends { id: string }>({
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={colCount} className="h-40">
                   <Loader size={36} label="Loading…" />
+                </TableCell>
+              </TableRow>
+            ) : error ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={colCount} className="h-40 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <AlertTriangle className="h-7 w-7 text-amber-400" />
+                    <span className="text-sm text-foreground">The list could not be loaded</span>
+                    <span className="text-xs">{error}</span>
+                    <button type="button" onClick={() => load()} className="mt-1 rounded-md border border-border px-3 py-1 text-xs text-foreground hover:bg-elevated">Try again</button>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (

@@ -40,13 +40,20 @@ export function mapError(e: unknown): { status: number; message: string; details
     }
     if (e.code === "P2025") return { status: 404, message: "Not found" };
     if (e.code === "P2003") return { status: 409, message: "Cannot complete: related records exist" };
+    // P1xxx: the database itself, not the query. Say so, and say it is temporary.
+    if (e.code.startsWith("P1")) return { status: 503, message: "The database is not reachable right now. Please try again shortly." };
   }
+  if (e instanceof Prisma.PrismaClientInitializationError) {
+    return { status: 503, message: "The database is not reachable right now. Please try again shortly." };
+  }
+  // c.req.json() on a body that is not JSON: the client's mistake, not ours.
+  if (e instanceof SyntaxError) return { status: 400, message: "Request body is not valid JSON" };
   return { status: 500, message: "A server error occurred" };
 }
 
 /** Global Hono onError handler. */
 export function onError(e: Error, c: Context) {
   const mapped = mapError(e);
-  if (mapped.status === 500) console.error("[api] unhandled error", e);
+  if (mapped.status >= 500) console.error(`[api] ${mapped.status} on ${c.req.method} ${c.req.path}`, e);
   return c.json({ error: mapped.message, ...(mapped.details ? { details: mapped.details } : {}) }, mapped.status as never);
 }

@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
-import { authConfig } from "@/auth.config";
+import { authConfig, accessTokenExpired } from "@/auth.config";
 import { ROUTE_GUARDS, can } from "@frontend/lib/rbac";
 
 const { auth } = NextAuth(authConfig);
@@ -20,6 +20,17 @@ export default auth((req) => {
     if (!session?.user) {
       if (isPublic) return NextResponse.next();
       const url = new URL("/login", nextUrl);
+      url.searchParams.set("callbackUrl", path);
+      return NextResponse.redirect(url);
+    }
+
+    // The cookie is still valid but the backend token inside it is not: every
+    // API call would 401. Send the person to sign in again before a screen
+    // gets the chance to fail in front of them.
+    if (accessTokenExpired(session.accessTokenExpires)) {
+      if (isPublic) return NextResponse.next();
+      const url = new URL("/login", nextUrl);
+      url.searchParams.set("reason", "expired");
       url.searchParams.set("callbackUrl", path);
       return NextResponse.redirect(url);
     }

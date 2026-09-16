@@ -1,6 +1,5 @@
 import type {
-  JobStatus, DriverStatus, DriverType, OwnershipStatus, FuelType, FacilityType, VehicleStatus, Role, ContractType, AccountType, AccountSubType, PostingType, JournalDocType, JournalStatus, OrderStatus, TripStatus, CorridorType, EquipmentType, TripExpenseType, InvoiceStatus, PaymentTerm, VendorGroup, PaymentMethod, CustomerAccountGroup, PartyStatus, DunningLevel, DisputeStatus, CollectionActivityType, RateType, BankAccountType, DisbursementType, TransferStatus, BudgetKind, BudgetControl, DriverDocType, ReconStatus, StockCategory, StockUnit, PurchaseOrderStatus, MatchStatus, EmployeeStatus, PayRunStatus, ExpenseClaimStatus, AssetCategory, AssetStatus, ServiceOrderStatus, ServiceKind, EmploymentType, ContractStatus, LeaveType, LeaveStatus, EmployeeDocType, AttendanceSource, TimesheetStatus, DockEventKind, DamageStatus, LeadStage, QuoteStatus, ProjectStatus, ForecastStatus, PosSaleStatus, PosPaymentMethod, PeriodStatus, AttributeDataType, UomDimension, IncidentType, IncidentCause, ClaimStatus, DockActivity, DockSource, CompanyKind,
-} from "@frontend/lib/enums";
+  JobStatus, DriverStatus, DriverType, OwnershipStatus, FuelType, FacilityType, VehicleStatus, Role, ContractType, AccountType, AccountSubType, PostingType, JournalDocType, JournalStatus, OrderStatus, TripStatus, CorridorType, EquipmentType, TripExpenseType, InvoiceStatus, PaymentTerm, VendorGroup, PaymentMethod, CustomerAccountGroup, PartyStatus, DunningLevel, DisputeStatus, CollectionActivityType, RateType, BankAccountType, DisbursementType, TransferStatus, BudgetKind, BudgetControl, DriverDocType, ReconStatus, StockCategory, StockUnit, PurchaseOrderStatus, MatchStatus, EmployeeStatus, PayRunStatus, ExpenseClaimStatus, AssetCategory, AssetStatus, ServiceOrderStatus, ServiceKind, EmploymentType, ContractStatus, LeaveType, LeaveStatus, EmployeeDocType, AttendanceSource, TimesheetStatus, DockEventKind, DamageStatus, LeadStage, QuoteStatus, ProjectStatus, ForecastStatus, PosSaleStatus, PosPaymentMethod, PeriodStatus, AttributeDataType, UomDimension, IncidentType, IncidentCause, ClaimStatus, DockActivity, DockSource, CompanyKind, ShiftActivityKind, DutyStatus, FatigueStatus,} from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
 
@@ -588,6 +587,54 @@ export const ATTENDANCE_SOURCE_LABEL: Record<AttendanceSource, string> = {
   MANUAL: "Manual",
   MOBILE: "Mobile app",
   BIOMETRIC: "Biometric",
+  RFID: "RFID badge",
+  EVV: "Visit verification",
+};
+
+export const SHIFT_ACTIVITY_LABEL: Record<ShiftActivityKind, string> = {
+  DRIVING: "Driving",
+  LOADING: "Loading",
+  UNLOADING: "Unloading",
+  REFUELING: "Refuelling",
+  BORDER_CROSSING: "Border crossing",
+  INSPECTION: "Inspection",
+  WAITING: "Waiting / delay",
+  BREAK: "Break",
+  REST: "Rest / sleeper",
+  YARD_MOVE: "Yard move",
+  OTHER: "Other",
+};
+
+export const DUTY_STATUS_LABEL: Record<DutyStatus, string> = {
+  ON_DUTY_DRIVING: "On duty, driving",
+  ON_DUTY_NOT_DRIVING: "On duty",
+  OFF_DUTY: "Off duty",
+  SLEEPER_BERTH: "Sleeper berth",
+  YARD_MOVES: "Yard moves",
+  CLOCKED_OUT: "Clocked out",
+};
+
+export const DUTY_STATUS_VARIANT: Record<DutyStatus, BadgeVariant> = {
+  ON_DUTY_DRIVING: "success",
+  ON_DUTY_NOT_DRIVING: "info",
+  OFF_DUTY: "secondary",
+  SLEEPER_BERTH: "secondary",
+  YARD_MOVES: "info",
+  CLOCKED_OUT: "secondary",
+};
+
+export const FATIGUE_STATUS_LABEL: Record<FatigueStatus, string> = {
+  OK: "Within limits",
+  WARNING: "Approaching a limit",
+  EXCEEDED: "Limit reached",
+  OFF_SHIFT: "Off shift",
+};
+
+export const FATIGUE_STATUS_VARIANT: Record<FatigueStatus, BadgeVariant> = {
+  OK: "success",
+  WARNING: "warning",
+  EXCEEDED: "destructive",
+  OFF_SHIFT: "secondary",
 };
 
 export const TIMESHEET_STATUS_LABEL: Record<TimesheetStatus, string> = {

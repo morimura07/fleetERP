@@ -91,7 +91,7 @@ const GROUPS: NavGroup[] = [
     label: "Human Resources",
     items: [
       { href: "/hr", label: "Human Resources", icon: UserCog, perm: "hr:read" },
-      { href: "/attendance", label: "Time & Attendance", icon: Clock, perm: "attendance:read" },
+      { href: "/attendance", label: "Time Management", icon: Clock, perm: "attendance:read" },
       { href: "/payroll", label: "Payroll", icon: BadgeDollarSign, perm: "payroll:read" },
     ],
   },

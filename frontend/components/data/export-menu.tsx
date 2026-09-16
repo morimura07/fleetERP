@@ -7,7 +7,7 @@ import {
 } from "@frontend/components/ui/dropdown-menu";
 import { useToast } from "@frontend/components/ui/toast";
 import { getToken } from "@frontend/lib/auth-token";
-import { getActiveCompany } from "@frontend/lib/fetcher";
+import { getActiveCompany, handleUnauthorized, describeError, SESSION_EXPIRED_MESSAGE } from "@frontend/lib/fetcher";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -55,10 +55,14 @@ export function ExportMenu({
         },
       });
 
+      if (res.status === 401) {
+        handleUnauthorized();
+        throw new Error(SESSION_EXPIRED_MESSAGE);
+      }
       if (!res.ok) {
         // The server explains a refusal (too many rows, unknown format) in JSON.
         const detail = await res.json().catch(() => null);
-        throw new Error(detail?.error ?? `Export failed (${res.status})`);
+        throw new Error(detail?.error ?? `The file could not be built (${res.status})`);
       }
 
       // Filename comes from Content-Disposition so the server names the file.
@@ -78,7 +82,7 @@ export function ExportMenu({
     } catch (e) {
       toast({
         title: "Export failed",
-        description: e instanceof Error ? e.message : "Could not build the file",
+        description: describeError(e, "Could not build the file"),
         variant: "destructive",
       });
     } finally {

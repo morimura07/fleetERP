@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ToastProvider } from "@frontend/components/ui/toast";
+import { ErrorReporter } from "@frontend/components/layout/error-reporter";
 
 export const metadata: Metadata = {
   title: "FleetFlow | Logistics ERP",
@@ -18,7 +19,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-screen bg-background antialiased">
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <ErrorReporter />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

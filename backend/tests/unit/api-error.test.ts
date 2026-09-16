@@ -26,7 +26,21 @@ describe("mapError — error → HTTP status mapping", () => {
     expect(mapError(e).status).toBe(404);
   });
 
-  it("falls back to 500 for unknown errors", () => {
-    expect(mapError(new Error("boom")).status).toBe(500);
+  it("maps a database that cannot be reached to 503, not a generic 500", () => {
+    const e = new Prisma.PrismaClientKnownRequestError("down", { code: "P1001", clientVersion: "x" });
+    expect(mapError(e)).toMatchObject({ status: 503 });
+    expect(mapError(e).message).toMatch(/try again/i);
+  });
+
+  it("maps a body that is not JSON to 400", () => {
+    let caught: unknown;
+    try { JSON.parse("{nope"); } catch (err) { caught = err; }
+    expect(mapError(caught).status).toBe(400);
+  });
+
+  it("falls back to 500 for unknown errors, without echoing the message", () => {
+    const mapped = mapError(new Error("secret internal detail"));
+    expect(mapped.status).toBe(500);
+    expect(mapped.message).not.toContain("secret");
   });
 });
