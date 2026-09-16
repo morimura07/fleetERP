@@ -914,6 +914,7 @@ export const goodsReceiptSchema = z.object({
 export const matchSchema = z.object({ vendorInvoiceId: z.string().min(1, "Vendor invoice is required") });
 
 export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>;
+export type PoLineInput = z.infer<typeof poLineSchema>;
 export type GoodsReceiptInput = z.infer<typeof goodsReceiptSchema>;
 
 // ── Payroll (M9) ──

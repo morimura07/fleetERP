@@ -845,8 +845,8 @@ export const stockMovementSchema = z.object({
   stockItemId: z.string().min(1, "Item is required"),
   type: z.enum(["RECEIPT", "ISSUE"]),
   quantity: z.coerce.number().positive("Quantity must be positive"),
-  unitCost: z.coerce.number().min(0).optional(),
-  warehouseId: z.string().optional().nullable(),
+  unitCost: z.coerce.number().min(0).optional(), // required for RECEIPT
+  warehouseId: z.string().optional().nullable(), // location (M18); default if omitted
   reference: z.string().max(80).optional().or(z.literal("")),
   memo: z.string().max(300).optional().or(z.literal("")),
 });
