@@ -2186,6 +2186,7 @@ model StockItem {
 
   movements    StockMovement[]
   poLines      PurchaseOrderLine[]
+  requisitionLines RequisitionLine[]
   balances     StockBalance[]
   serviceParts ServicePart[]
   posLines     PosSaleLine[]
@@ -2330,9 +2331,14 @@ model PurchaseOrder {
   updatedById String?
   fixedAssets FixedAsset[]
 
+  // ── Sourcing trail (client requirements, Sept 2026, Procurement §1-2) ──
+  requisitionId String?
+  requisition   Requisition? @relation(fields: [requisitionId], references: [id], onDelete: SetNull)
+
   @@unique([dataAreaId, poNumber])
   @@index([vendorId])
   @@index([status])
+  @@index([requisitionId])
   @@map("purchase_orders")
 }
 
@@ -4331,4 +4337,233 @@ model ConsolidationRunLine {
 
   @@index([runId])
   @@map("consolidation_run_lines")
+}
+
+// ───────────────────────── Procurement: requisitions and delegation of authority (client requirements, Sept 2026) ─────────────────────────
+
+enum RequisitionStatus {
+  DRAFT
+  PENDING_REVIEW // technical review by the user department
+  PENDING_BUDGET // funds insufficient; waiting for allocation or a Finance override
+  PENDING_APPROVAL // in the DOA queue
+  APPROVED
+  SOURCING // an RFQ is out
+  ORDERED // a purchase order was raised from it
+  REJECTED
+  CANCELLED
+}
+
+enum BudgetGateStatus {
+  NOT_CHECKED
+  WITHIN // funds available
+  SOFT_BLOCK // over budget; may proceed with a warning
+  HARD_BLOCK // over budget; needs a Finance override
+  OVERRIDDEN // a Finance Head let it through
+}
+
+/// A purchase requisition: what a department needs, before anyone asks a
+/// vendor. Carries its own budget gate and its DOA approval.
+model Requisition {
+  id         String            @id @default(cuid())
+  dataAreaId String            @default("HQ01")
+  prNumber   String // PR-000001
+  title      String
+  department String?
+  costCenter String?
+  neededBy   DateTime?         @db.Date
+  currency   String            @default("USD")
+  subtotal   Decimal           @default(0) @db.Decimal(18, 2)
+  /// The subtotal in the DOA tier currency at the day's rate, for the trail.
+  amountBase Decimal?          @db.Decimal(18, 2)
+  baseCurrency String?
+  status     RequisitionStatus @default(DRAFT)
+  justification String?
+
+  requestedById String?
+  submittedAt   DateTime?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  reviewNote    String?
+
+  // ── Budget gate (SOP step 2) ──
+  budgetStatus       BudgetGateStatus @default(NOT_CHECKED)
+  budgetNote         String? // what the check found
+  budgetOverrideById String?
+  budgetOverrideAt   DateTime?
+  budgetOverrideNote String?
+
+  approvedAt      DateTime?
+  rejectedReason  String?
+
+  lines          RequisitionLine[]
+  purchaseOrders PurchaseOrder[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, prNumber])
+  @@index([dataAreaId, status])
+  @@map("requisitions")
+}
+
+model RequisitionLine {
+  id            String      @id @default(cuid())
+  requisitionId String
+  requisition   Requisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  stockItemId   String?
+  stockItem     StockItem?  @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
+  description   String
+  uom           String      @default("PIECE")
+  quantity      Decimal     @db.Decimal(18, 3)
+  estUnitPrice  Decimal     @default(0) @db.Decimal(18, 4)
+  lineTotal     Decimal     @default(0) @db.Decimal(18, 2)
+  expenseCode   String      @default("5100")
+  specification String? // technical specification; documents attach to the requisition
+  sortOrder     Int         @default(0)
+
+  @@index([requisitionId])
+  @@index([stockItemId])
+  @@map("requisition_lines")
+}
+
+enum DoaMode {
+  SEQUENTIAL // each role in order
+  PARALLEL // every role, any order
+  ANY // one of the roles is enough
+}
+
+/// One tier of the delegation-of-authority matrix, as settings. The
+/// customer's own roles approve; the thresholds carry a currency and other
+/// currencies are converted at the day's rate, as Priyam asked.
+model DoaTier {
+  id         String  @id @default(cuid())
+  dataAreaId String  @default("HQ01")
+  name       String // "Under 5,000", "Board"
+  minAmount  Decimal @default(0) @db.Decimal(18, 2)
+  maxAmount  Decimal? @db.Decimal(18, 2) // null = no ceiling
+  currency   String  @default("USD")
+  /// Role keys (RbacRole.key or a system role name) that may approve.
+  approverRoles String[]
+  mode          DoaMode @default(SEQUENTIAL)
+  /// How many approvals are needed: all listed roles, or this many of them.
+  minSignatures Int     @default(1)
+  requiresBudgetSignOff Boolean @default(false)
+  requiresBidSummary    Boolean @default(false)
+  autoRelease           Boolean @default(false) // single-level: approval releases the PO at once
+  sortOrder  Int     @default(0)
+  isActive   Boolean @default(true)
+
+  requests ApprovalRequest[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId, sortOrder])
+  @@map("doa_tiers")
+}
+
+enum ApprovalSubject {
+  REQUISITION
+  AWARD // a recommended bid, before the PO
+  PURCHASE_ORDER // a change order re-opening the tier
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUPERSEDED // re-triggered by a later change
+}
+
+enum DecisionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED // not needed once the request resolved
+}
+
+/// One trip through the DOA matrix for one subject. Immutable once
+/// resolved; a change order creates a new request and marks this one
+/// superseded, so the trail shows every tier that was ever opened.
+model ApprovalRequest {
+  id          String          @id @default(cuid())
+  dataAreaId  String          @default("HQ01")
+  subjectType ApprovalSubject
+  subjectId   String
+  subjectRef  String // PR-000001, PO-000123, for the queue
+  amount      Decimal         @db.Decimal(18, 2)
+  currency    String
+  amountBase  Decimal         @db.Decimal(18, 2) // in the tier currency
+  baseCurrency String
+  rate        Decimal?        @db.Decimal(18, 6)
+  tierId      String?
+  tier        DoaTier?        @relation(fields: [tierId], references: [id], onDelete: SetNull)
+  tierName    String // snapshot
+  status      ApprovalStatus  @default(PENDING)
+  reason      String? // "initial", "change order +12%"
+  requestedById String?
+  resolvedAt    DateTime?
+
+  decisions ApprovalDecision[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dataAreaId, status])
+  @@index([subjectType, subjectId])
+  @@map("approval_requests")
+}
+
+/// One required signature on a request: which role, in which step, and
+/// who eventually gave it.
+model ApprovalDecision {
+  id        String          @id @default(cuid())
+  requestId String
+  request   ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  step      Int // 1-based order for SEQUENTIAL tiers; all 1 otherwise
+  roleKey   String
+  status    DecisionStatus  @default(PENDING)
+  userId    String?
+  userName  String?
+  note      String?
+  decidedAt DateTime?
+
+  @@index([requestId])
+  @@map("approval_decisions")
+}
+
+/// Procurement rules for a company, as settings.
+model ProcurementPolicy {
+  id         String @id @default(cuid())
+  dataAreaId String @unique
+  /// Quotes needed before a PO may progress; fewer needs a single-source justification.
+  minQuotes Int @default(3)
+  /// Three-way match tolerances.
+  priceTolerancePct    Decimal @default(1) @db.Decimal(5, 2)
+  quantityTolerancePct Decimal @default(0) @db.Decimal(5, 2)
+  /// Receiving more than ordered, up to this much, is accepted.
+  overDeliveryTolerancePct Decimal @default(0) @db.Decimal(5, 2)
+  /// A change order beyond either of these re-opens the DOA tier.
+  retriggerVariancePct    Decimal @default(5) @db.Decimal(5, 2)
+  retriggerVarianceAmount Decimal @default(0) @db.Decimal(18, 2) // 0 = percentage only
+  /// Working days from requisition approval to PO transmission.
+  poTurnaroundSlaDays Int @default(2)
+  /// Imports need the shipping documents before goods can be received.
+  shippingDocsBeforeGrn Boolean @default(true)
+  /// Currency the DOA thresholds are read in when a tier has none.
+  thresholdCurrency String @default("USD")
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("procurement_policies")
 }

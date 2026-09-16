@@ -1905,3 +1905,84 @@ export const uomConvertSchema = z.object({
 
 export type UnitOfMeasureInput = z.infer<typeof unitOfMeasureSchema>;
 export type UomConvertInput = z.infer<typeof uomConvertSchema>;
+
+// ── Procurement: requisitions and delegation of authority (client requirements, Sept 2026) ──
+
+export const requisitionLineSchema = z.object({
+  stockItemId: z.string().optional().nullable(),
+  description: z.string().min(1, "Description is required").max(200),
+  uom: z.string().max(12).optional().or(z.literal("")),
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+  estUnitPrice: z.coerce.number().min(0).optional(),
+  expenseCode: z.string().max(20).optional().or(z.literal("")),
+  specification: optText(2000),
+});
+
+export const requisitionSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  title: z.string().min(1, "Title is required").max(150),
+  department: optText(80),
+  costCenter: optText(80),
+  neededBy: z.coerce.date().optional().nullable(),
+  currency: currencyCode.default("USD"),
+  justification: optText(1000),
+  lines: z.array(requisitionLineSchema).min(1, "Add at least one line").max(200),
+});
+
+export const reviewSchema = z.object({
+  pass: z.boolean(),
+  note: optText(500),
+});
+
+export const decisionSchema = z.object({
+  approve: z.boolean(),
+  note: optText(500),
+});
+
+export const budgetOverrideSchema = z.object({
+  note: z.string().min(3, "Say why the budget is being overridden").max(500),
+});
+
+const doaTierBase = z.object({
+    name: z.string().min(1, "Name is required").max(60),
+    minAmount: z.coerce.number().min(0),
+    maxAmount: z.coerce.number().min(0).optional().nullable(),
+    currency: currencyCode.default("USD"),
+    approverRoles: z.array(z.string().min(1).max(40)).min(1, "Pick at least one approver role").max(10),
+    mode: z.enum(["SEQUENTIAL", "PARALLEL", "ANY"]).default("SEQUENTIAL"),
+    minSignatures: z.coerce.number().int().min(1).max(10).default(1),
+    requiresBudgetSignOff: z.coerce.boolean().default(false),
+    requiresBidSummary: z.coerce.boolean().default(false),
+    autoRelease: z.coerce.boolean().default(false),
+    sortOrder: z.coerce.number().int().min(0).default(0),
+    isActive: z.coerce.boolean().default(true),
+});
+
+export const doaTierSchema = doaTierBase
+  .refine((t) => t.maxAmount == null || t.maxAmount >= t.minAmount, { message: "Maximum must not be below minimum", path: ["maxAmount"] })
+  .refine((t) => t.minSignatures <= t.approverRoles.length, { message: "Cannot need more signatures than there are roles", path: ["minSignatures"] });
+
+/** A partial edit; the service re-checks the band and signature rules on the merged row. */
+export const doaTierUpdateSchema = doaTierBase.partial();
+
+export const procurementPolicySchema = z
+  .object({
+    minQuotes: z.coerce.number().int().min(1).max(10),
+    priceTolerancePct: z.coerce.number().min(0).max(100),
+    quantityTolerancePct: z.coerce.number().min(0).max(100),
+    overDeliveryTolerancePct: z.coerce.number().min(0).max(100),
+    retriggerVariancePct: z.coerce.number().min(0).max(100),
+    retriggerVarianceAmount: z.coerce.number().min(0),
+    poTurnaroundSlaDays: z.coerce.number().int().min(0).max(60),
+    shippingDocsBeforeGrn: z.coerce.boolean(),
+    thresholdCurrency: currencyCode,
+  })
+  .partial();
+
+export type RequisitionLineInput = z.infer<typeof requisitionLineSchema>;
+export type RequisitionInput = z.infer<typeof requisitionSchema>;
+export type ReviewInput = z.infer<typeof reviewSchema>;
+export type DecisionInput = z.infer<typeof decisionSchema>;
+export type DoaTierInput = z.infer<typeof doaTierSchema>;
+export type DoaTierUpdateInput = z.infer<typeof doaTierUpdateSchema>;
+export type ProcurementPolicyInput = z.infer<typeof procurementPolicySchema>;
