@@ -2,7 +2,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { AuthError } from "@backend/lib/errors";
 import { createJournalEntry } from "@backend/services/ledger";
-import { computeStatutory } from "@backend/services/statutory";
+import { computePayslip } from "@backend/services/payslip-engine";
+import { schemeFor } from "@backend/services/statutory-schemes";
 import { approvedOvertimeByEmployee } from "@backend/services/attendance";
 
 /**
@@ -46,29 +47,74 @@ export async function computePayRun(
 ) {
   const employees = await prisma.employee.findMany({
     where: { dataAreaId, status: "ACTIVE" },
-    select: { id: true, grossSalary: true, country: true, currency: true },
+    include: { deductionOptIns: true },
   });
   if (employees.length === 0) throw new AuthError("No active employees to run payroll for", 422);
 
-  // Approved overtime for this period (Time & Attendance M26) is added to base
-  // salary as taxable earnings before statutory deductions are computed.
+  // Approved overtime for this period (Time & Attendance M26) is added as a
+  // taxable earning before statutory deductions are computed.
   const period = `${year}-${String(month).padStart(2, "0")}`;
   const overtime = await approvedOvertimeByEmployee(dataAreaId, period);
 
+  // One scheme load per country in the run, not per employee.
+  const schemes = new Map<string, Awaited<ReturnType<typeof schemeFor>>>();
+  for (const country of new Set(employees.map((e) => e.country))) {
+    schemes.set(country, await schemeFor(country));
+  }
+
   const slips = employees.map((e) => {
-    const ot = overtime.get(e.id) ?? new Prisma.Decimal(0);
-    const grossWithOt = new Prisma.Decimal(e.grossSalary).plus(ot);
-    const s = computeStatutory(grossWithOt, e.country);
+    const scheme = schemes.get(e.country)!;
+    // Basic pay is what the statutory percentages work on. An employee
+    // recorded before the field existed has only a gross salary, which is
+    // then treated as all basic: the same figure the old engine used.
+    const basic = e.basicPay ?? e.grossSalary;
+    const result = computePayslip(
+      {
+        basicPay: basic,
+        allowances: [
+          { code: "HOUSING", label: "Housing allowance", amount: e.housingAllowance },
+          { code: "TRANSPORT", label: "Transport allowance", amount: e.transportAllowance },
+          { code: "WEEKLY", label: "Weekly allowance", amount: e.weeklyAllowance },
+          { code: "PER_DIEM", label: "Per diem", amount: e.perDiem },
+          { code: "OVERNIGHT", label: "Overnight allowance", amount: e.overnightAllowance },
+          { code: "NIGHT_SHIFT", label: "Night shift premium", amount: e.nightShiftPremium },
+          { code: "LAYOVER", label: "Layover pay", amount: e.layoverPay },
+          { code: "MILEAGE", label: "Mileage bonus", amount: e.mileageBonus },
+          { code: "PHONE", label: "Phone allowance", amount: e.phoneAllowance },
+          { code: "OTHER", label: "Other allowance", amount: e.otherAllowance },
+        ],
+        overtimePay: overtime.get(e.id) ?? 0,
+      },
+      scheme,
+      e.deductionOptIns.map((o) => ({ code: o.code, amountOverride: o.amountOverride })),
+    );
+
+    // The ledger posting credits PAYE, a statutory payable and net, and the
+    // three must sum to gross. Pre-tax pension goes to nssfTotal; every other
+    // employee deduction goes to shifTotal, which the posting treats as the
+    // general statutory payable. Splitting union dues and loan repayments into
+    // their own payables needs accounts the chart does not have yet.
+    const preTax = result.lines.filter((l) => l.kind === "DEDUCTION" && scheme.deductions.find((d) => d.code === l.code)?.reducesTaxable);
+    const otherDed = result.lines.filter((l) => l.kind === "DEDUCTION" && l.code !== "PAYE" && !preTax.includes(l));
+    const sumLines = (ls: typeof result.lines) => ls.reduce((t, l) => t.plus(l.amount), new Prisma.Decimal(0));
+
     return {
       employeeId: e.id,
-      gross: s.gross.toFixed(2),
-      paye: s.paye.toFixed(2),
-      nssf: s.nssf.toFixed(2),
-      shif: s.shif.toFixed(2),
-      net: s.net.toFixed(2),
+      gross: result.gross.toFixed(2),
+      paye: result.paye.toFixed(2),
+      nssf: sumLines(preTax).toFixed(2),
+      shif: sumLines(otherDed).toFixed(2),
+      net: result.net.toFixed(2),
+      basic: result.basic.toFixed(2),
+      allowances: result.allowances.toFixed(2),
+      overtimePay: result.overtimePay.toFixed(2),
+      taxable: result.taxable.toFixed(2),
+      deductions: result.deductions.toFixed(2),
+      employerCosts: result.employerCosts.toFixed(2),
+      schemeCountry: scheme.country,
+      lines: result.lines,
     };
   });
-
   const sum = (k: "gross" | "paye" | "nssf" | "shif" | "net") =>
     slips.reduce((acc, sl) => acc.plus(sl[k]), new Prisma.Decimal(0));
 
@@ -100,7 +146,20 @@ export async function computePayRun(
 
     // Replace payslips for a clean recompute.
     await tx.payslip.deleteMany({ where: { payRunId: run.id } });
-    await tx.payslip.createMany({ data: slips.map((s) => ({ ...s, payRunId: run.id })) });
+    for (const { lines, ...slip } of slips) {
+      await tx.payslip.create({
+        data: {
+          ...slip,
+          payRunId: run.id,
+          lines: {
+            create: lines.map((l) => ({
+              kind: l.kind, code: l.code, label: l.label, amount: l.amount.toFixed(2),
+              basis: l.basis?.toFixed(2) ?? null, ratePct: l.ratePct?.toFixed(4) ?? null, sortOrder: l.sortOrder,
+            })),
+          },
+        },
+      });
+    }
 
     return tx.payRun.findUniqueOrThrow({ where: { id: run.id }, include: { payslips: true } });
   });

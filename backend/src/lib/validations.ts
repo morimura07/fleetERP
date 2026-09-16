@@ -969,6 +969,63 @@ export const employeeSchema = z.object({
   skillLevel: z.enum(["SKILLED", "UNSKILLED", "NON_CITIZEN"]).nullish(),
   incrementDate: z.coerce.date().optional().nullable(),
   exitDate: z.coerce.date().optional().nullable(),
+
+  // ── Earnings (client requirements, Sept 2026, HR §4) ──
+  basicPay: z.coerce.number().min(0).optional().nullable(),
+  payGrade: os(40),
+  hourlyRate: z.coerce.number().min(0).optional().nullable(),
+  overtimeRate: z.coerce.number().min(0).optional().nullable(),
+  weeklyAllowance: z.coerce.number().min(0).default(0),
+  housingAllowance: z.coerce.number().min(0).default(0),
+  transportAllowance: z.coerce.number().min(0).default(0),
+  nightShiftPremium: z.coerce.number().min(0).default(0),
+  layoverPay: z.coerce.number().min(0).default(0),
+  mileageBonus: z.coerce.number().min(0).default(0),
+  // ── Banking and payout ──
+  bankName: os(120),
+  bankBranch: os(120),
+  routingNumber: os(60),
+  paymentMethod: z.enum(["DIRECT_DEPOSIT", "CHEQUE", "MOBILE_MONEY", "CASH"]).default("DIRECT_DEPOSIT"),
+  nhifNumber: os(40),
+  wcfNumber: os(40),
+});
+
+// ── Statutory schemes (client requirements, Sept 2026, HR §4) ──
+
+export const payeBandSchema = z.object({
+  from: z.coerce.number().min(0),
+  rate: z.coerce.number().min(0).max(1),
+});
+
+export const statutorySchemeSchema = z.object({
+  name: z.string().min(1).max(150),
+  currency: currencyCode,
+  payeBands: z.array(payeBandSchema).min(1, "At least one band is required")
+    // Bands must start at zero and rise, or the marginal calculation is meaningless.
+    .refine((b) => b[0].from === 0, { message: "The first band must start at 0" })
+    .refine((b) => b.every((x, i) => i === 0 || x.from > b[i - 1].from), { message: "Bands must be in ascending order" }),
+  source: os(1000),
+  verifiedAt: z.coerce.date().optional().nullable(),
+  isActive: z.boolean().default(true),
+});
+
+export const statutoryDeductionSchema = z.object({
+  label: z.string().min(1).max(120),
+  employeeRatePct: z.coerce.number().min(0).max(100).default(0),
+  employerRatePct: z.coerce.number().min(0).max(100).default(0),
+  basis: z.enum(["BASIC", "GROSS", "TAXABLE"]).default("BASIC"),
+  basisCap: z.coerce.number().min(0).optional().nullable(),
+  minAmount: z.coerce.number().min(0).optional().nullable(),
+  fixedAmount: z.coerce.number().min(0).optional().nullable(),
+  reducesTaxable: z.boolean().default(false),
+  optIn: z.boolean().default(false),
+  sortOrder: z.coerce.number().int().default(0),
+  isActive: z.boolean().default(true),
+});
+
+export const optInSchema = z.object({
+  amountOverride: z.coerce.number().min(0).optional().nullable(),
+  reference: os(80),
 });
 
 // ── Driver qualification file (client requirements, Sept 2026, HR §2) ──

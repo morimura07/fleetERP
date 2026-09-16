@@ -2427,9 +2427,35 @@ model Employee {
   skillLevel    SkillLevel?
   incrementDate DateTime?   @db.Date // next scheduled pay review
   exitDate      DateTime?   @db.Date
+
+  // ── Earnings (client requirements, Sept 2026, HR §4) ──
+  /// The figure statutory percentages are taken from. grossSalary above is
+  /// kept as the contractual total; basic is what NSSF and NHIF work on.
+  basicPay           Decimal? @db.Decimal(18, 2)
+  payGrade           String?
+  hourlyRate         Decimal? @db.Decimal(18, 2)
+  overtimeRate       Decimal? @db.Decimal(18, 2) // per hour, if not a multiple
+  weeklyAllowance    Decimal  @default(0) @db.Decimal(18, 2)
+  housingAllowance   Decimal  @default(0) @db.Decimal(18, 2)
+  transportAllowance Decimal  @default(0) @db.Decimal(18, 2)
+  nightShiftPremium  Decimal  @default(0) @db.Decimal(18, 2)
+  layoverPay         Decimal  @default(0) @db.Decimal(18, 2)
+  mileageBonus       Decimal  @default(0) @db.Decimal(18, 2)
+
+  // ── Banking and payout ──
+  bankName      String?
+  bankBranch    String?
+  routingNumber String?
+  paymentMethod PayoutMethod @default(DIRECT_DEPOSIT)
+
+  // ── Statutory identifiers the document names ──
+  nhifNumber String? // Tanzania health fund membership
+  wcfNumber  String? // Workers Compensation Fund
+
+  deductionOptIns EmployeeDeductionOptIn[]
   // Optional link to a Driver record (a driver may also be an employee).
-  driverId      String?     @unique
-  driver        Driver?     @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  driverId        String?                  @unique
+  driver          Driver?                  @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
   payslips         Payslip[]
   contracts        EmploymentContract[]
@@ -2496,6 +2522,21 @@ model Payslip {
   nssf       Decimal  @db.Decimal(18, 2) // pension
   shif       Decimal  @db.Decimal(18, 2) // health
   net        Decimal  @db.Decimal(18, 2) // gross − paye − nssf − shif
+
+  // ── Widened (client requirements, Sept 2026, HR §4) ──
+  /// Pay before any deduction, after allowances and overtime.
+  /// `gross` above is retained for the ledger posting and equals this.
+  basic         Decimal @default(0) @db.Decimal(18, 2)
+  allowances    Decimal @default(0) @db.Decimal(18, 2)
+  overtimePay   Decimal @default(0) @db.Decimal(18, 2)
+  /// Gross less the deductions that reduce taxable income (NSSF in Tanzania).
+  taxable       Decimal @default(0) @db.Decimal(18, 2)
+  deductions    Decimal @default(0) @db.Decimal(18, 2) // employee side, all of them
+  employerCosts Decimal @default(0) @db.Decimal(18, 2) // WCF, employer NSSF share
+  /// Which scheme produced this, so a slip can be explained after the rules change.
+  schemeCountry String?
+
+  lines PayslipLine[]
 
   @@unique([payRunId, employeeId])
   @@index([employeeId])
@@ -3837,4 +3878,123 @@ model DriverEvent {
   @@index([dataAreaId, driverId, kind])
   @@index([dataAreaId, renewalDue])
   @@map("driver_events")
+}
+
+enum PayoutMethod {
+  DIRECT_DEPOSIT
+  CHEQUE
+  MOBILE_MONEY
+  CASH
+}
+
+enum PayslipLineKind {
+  EARNING
+  DEDUCTION
+  EMPLOYER // employer-side cost, not taken from the employee
+}
+
+/// One element of a payslip: an allowance, a deduction, an employer cost.
+///
+/// Lines rather than a column per element, because the elements differ by
+/// country. A Tanzanian slip carries NHIF and TUICO; a Kenyan one carries SHIF
+/// and the housing levy. A fixed set of columns would either be wrong for one
+/// of them or need a migration every time a country is added.
+model PayslipLine {
+  id        String          @id @default(cuid())
+  payslipId String
+  payslip   Payslip         @relation(fields: [payslipId], references: [id], onDelete: Cascade)
+  kind      PayslipLineKind
+  code      String // BASIC, HOUSING, OT, PAYE, NSSF, NHIF, WCF, HESLB, TUICO ...
+  label     String
+  amount    Decimal         @db.Decimal(18, 2)
+  /// The figure the percentage was applied to, so the line can be checked.
+  basis     Decimal?        @db.Decimal(18, 2)
+  ratePct   Decimal?        @db.Decimal(8, 4)
+  sortOrder Int             @default(0)
+
+  @@index([payslipId])
+  @@map("payslip_lines")
+}
+
+/// What a percentage is taken of.
+enum DeductionBasis {
+  BASIC // basic pay only, which is what Priyam confirmed for the statutory rates
+  GROSS // basic plus allowances and overtime
+  TAXABLE // gross less the deductions that reduce it
+}
+
+/// A country's payroll regulations, as settings rather than source code.
+///
+/// The client asked for the rules to sit in the backend with the customer
+/// only choosing a country. Rates change every budget year, and a change
+/// should be an edit here rather than a release. Global rather than per
+/// tenant: the law is the same for everyone in a country.
+model StatutoryScheme {
+  id         String    @id @default(cuid())
+  country    String    @unique // ISO 2-letter
+  name       String // "Tanzania (TRA / NSSF / NHIF), FY2026"
+  currency   String // what the PAYE bands are denominated in
+  /// Progressive monthly PAYE bands: [{ from, rate }], ascending.
+  payeBands  Json
+  /// Where the figures came from and when they were last checked.
+  source     String?
+  verifiedAt DateTime? @db.Date
+  isActive   Boolean   @default(true)
+
+  deductions StatutoryDeduction[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("statutory_schemes")
+}
+
+/// One deduction or contribution under a scheme: NSSF, NHIF, WCF, a union.
+model StatutoryDeduction {
+  id       String          @id @default(cuid())
+  schemeId String
+  scheme   StatutoryScheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+
+  code            String // NSSF, NHIF, WCF, HESLB, TUICO, CHAWAMATA, SHIF, HOUSING_LEVY
+  label           String
+  /// Percentage taken from the employee. Zero for an employer-only cost.
+  employeeRatePct Decimal        @default(0) @db.Decimal(8, 4)
+  /// Percentage the employer pays on top. Not deducted; reported as a cost.
+  employerRatePct Decimal        @default(0) @db.Decimal(8, 4)
+  basis           DeductionBasis @default(BASIC)
+  /// Ceiling on the basis the rate applies to, e.g. Kenya's pensionable cap.
+  basisCap        Decimal?       @db.Decimal(18, 2)
+  /// Floor on the employee amount, e.g. a minimum health contribution.
+  minAmount       Decimal?       @db.Decimal(18, 2)
+  /// Flat monthly amount instead of a percentage, e.g. a loan instalment.
+  fixedAmount     Decimal?       @db.Decimal(18, 2)
+  /// Deducted before PAYE is worked out (Tanzanian NSSF is).
+  reducesTaxable  Boolean        @default(false)
+  /// Applies only to employees who opt in: union dues, student loan repayment.
+  optIn           Boolean        @default(false)
+  sortOrder       Int            @default(0)
+  isActive        Boolean        @default(true)
+
+  @@unique([schemeId, code])
+  @@map("statutory_deductions")
+}
+
+/// An employee is a TUICO member, or repays a HESLB loan. The deduction
+/// exists in the scheme; this says it applies to them.
+model EmployeeDeductionOptIn {
+  id             String   @id @default(cuid())
+  employeeId     String
+  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  code           String // matches StatutoryDeduction.code
+  /// Overrides the scheme's fixed amount for this person, e.g. their own
+  /// loan instalment.
+  amountOverride Decimal? @db.Decimal(18, 2)
+  reference      String? // loan account, membership number
+  createdAt      DateTime @default(now())
+
+  @@unique([employeeId, code])
+  @@map("employee_deduction_opt_ins")
 }

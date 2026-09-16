@@ -1,7 +1,12 @@
 import { Hono } from "hono";
 import { Prisma, EmployeeStatus } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
-import { employeeSchema, payRunSchema, paginationSchema } from "@backend/lib/validations";
+import {
+  employeeSchema, payRunSchema, paginationSchema,
+  statutorySchemeSchema, statutoryDeductionSchema, optInSchema,
+} from "@backend/lib/validations";
+import { schemeFor, allSchemes } from "@backend/services/statutory-schemes";
+import { AuthError } from "@backend/lib/errors";
 import { computePayRun, approvePayRun, postPayRun } from "@backend/services/payroll";
 import { logActivity } from "@backend/lib/activity";
 import { updateWithVersion, requireVersion } from "@backend/lib/concurrency";
@@ -104,7 +109,9 @@ payroll.get("/runs/:id", requireAuth, requirePermission("payroll:read"), async (
   const id = c.req.param("id");
   const run = await prisma.payRun.findUnique({
     where: { id },
-    include: { payslips: { include: { employee: { select: { code: true, name: true } } } } },
+    // Lines are what make a slip explainable: each carries the basis and rate
+    // it was computed from.
+    include: { payslips: { include: { employee: { select: { code: true, name: true } }, lines: { orderBy: { sortOrder: "asc" } } } } },
   });
   assertSameArea(user, run);
   return ok(c, run);
@@ -138,4 +145,117 @@ payroll.post("/runs/:id/post", requireAuth, requirePermission("payroll:approve")
   const entry = await postPayRun(id, user.id);
   await logActivity({ userId: user.id, action: "POST", target: `PayRun:${id}`, detail: { voucherNumber: entry.voucherNumber } });
   return ok(c, entry);
+});
+
+// ── Statutory schemes: the regulations as settings ───────────────────────────
+//
+// Priyam's answer to the payroll question: the rules live in the backend, the
+// customer selects a country. These are the routes that make them editable, so
+// a budget-year rate change is an edit by an administrator rather than a
+// release. Global rather than per tenant, because the law is the same for
+// everyone in a country; hence company:manage rather than payroll:write.
+
+/** Every scheme on file, with its deductions. Seeds any the seed knows about. */
+payroll.get("/schemes", requireAuth, requirePermission("payroll:read"), async (c) => {
+  return ok(c, await allSchemes());
+});
+
+/**
+ * Amend a scheme's PAYE bands, source or verification date.
+ *
+ * `verifiedAt` is the accountant's sign-off. Until it is set, the payroll
+ * screen shows the scheme as unverified, because a seed is a starting point
+ * and not the law.
+ */
+payroll.patch("/schemes/:country", requireAuth, requirePermission("company:manage"), async (c) => {
+  const user = c.get("user");
+  const country = c.req.param("country").toUpperCase();
+  const raw = await c.req.json();
+  const version = requireVersion(raw);
+  const body = statutorySchemeSchema.parse(raw);
+  await schemeFor(country); // seeds it if it is missing, so a patch can never 404 on a known country
+  const existing = await prisma.statutoryScheme.findUniqueOrThrow({ where: { country }, select: { id: true } });
+  const row = await updateWithVersion(prisma.statutoryScheme, existing.id, version, user.id, {
+    name: body.name,
+    currency: body.currency,
+    payeBands: body.payeBands,
+    source: body.source || null,
+    verifiedAt: body.verifiedAt ?? null,
+    isActive: body.isActive,
+  });
+  await logActivity({ userId: user.id, action: "UPDATE", target: `StatutoryScheme:${country}` });
+  return ok(c, row);
+});
+
+/** Amend one deduction's rates, basis, cap or opt-in flag. */
+payroll.put("/schemes/:country/deductions/:code", requireAuth, requirePermission("company:manage"), async (c) => {
+  const user = c.get("user");
+  const country = c.req.param("country").toUpperCase();
+  const code = c.req.param("code").toUpperCase();
+  const body = statutoryDeductionSchema.parse(await c.req.json());
+  await schemeFor(country);
+  const scheme = await prisma.statutoryScheme.findUniqueOrThrow({ where: { country }, select: { id: true } });
+  const data = {
+    label: body.label,
+    employeeRatePct: body.employeeRatePct,
+    employerRatePct: body.employerRatePct,
+    basis: body.basis,
+    basisCap: body.basisCap ?? null,
+    minAmount: body.minAmount ?? null,
+    fixedAmount: body.fixedAmount ?? null,
+    reducesTaxable: body.reducesTaxable,
+    optIn: body.optIn,
+    sortOrder: body.sortOrder,
+    isActive: body.isActive,
+  };
+  const row = await prisma.statutoryDeduction.upsert({
+    where: { schemeId_code: { schemeId: scheme.id, code } },
+    create: { schemeId: scheme.id, code, ...data },
+    update: data,
+  });
+  await logActivity({ userId: user.id, action: "UPSERT", target: `StatutoryDeduction:${country}/${code}` });
+  return ok(c, row);
+});
+
+// ── Per-employee opt-ins: union membership, loan repayment ───────────────────
+
+payroll.get("/employees/:id/opt-ins", requireAuth, requirePermission("payroll:read"), async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+  const emp = await prisma.employee.findUnique({ where: { id }, select: { dataAreaId: true } });
+  assertSameArea(user, emp);
+  return ok(c, await prisma.employeeDeductionOptIn.findMany({ where: { employeeId: id }, orderBy: { code: "asc" } }));
+});
+
+payroll.put("/employees/:id/opt-ins/:code", requireAuth, requirePermission("payroll:write"), async (c) => {
+  const user = c.get("user");
+  const { id, code } = c.req.param();
+  const emp = await prisma.employee.findUnique({ where: { id }, select: { dataAreaId: true, country: true } });
+  assertSameArea(user, emp);
+  // The code has to exist in the employee's own country's scheme, or the
+  // opt-in would sit there doing nothing and look like a deduction that is
+  // silently failing.
+  const scheme = await schemeFor(emp!.country);
+  const upper = code.toUpperCase();
+  if (!scheme.deductions.some((d) => d.code === upper && d.optIn)) {
+    throw new AuthError(`${upper} is not an opt-in deduction in the ${scheme.country} scheme`, 422);
+  }
+  const body = optInSchema.parse(await c.req.json());
+  const row = await prisma.employeeDeductionOptIn.upsert({
+    where: { employeeId_code: { employeeId: id, code: upper } },
+    create: { employeeId: id, code: upper, amountOverride: body.amountOverride ?? null, reference: body.reference || null },
+    update: { amountOverride: body.amountOverride ?? null, reference: body.reference || null },
+  });
+  await logActivity({ userId: user.id, action: "UPSERT", target: `EmployeeDeductionOptIn:${id}/${upper}` });
+  return ok(c, row);
+});
+
+payroll.delete("/employees/:id/opt-ins/:code", requireAuth, requirePermission("payroll:write"), async (c) => {
+  const user = c.get("user");
+  const { id, code } = c.req.param();
+  const emp = await prisma.employee.findUnique({ where: { id }, select: { dataAreaId: true } });
+  assertSameArea(user, emp);
+  await prisma.employeeDeductionOptIn.deleteMany({ where: { employeeId: id, code: code.toUpperCase() } });
+  await logActivity({ userId: user.id, action: "DELETE", target: `EmployeeDeductionOptIn:${id}/${code}` });
+  return ok(c, { id, code });
 });
