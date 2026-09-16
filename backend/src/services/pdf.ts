@@ -211,3 +211,40 @@ export async function dataTablePdf(
 
   return render(doc);
 }
+
+// ───────── Purchase order ─────────
+/** The document sent to the supplier (client requirements, Sept 2026, Procurement §3). */
+export async function purchaseOrderPdf(po: {
+  poNumber: string; orderDate: Date; expectedAt: Date | null; currency: string; subtotal: string; status: string; memo: string | null;
+  company: { name: string; code: string };
+  vendor: { code: string; legalName: string; email: string | null; paymentTerm: string };
+  lines: { description: string; quantity: string; unitPrice: string; lineTotal: string }[];
+  reference: { requisition: string | null; rfq: string | null; quote: string | null };
+}): Promise<Buffer> {
+  const doc = newDoc();
+  doc.fontSize(18).text("Purchase Order", { align: "left" });
+  doc.fontSize(11).fillColor("#334155").text(po.poNumber, { align: "left" });
+  doc.moveDown(0.5);
+  doc.fontSize(10).fillColor("#000");
+  doc.text(`From: ${po.company.name} (${po.company.code})`);
+  doc.text(`To: ${po.vendor.legalName} (${po.vendor.code})${po.vendor.email ? ` · ${po.vendor.email}` : ""}`);
+  doc.text(`Order date: ${po.orderDate.toISOString().slice(0, 10)}${po.expectedAt ? `    Expected: ${po.expectedAt.toISOString().slice(0, 10)}` : ""}`);
+  doc.text(`Currency: ${po.currency}    Payment terms: ${po.vendor.paymentTerm.replace("_", " ")}    Status: ${po.status.replace("_", " ")}`);
+  const refs = [po.reference.requisition && `PR ${po.reference.requisition}`, po.reference.rfq && `RFQ ${po.reference.rfq}`, po.reference.quote && `Quote ${po.reference.quote}`].filter(Boolean);
+  if (refs.length) doc.text(`Reference: ${refs.join(" · ")}`);
+  doc.moveDown();
+  const money = (v: string) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  table(
+    doc,
+    ["#", "Description", "Qty", "Unit price", "Line total"],
+    po.lines.map((l, i) => [String(i + 1), l.description, Number(l.quantity).toString(), money(l.unitPrice), money(l.lineTotal)]),
+    [30, 265, 60, 80, 80],
+  );
+  doc.fontSize(11).text(`Total ${po.currency} ${money(po.subtotal)}`, { align: "right" });
+  if (po.memo) { doc.moveDown(); doc.fontSize(9).fillColor("#334155").text(po.memo); }
+  doc.moveDown(2);
+  doc.fontSize(9).fillColor("#000").text("Supplier acknowledgement: ______________________    Committed delivery date: ____________");
+  doc.moveDown();
+  doc.fontSize(8).fillColor("#64748b").text(`Generated: ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`);
+  return render(doc);
+}

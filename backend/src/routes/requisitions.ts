@@ -9,6 +9,7 @@ import {
   cancelRequisition, getRequisition,
 } from "@backend/services/requisition";
 import { policyFor, tiersFor, matrixStatus, queueFor, decide } from "@backend/services/doa";
+import { decidePo } from "@backend/services/purchase-order";
 import { logActivity } from "@backend/lib/activity";
 import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
@@ -113,6 +114,11 @@ requisitions.post("/approvals/:requestId/decide", requireAuth, requirePermission
     const r = await decideRequisition(req.subjectId, user, body.approve, body.note);
     await logActivity({ userId: user.id, action: body.approve ? "APPROVE" : "REJECT", target: `Requisition:${req.subjectId}` });
     return ok(c, { request: r.approvals[0], subject: r });
+  }
+  if (req.subjectType === "PURCHASE_ORDER") {
+    const po = await decidePo(req.subjectId, user, body.approve, body.note);
+    await logActivity({ userId: user.id, action: body.approve ? "APPROVE" : "REJECT", target: `PurchaseOrder:${req.subjectId}` });
+    return ok(c, { request: po.approvals[0], subject: po });
   }
   const result = await decide(requestId, user, body.approve, body.note);
   await logActivity({ userId: user.id, action: body.approve ? "APPROVE" : "REJECT", target: `ApprovalRequest:${requestId}` });

@@ -111,6 +111,7 @@ export interface CreatePoInput {
   orderDate: Date;
   expectedAt?: Date | null;
   memo?: string | null;
+  costCenter?: string | null;
   lines: PoLineInput[];
   createdById?: string | null;
 }
@@ -132,6 +133,7 @@ export async function createPurchaseOrder(input: CreatePoInput) {
       expectedAt: input.expectedAt ?? null,
       subtotal: subtotal.toFixed(2),
       memo: input.memo ?? null,
+      costCenter: input.costCenter ?? null,
       createdById: input.createdById ?? null,
       lines: {
         create: input.lines.map((l) => ({
@@ -145,17 +147,6 @@ export async function createPurchaseOrder(input: CreatePoInput) {
       },
     },
     include: { lines: true, vendor: { select: { legalName: true } } },
-  });
-}
-
-/** Approve a DRAFT PO (ready to receive). */
-export async function approvePurchaseOrder(id: string, approvedById: string) {
-  const po = await prisma.purchaseOrder.findUnique({ where: { id } });
-  if (!po) throw new AuthError("Purchase order not found", 404);
-  if (po.status !== "DRAFT") throw new AuthError("Only draft orders can be approved", 409);
-  return prisma.purchaseOrder.update({
-    where: { id },
-    data: { status: "APPROVED", approvedById, approvedAt: new Date() },
   });
 }
 
@@ -176,8 +167,8 @@ export async function receiveGoods(
 ) {
   const po = await prisma.purchaseOrder.findUnique({ where: { id: poId }, include: { lines: true } });
   if (!po) throw new AuthError("Purchase order not found", 404);
-  if (!["APPROVED", "PARTIAL"].includes(po.status)) {
-    throw new AuthError("Only approved orders can receive goods", 409);
+  if (!["APPROVED", "ISSUED", "ACKNOWLEDGED", "IN_PRODUCTION", "DISPATCHED", "PARTIAL"].includes(po.status)) {
+    throw new AuthError(`Goods can be received against an approved order (this one is ${po.status.toLowerCase().replace("_", " ")})`, 409);
   }
   if (lines.length === 0) throw new AuthError("Nothing to receive", 422);
 

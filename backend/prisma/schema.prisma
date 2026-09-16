@@ -396,7 +396,12 @@ enum StockMovementType {
 // Procurement (M15)
 enum PurchaseOrderStatus {
   DRAFT
-  APPROVED
+  PENDING_APPROVAL // in the DOA queue
+  APPROVED // matrix signed; not yet sent to the supplier
+  ISSUED // transmitted to the supplier
+  ACKNOWLEDGED // supplier accepted and committed a delivery date
+  IN_PRODUCTION
+  DISPATCHED
   PARTIAL // some lines received
   RECEIVED // all lines fully received
   CLOSED // matched & billed
@@ -1590,6 +1595,16 @@ model Vendor {
   customsBrokerCode String?
   customsBondNumber String?
 
+  // ── Approved vendor list and KYC (client requirements, Sept 2026, Procurement §2) ──
+  avlStatus     AvlStatus  @default(PENDING)
+  avlRegion     AvlRegion?
+  kycStatus     KycStatus  @default(NOT_STARTED)
+  kycVerifiedAt DateTime?
+  kycVerifiedById String?
+  kycNote       String?
+  /// What they supply, for RFQ vendor selection: "TYRES", "FUEL", "SPARES".
+  categories    String[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1602,6 +1617,8 @@ model Vendor {
   fixedAssets    FixedAsset[]
   partySites     PartySite[]
   partyContacts  PartyContact[]
+  rfqInvitations RfqVendor[]
+  quotations     Quotation[]
   expenseLines   ExpenseLine[]
 
   @@unique([dataAreaId, code])
@@ -2187,6 +2204,7 @@ model StockItem {
   movements    StockMovement[]
   poLines      PurchaseOrderLine[]
   requisitionLines RequisitionLine[]
+  rfqLines         RfqLine[]
   balances     StockBalance[]
   serviceParts ServicePart[]
   posLines     PosSaleLine[]
@@ -2334,11 +2352,34 @@ model PurchaseOrder {
   // ── Sourcing trail (client requirements, Sept 2026, Procurement §1-2) ──
   requisitionId String?
   requisition   Requisition? @relation(fields: [requisitionId], references: [id], onDelete: SetNull)
+  rfqId         String?
+  rfq           Rfq?         @relation(fields: [rfqId], references: [id], onDelete: SetNull)
+  quotationId   String?      @unique
+  quotation     Quotation?   @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+
+  /// Budget commitment target for a manual order; an awarded order takes its requisition's.
+  costCenter    String?
+
+  // ── Lifecycle (SOP steps 13-15) ──
+  issuedAt              DateTime?
+  acknowledgedAt        DateTime?
+  committedDeliveryDate DateTime? @db.Date // the supplier's promise
+  supplierNote          String?
+  inProductionAt        DateTime?
+  dispatchedAt          DateTime?
+
+  // ── Savings and the tier (SOP steps 10-12) ──
+  /// The winning quote before negotiation; subtotal is the negotiated figure.
+  initialQuoteTotal Decimal? @db.Decimal(18, 2)
+  amountBase        Decimal? @db.Decimal(18, 2) // in the tier currency when last approved
+  baseCurrency      String?
+  changeOrders      Int      @default(0)
 
   @@unique([dataAreaId, poNumber])
   @@index([vendorId])
   @@index([status])
   @@index([requisitionId])
+  @@index([rfqId])
   @@map("purchase_orders")
 }
 
@@ -4397,6 +4438,7 @@ model Requisition {
 
   lines          RequisitionLine[]
   purchaseOrders PurchaseOrder[]
+  rfqs           Rfq[]
 
   version     Int      @default(0)
   createdById String?
@@ -4423,6 +4465,8 @@ model RequisitionLine {
   expenseCode   String      @default("5100")
   specification String? // technical specification; documents attach to the requisition
   sortOrder     Int         @default(0)
+
+  rfqLines RfqLine[]
 
   @@index([requisitionId])
   @@index([stockItemId])
@@ -4566,4 +4610,173 @@ model ProcurementPolicy {
   updatedAt   DateTime @updatedAt
 
   @@map("procurement_policies")
+}
+
+// ───────────────────────── Procurement: sourcing (client requirements, Sept 2026) ─────────────────────────
+
+enum AvlStatus {
+  PENDING // onboarding; may not be invited to quote
+  APPROVED
+  SUSPENDED
+}
+
+enum AvlRegion {
+  LOCAL
+  REGIONAL // Africa
+  INTERNATIONAL
+}
+
+enum KycStatus {
+  NOT_STARTED
+  SUBMITTED // documents uploaded, awaiting verification
+  VERIFIED
+  REJECTED
+}
+
+enum RfqStatus {
+  DRAFT
+  SENT // invitations out; quotes may be entered
+  CLOSED // deadline passed or closed by hand; comparison and award
+  AWARDED
+  CANCELLED
+}
+
+enum RfqVendorStatus {
+  INVITED
+  QUOTED
+  DECLINED
+}
+
+/// A request for quotation: the lines to be priced and the vendors asked.
+model Rfq {
+  id            String       @id @default(cuid())
+  dataAreaId    String       @default("HQ01")
+  rfqNumber     String // RFQ-000001
+  requisitionId String?
+  requisition   Requisition? @relation(fields: [requisitionId], references: [id], onDelete: SetNull)
+  title         String
+  currency      String       @default("USD")
+  status        RfqStatus    @default(DRAFT)
+  deadline      DateTime?
+  sentAt        DateTime?
+  closedAt      DateTime?
+  notes         String?
+
+  // ── Single-source justification (the override to the three-quote rule) ──
+  singleSourceJustification String?
+  singleSourceApprovedById  String?
+  singleSourceApprovedAt    DateTime?
+
+  awardedQuotationId String?
+  awardedAt          DateTime?
+  awardedById        String?
+
+  lines      RfqLine[]
+  vendors    RfqVendor[]
+  quotations Quotation[]
+  purchaseOrders PurchaseOrder[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, rfqNumber])
+  @@index([dataAreaId, status])
+  @@index([requisitionId])
+  @@map("rfqs")
+}
+
+model RfqLine {
+  id                String           @id @default(cuid())
+  rfqId             String
+  rfq               Rfq              @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  requisitionLineId String?
+  requisitionLine   RequisitionLine? @relation(fields: [requisitionLineId], references: [id], onDelete: SetNull)
+  stockItemId       String?
+  stockItem         StockItem?       @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
+  description       String
+  uom               String           @default("PIECE")
+  quantity          Decimal          @db.Decimal(18, 3)
+  expenseCode       String           @default("5100")
+  specification     String?
+  sortOrder         Int              @default(0)
+
+  quotationLines QuotationLine[]
+
+  @@index([rfqId])
+  @@index([requisitionLineId])
+  @@index([stockItemId])
+  @@map("rfq_lines")
+}
+
+/// A vendor asked to quote on an RFQ.
+model RfqVendor {
+  id        String          @id @default(cuid())
+  rfqId     String
+  rfq       Rfq             @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  vendorId  String
+  vendor    Vendor          @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  status    RfqVendorStatus @default(INVITED)
+  invitedAt DateTime        @default(now())
+  note      String?
+
+  @@unique([rfqId, vendorId])
+  @@index([vendorId])
+  @@map("rfq_vendors")
+}
+
+/// What one vendor quoted. Prices are per RFQ line; a negotiated price sits
+/// beside the first one so the saving is visible.
+model Quotation {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  rfqId      String
+  rfq        Rfq      @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  vendorId   String
+  vendor     Vendor   @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  quoteRef   String? // the vendor's own reference
+  currency   String   @default("USD")
+  receivedAt DateTime @default(now())
+  validUntil DateTime? @db.Date
+  deliveryDays Int?
+  paymentTerms String?
+  incoterm     String?
+  subtotal           Decimal  @default(0) @db.Decimal(18, 2) // as first quoted
+  negotiatedSubtotal Decimal? @db.Decimal(18, 2) // after negotiation; null = not negotiated
+  technicalScore  Decimal? @db.Decimal(5, 2) // 0-100
+  commercialScore Decimal? @db.Decimal(5, 2)
+  notes           String?
+  isRecommended   Boolean  @default(false)
+
+  lines         QuotationLine[]
+  purchaseOrder PurchaseOrder?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([rfqId, vendorId])
+  @@index([dataAreaId])
+  @@map("quotations")
+}
+
+model QuotationLine {
+  id          String    @id @default(cuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  rfqLineId   String
+  rfqLine     RfqLine   @relation(fields: [rfqLineId], references: [id], onDelete: Cascade)
+  unitPrice           Decimal  @db.Decimal(18, 4)
+  negotiatedUnitPrice Decimal? @db.Decimal(18, 4)
+  lineTotal           Decimal  @db.Decimal(18, 2)
+  leadDays            Int?
+  note                String?
+
+  @@unique([quotationId, rfqLineId])
+  @@index([rfqLineId])
+  @@map("quotation_lines")
 }
