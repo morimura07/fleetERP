@@ -1784,6 +1784,8 @@ export const procurementPolicySchema = z
     retriggerVarianceAmount: z.coerce.number().min(0),
     poTurnaroundSlaDays: z.coerce.number().int().min(0).max(60),
     shippingDocsBeforeGrn: z.coerce.boolean(),
+    grnRequiredDocs: z.array(z.string().min(1).max(40)).max(10),
+    qaBeforeStock: z.coerce.boolean(),
     thresholdCurrency: currencyCode,
   })
   .partial();
@@ -1886,3 +1888,101 @@ export type QuoteScoreInput = z.infer<typeof quoteScoreSchema>;
 export type AwardInput = z.infer<typeof awardSchema>;
 export type AcknowledgeInput = z.infer<typeof acknowledgeSchema>;
 export type ChangeOrderInput = z.infer<typeof changeOrderSchema>;
+
+// ── Procurement: logistics, customs and receiving (client requirements, Sept 2026) ──
+
+export const SHIPMENT_DOC_TYPES = [
+  "TRANSPORT_DOCUMENT", "COMMERCIAL_INVOICE", "PACKING_LIST", "CERTIFICATE_OF_ORIGIN",
+  "INSURANCE_CERTIFICATE", "IMPORT_PERMIT", "CUSTOMS_DECLARATION", "RELEASE_ORDER", "OTHER",
+] as const;
+
+export const shipmentSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  purchaseOrderId: z.string().min(1, "Purchase order is required"),
+  incoterm: optText(10),
+  mode: z.enum(["SEA", "AIR", "ROAD", "RAIL", "COURIER"]).default("SEA"),
+  carrier: optText(120),
+  vesselOrFlight: optText(80),
+  containerNo: optText(40),
+  transportDocNo: optText(60),
+  portOfLoading: optText(80),
+  portOfDischarge: optText(80),
+  etd: z.coerce.date().optional().nullable(),
+  eta: z.coerce.date().optional().nullable(),
+  atd: z.coerce.date().optional().nullable(),
+  ata: z.coerce.date().optional().nullable(),
+  clearingAgentId: z.string().optional().nullable(),
+  dutyCurrency: currencyCode.optional(),
+  notes: optText(1000),
+});
+
+export const shipmentStatusSchema = z.object({
+  status: z.enum(["PLANNED", "IN_TRANSIT", "ARRIVED", "CLEARING", "CLEARED", "DELIVERED", "CANCELLED"]),
+  note: optText(500),
+  location: optText(120),
+});
+
+export const clearanceSchema = z.object({
+  clearanceStatus: z.enum(["NOT_STARTED", "DOCS_LODGED", "ASSESSED", "DUTY_PAID", "RELEASED", "HELD"]),
+  clearanceRef: optText(60),
+  note: optText(500),
+});
+
+export const shipmentEventSchema = z.object({
+  kind: z.enum(["LOCATION", "NOTE"]).default("NOTE"),
+  at: z.coerce.date().optional(),
+  location: optText(120),
+  note: optText(500),
+});
+
+export const dutySchema = z.object({
+  customsValue: z.coerce.number().min(0),
+  dutyRatePct: z.coerce.number().min(0).max(100),
+  vatRatePct: z.coerce.number().min(0).max(100).optional().nullable(),
+  otherChargesEst: z.coerce.number().min(0).optional().nullable(),
+  dutyPaid: z.coerce.number().min(0).optional().nullable(),
+  dutyPaidAt: z.coerce.date().optional().nullable(),
+  dutyCurrency: currencyCode.optional(),
+});
+
+export const shipmentDocumentSchema = z.object({
+  docType: z.enum(SHIPMENT_DOC_TYPES),
+  reference: optText(60),
+  attachmentId: z.string().optional().nullable(),
+  note: optText(300),
+});
+
+export const verifyDocumentSchema = z.object({
+  verified: z.boolean(),
+  note: optText(300),
+});
+
+export const inspectionSchema = z.object({
+  qaStatus: z.enum(["PASSED", "FAILED", "QUARANTINE"]),
+  qtyAccepted: z.coerce.number().min(0).optional().nullable(),
+  note: optText(500),
+  /** Parameters as logged: { "seal intact": "yes", "tread mm": "16" }. */
+  params: z.record(z.string().max(60), z.string().max(120)).optional().nullable(),
+});
+
+export const rtvSchema = z.object({
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+  reason: z.string().min(3, "Say why the goods are going back").max(500),
+  note: optText(500),
+});
+
+export const rtvUpdateSchema = z.object({
+  status: z.enum(["OPEN", "SHIPPED", "CREDITED", "CLOSED"]).optional(),
+  shippedAt: z.coerce.date().optional().nullable(),
+  creditNoteRef: optText(60),
+  creditAmount: z.coerce.number().min(0).optional().nullable(),
+  note: optText(500),
+});
+
+export type ShipmentInput = z.infer<typeof shipmentSchema>;
+export type ShipmentEventInput = z.infer<typeof shipmentEventSchema>;
+export type DutyInput = z.infer<typeof dutySchema>;
+export type ShipmentDocumentInput = z.infer<typeof shipmentDocumentSchema>;
+export type InspectionInput = z.infer<typeof inspectionSchema>;
+export type RtvInput = z.infer<typeof rtvSchema>;
+export type RtvUpdateInput = z.infer<typeof rtvUpdateSchema>;

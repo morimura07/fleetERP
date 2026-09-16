@@ -1619,6 +1619,8 @@ model Vendor {
   partyContacts  PartyContact[]
   rfqInvitations RfqVendor[]
   quotations     Quotation[]
+  clearingFor    Shipment[]       @relation("ClearingAgent")
+  returns        ReturnToVendor[]
   expenseLines   ExpenseLine[]
 
   @@unique([dataAreaId, code])
@@ -2341,6 +2343,8 @@ model PurchaseOrder {
 
   lines    PurchaseOrderLine[]
   receipts GoodsReceipt[]
+  shipments Shipment[]
+  returns   ReturnToVendor[]
 
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -2392,9 +2396,12 @@ model PurchaseOrderLine {
   description     String
   quantity        Decimal       @db.Decimal(18, 3) // ordered
   qtyReceived     Decimal       @default(0) @db.Decimal(18, 3)
+  qtyAccepted     Decimal       @default(0) @db.Decimal(18, 3) // passed inspection; what the match counts
   unitPrice       Decimal       @db.Decimal(18, 4)
   lineTotal       Decimal       @db.Decimal(18, 2) // quantity × unitPrice
   expenseCode     String        @default("5100") // non-stock lines charge here
+
+  receiptLines GoodsReceiptLine[]
 
   @@index([purchaseOrderId])
   @@index([stockItemId])
@@ -2410,6 +2417,15 @@ model GoodsReceipt {
   receivedAt      DateTime      @db.Date
   note            String?
 
+  // ── Receiving (client requirements, Sept 2026, Procurement §5) ──
+  status         GrnStatus @default(RECEIVED)
+  gateEntryNo    String?
+  gateEntryAt    DateTime?
+  deliveryNoteNo String?
+  receivedById   String?
+  shipmentId     String?
+  shipment       Shipment? @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+
   lines GoodsReceiptLine[]
 
   createdAt   DateTime @default(now())
@@ -2417,6 +2433,7 @@ model GoodsReceipt {
 
   @@unique([dataAreaId, receiptNumber])
   @@index([purchaseOrderId])
+  @@index([shipmentId])
   @@map("goods_receipts")
 }
 
@@ -2425,12 +2442,26 @@ model GoodsReceiptLine {
   goodsReceiptId      String
   goodsReceipt        GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
   purchaseOrderLineId String
+  purchaseOrderLine   PurchaseOrderLine @relation(fields: [purchaseOrderLineId], references: [id], onDelete: Cascade)
   quantity            Decimal      @db.Decimal(18, 3) // received on this receipt
 
   // Inventory link — the stock movement this receipt line created (if a stock item).
   stockMovementId String?
 
+  // ── Quality inspection (SOP step 20). Stock is posted for qtyAccepted on a pass. ──
+  qaStatus      QaStatus  @default(PENDING)
+  qtyAccepted   Decimal   @default(0) @db.Decimal(18, 3)
+  qtyRejected   Decimal   @default(0) @db.Decimal(18, 3)
+  qaNote        String?
+  /// Inspection parameters as logged: { "seal intact": "yes", "tread mm": "16" }.
+  qaParams      Json?
+  inspectedById String?
+  inspectedAt   DateTime?
+
+  returns ReturnToVendor[]
+
   @@index([goodsReceiptId])
+  @@index([purchaseOrderLineId])
   @@map("goods_receipt_lines")
 }
 
@@ -4600,6 +4631,10 @@ model ProcurementPolicy {
   poTurnaroundSlaDays Int @default(2)
   /// Imports need the shipping documents before goods can be received.
   shippingDocsBeforeGrn Boolean @default(true)
+  /// Document types that must be verified on a shipment before goods are received.
+  grnRequiredDocs String[] @default(["TRANSPORT_DOCUMENT", "COMMERCIAL_INVOICE", "PACKING_LIST"])
+  /// Stock is posted only when a receipt line passes inspection. Off: posted at receipt, as before.
+  qaBeforeStock Boolean @default(true)
   /// Currency the DOA thresholds are read in when a tier has none.
   thresholdCurrency String @default("USD")
 
@@ -4779,4 +4814,204 @@ model QuotationLine {
   @@unique([quotationId, rfqLineId])
   @@index([rfqLineId])
   @@map("quotation_lines")
+}
+
+// ───────────────────────── Procurement: logistics, customs and receiving (client requirements, Sept 2026) ─────────────────────────
+
+enum ShipmentMode {
+  SEA
+  AIR
+  ROAD
+  RAIL
+  COURIER
+}
+
+enum ShipmentStatus {
+  PLANNED
+  IN_TRANSIT
+  ARRIVED // at the port or border
+  CLEARING
+  CLEARED
+  DELIVERED // at our gate; the GRN follows
+  CANCELLED
+}
+
+enum ClearanceStatus {
+  NOT_STARTED
+  DOCS_LODGED
+  ASSESSED // duty assessed
+  DUTY_PAID
+  RELEASED
+  HELD // query, inspection or dispute
+}
+
+/// The document types the SOP names. TRANSPORT_DOCUMENT is the bill of
+/// lading, air waybill or road consignment note, whichever the mode uses.
+enum ShipmentDocType {
+  TRANSPORT_DOCUMENT
+  COMMERCIAL_INVOICE
+  PACKING_LIST
+  CERTIFICATE_OF_ORIGIN
+  INSURANCE_CERTIFICATE
+  IMPORT_PERMIT
+  CUSTOMS_DECLARATION
+  RELEASE_ORDER
+  OTHER
+}
+
+enum ShipmentEventKind {
+  STATUS
+  LOCATION // container tracking
+  CLEARANCE
+  NOTE
+}
+
+enum GrnStatus {
+  RECEIVED // counted at the dock; inspection pending
+  INSPECTING
+  COMPLETED // every line inspected
+}
+
+enum QaStatus {
+  PENDING
+  PASSED
+  FAILED
+  QUARANTINE // held pending a decision
+}
+
+enum RtvStatus {
+  OPEN
+  SHIPPED // sent back
+  CREDITED // vendor credit note received
+  CLOSED
+}
+
+/// One consignment against a purchase order (SOP steps 16 to 18): how it
+/// travels, where it is, its papers, and its way through customs.
+model Shipment {
+  id              String         @id @default(cuid())
+  dataAreaId      String         @default("HQ01")
+  shipmentNumber  String // SHP-000001
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  status          ShipmentStatus @default(PLANNED)
+
+  // ── Plan ──
+  incoterm        String? // FOB, CIF, DAP ...
+  mode            ShipmentMode   @default(SEA)
+  carrier         String?
+  vesselOrFlight  String?
+  containerNo     String?
+  transportDocNo  String? // BL / AWB / CMR number
+  portOfLoading   String?
+  portOfDischarge String?
+  etd             DateTime?      @db.Date
+  eta             DateTime?      @db.Date
+  atd             DateTime?      @db.Date
+  ata             DateTime?      @db.Date
+  deliveredAt     DateTime?
+
+  // ── Clearing and forwarding ──
+  clearingAgentId String?
+  clearingAgent   Vendor?        @relation("ClearingAgent", fields: [clearingAgentId], references: [id], onDelete: SetNull)
+  clearanceStatus ClearanceStatus @default(NOT_STARTED)
+  clearanceRef    String? // customs entry number
+  dutyCurrency    String         @default("USD")
+  /// Duty as estimated from the customs value and rate; the calculator writes this.
+  dutyEstimate    Decimal?       @db.Decimal(18, 2)
+  dutyPaid        Decimal?       @db.Decimal(18, 2)
+  dutyPaidAt      DateTime?      @db.Date
+  customsValue    Decimal?       @db.Decimal(18, 2)
+  dutyRatePct     Decimal?       @db.Decimal(5, 2)
+  vatRatePct      Decimal?       @db.Decimal(5, 2)
+  otherChargesEst Decimal?       @db.Decimal(18, 2) // port, handling, agent fees
+  clearanceNote   String?
+  notes           String?
+
+  documents ShipmentDocument[]
+  events    ShipmentEvent[]
+  receipts  GoodsReceipt[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, shipmentNumber])
+  @@index([purchaseOrderId])
+  @@index([dataAreaId, status])
+  @@index([clearingAgentId])
+  @@map("shipments")
+}
+
+/// A paper on the shipment: which kind, the file, and whether someone
+/// checked it. The GRN gate counts verified documents only.
+model ShipmentDocument {
+  id           String          @id @default(cuid())
+  shipmentId   String
+  shipment     Shipment        @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  docType      ShipmentDocType
+  reference    String? // the document's own number
+  attachmentId String?
+  verified     Boolean         @default(false)
+  verifiedById String?
+  verifiedAt   DateTime?
+  note         String?
+  createdById  String?
+  createdAt    DateTime        @default(now())
+
+  @@index([shipmentId])
+  @@map("shipment_documents")
+}
+
+/// The shipment's log: status changes, where the container was seen,
+/// clearance steps, notes. Immutable.
+model ShipmentEvent {
+  id         String            @id @default(cuid())
+  shipmentId String
+  shipment   Shipment          @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  kind       ShipmentEventKind
+  at         DateTime          @default(now())
+  status     String? // the status or clearance status entered, if any
+  location   String?
+  note       String?
+  userId     String?
+  userName   String?
+
+  @@index([shipmentId, at])
+  @@map("shipment_events")
+}
+
+/// Goods sent back after a failed inspection (SOP step 20).
+model ReturnToVendor {
+  id                 String           @id @default(cuid())
+  dataAreaId         String           @default("HQ01")
+  rtvNumber          String // RTV-000001
+  goodsReceiptLineId String
+  goodsReceiptLine   GoodsReceiptLine @relation(fields: [goodsReceiptLineId], references: [id], onDelete: Restrict)
+  purchaseOrderId    String
+  purchaseOrder      PurchaseOrder    @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  vendorId           String
+  vendor             Vendor           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  quantity           Decimal          @db.Decimal(18, 3)
+  reason             String
+  status             RtvStatus        @default(OPEN)
+  shippedAt          DateTime?        @db.Date
+  creditNoteRef      String?
+  creditAmount       Decimal?         @db.Decimal(18, 2)
+  closedAt           DateTime?
+  note               String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, rtvNumber])
+  @@index([purchaseOrderId])
+  @@index([vendorId])
+  @@index([dataAreaId, status])
+  @@map("returns_to_vendor")
 }

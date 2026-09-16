@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { PoDetail } from "./po-detail";
+import { ReturnsPanel } from "./returns-panel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@frontend/components/ui/tabs";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
@@ -108,6 +110,12 @@ export function ProcurementManager({ vendors, items }: { vendors: Vendor[]; item
 
   return (
     <>
+      <Tabs defaultValue="orders">
+        <TabsList>
+          <TabsTrigger value="orders">Purchase orders</TabsTrigger>
+          <TabsTrigger value="returns">Returns to vendor</TabsTrigger>
+        </TabsList>
+        <TabsContent value="orders" className="pt-4">
       <DataTable<PORow>
         endpoint="/api/procurement"
         columns={columns}
@@ -116,6 +124,9 @@ export function ProcurementManager({ vendors, items }: { vendors: Vendor[]; item
         toolbar={<Button onClick={openCreate}><Plus className="h-4 w-4" />New PO</Button>}
         rowActions={(r) => <Button variant="outline" size="sm" onClick={() => setDetailId(r.id)}>Open</Button>}
       />
+        </TabsContent>
+        <TabsContent value="returns" className="pt-4"><ReturnsPanel /></TabsContent>
+      </Tabs>
 
       {/* New PO dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
