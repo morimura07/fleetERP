@@ -103,7 +103,12 @@ export type ContractStatus = "DRAFT" | "ACTIVE" | "ENDED";
 export type LeaveType = "ANNUAL" | "SICK" | "UNPAID" | "MATERNITY" | "COMPASSIONATE";
 export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 export type EmployeeDocType = "CONTRACT" | "NATIONAL_ID" | "PASSPORT" | "WORK_PERMIT" | "CERTIFICATE" | "OTHER";
-export type AttendanceSource = "MANUAL" | "MOBILE" | "BIOMETRIC";
+export type AttendanceSource = "MANUAL" | "MOBILE" | "BIOMETRIC" | "RFID" | "EVV";
+export type ShiftActivityKind =
+  | "DRIVING" | "LOADING" | "UNLOADING" | "REFUELING" | "BORDER_CROSSING"
+  | "INSPECTION" | "WAITING" | "BREAK" | "REST" | "YARD_MOVE" | "OTHER";
+export type DutyStatus = "ON_DUTY_DRIVING" | "ON_DUTY_NOT_DRIVING" | "OFF_DUTY" | "SLEEPER_BERTH" | "YARD_MOVES" | "CLOCKED_OUT";
+export type FatigueStatus = "OK" | "WARNING" | "EXCEEDED" | "OFF_SHIFT";
 export type TimesheetStatus = "OPEN" | "SUBMITTED" | "APPROVED" | "REJECTED";
 export type DockEventKind = "ARRIVAL" | "DEPARTURE";
 export type DamageStatus = "REPORTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "SETTLED";

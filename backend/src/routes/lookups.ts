@@ -217,12 +217,24 @@ lookups.get("/hr-form", requireAuth, requirePermission("hr:read"), async (c) => 
 /** Active employees for the attendance forms (own read permission). */
 lookups.get("/attendance-form", requireAuth, requirePermission("attendance:read"), async (c) => {
   const user = c.get("user");
-  const employees = await prisma.employee.findMany({
-    where: { ...areaScope(user), status: { not: "TERMINATED" } },
-    select: { id: true, code: true, name: true },
-    orderBy: { name: "asc" },
-  });
-  return ok(c, { employees });
+  const [employees, shiftCodes, vehicles] = await Promise.all([
+    prisma.employee.findMany({
+      where: { ...areaScope(user), status: { not: "TERMINATED" } },
+      select: { id: true, code: true, name: true, currency: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.shiftCode.findMany({
+      where: { ...areaScope(user), isActive: true },
+      select: { id: true, code: true, name: true, startTime: true, endTime: true },
+      orderBy: { code: "asc" },
+    }),
+    prisma.vehicle.findMany({
+      where: areaScope(user),
+      select: { id: true, vehicleNumber: true, plateNumber: true },
+      orderBy: { vehicleNumber: "asc" },
+    }),
+  ]);
+  return ok(c, { employees, shiftCodes, vehicles });
 });
 
 /** Vehicles, vendors, and in-stock parts for the service-order create form. */

@@ -1,18 +1,17 @@
 import { serverApi } from "@frontend/lib/server-api";
 import { PageHeader } from "@frontend/components/layout/page-header";
 import { AttendanceManager } from "./attendance-manager";
+import type { Lookups } from "./shared";
 
-export const metadata = { title: "Time & Attendance | FleetFlow" };
+export const metadata = { title: "Time Management | FleetFlow" };
 export const dynamic = "force-dynamic";
 
-type AttForm = { employees: { id: string; code: string; name: string }[] };
-
 export default async function AttendancePage() {
-  const { employees } = await serverApi<AttForm>("/api/lookups/attendance-form");
+  const lookups = await serverApi<Lookups>("/api/lookups/attendance-form");
   return (
     <div className="space-y-6">
-      <PageHeader title="Time & Attendance" subtitle="Clock-in/out records rolled into monthly timesheets; approved overtime feeds payroll." />
-      <AttendanceManager employees={employees} />
+      <PageHeader title="Time Management" subtitle="Shifts, tasks and hours of service; rostered against shift codes; rolled into timesheets that feed payroll." />
+      <AttendanceManager lookups={lookups} />
     </div>
   );
 }
