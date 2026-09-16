@@ -33,9 +33,18 @@ describe("period to date range", () => {
   });
 
   it("rejects malformed periods rather than guessing a range", () => {
-    for (const bad of ["2026", "2026-13", "26-08", "2026-W00", "2026-W54", "August", ""]) {
-      expect(periodRange(bad)).toBeNull();
+    // "2026" was on this list until the planning screen gained an annual
+    // horizon (client requirements, Sept 2026); a bare year is now a real
+    // period and is covered in fleet-capacity.test.ts.
+    for (const bad of ["2026-13", "26-08", "2026-W00", "2026-W54", "August", ""]) {
+      expect(periodRange(bad), bad).toBeNull();
     }
+  });
+
+  it("reads a bare year as the whole year", () => {
+    const y = periodRange("2026")!;
+    expect(y.start.toISOString().slice(0, 10)).toBe("2026-01-01");
+    expect(y.end.toISOString().slice(0, 10)).toBe("2027-01-01");
   });
 });
 

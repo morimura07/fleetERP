@@ -7,10 +7,14 @@ export function toCsv<T extends Record<string, unknown>>(
 ): string {
   let csv: string;
   if (columns) {
-    const data = rows.map((r) =>
-      Object.fromEntries(columns.map((c) => [c.header, r[c.key] ?? ""])),
-    );
-    csv = Papa.unparse(data, { columns: columns.map((c) => c.header) });
+    // `fields` + `data` rather than passing objects with a `columns` option:
+    // given an empty list the latter emits nothing at all, so an export of a
+    // filter that matched no rows downloaded as an empty file with no headers,
+    // which reads as a broken download rather than as an empty result.
+    csv = Papa.unparse({
+      fields: columns.map((c) => c.header),
+      data: rows.map((r) => columns.map((c) => r[c.key] ?? "")),
+    });
   } else {
     csv = Papa.unparse(rows);
   }

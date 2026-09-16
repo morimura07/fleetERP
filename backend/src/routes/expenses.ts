@@ -7,6 +7,7 @@ import { logActivity } from "@backend/lib/activity";
 import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
 import { ok, created, pageMeta } from "@backend/lib/http";
+import { checkFuelLine } from "@backend/services/expense-kind";
 
 export const expenses = new Hono();
 
@@ -65,7 +66,23 @@ expenses.get("/:id", requireAuth, requirePermission("expense:read"), async (c) =
     },
   });
   assertSameArea(user, claim);
-  return ok(c, claim);
+
+  // Each fuel line carries its own reconciliation: volume times rate against
+  // what was claimed. Derived on read rather than stored, because either figure
+  // can be corrected after the fact and a saved variance would go stale.
+  return ok(c, {
+    ...claim,
+    lines: claim.lines.map((l) => {
+      const fuel = checkFuelLine(l);
+      return {
+        ...l,
+        fuelExpected: fuel.expected?.toFixed(2) ?? null,
+        fuelVariance: fuel.variance?.toFixed(2) ?? null,
+        fuelVariancePct: fuel.variancePct,
+        fuelSuspicious: fuel.suspicious,
+      };
+    }),
+  });
 });
 
 /** DRAFT → SUBMITTED. */

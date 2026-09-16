@@ -277,6 +277,7 @@ export const ROUTE_GUARDS: { prefix: string; permission: Permission }[] = [
   { prefix: "/pos", permission: "pos:read" },
   { prefix: "/dock-events", permission: "kpi:read" },
   { prefix: "/damage-reports", permission: "kpi:read" },
+  { prefix: "/imports", permission: "vehicle:write" },
   { prefix: "/feedback", permission: "kpi:read" },
   { prefix: "/waypoints", permission: "waypoint:read" },
   { prefix: "/tracking", permission: "tracking:read" },

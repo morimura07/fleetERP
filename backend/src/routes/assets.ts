@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { Prisma, AssetStatus } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { fixedAssetSchema, depreciationRunSchema, assetDisposalSchema, paginationSchema, assetAssignSchema, assetReturnSchema } from "@backend/lib/validations";
@@ -8,6 +9,8 @@ import { logActivity } from "@backend/lib/activity";
 import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
 import { ok, created, pageMeta } from "@backend/lib/http";
+import { requireVersion, updateWithVersion } from "@backend/lib/concurrency";
+import { AuthError } from "@backend/lib/errors";
 
 export const assets = new Hono();
 
@@ -49,31 +52,123 @@ assets.get("/", requireAuth, requirePermission("asset:read"), async (c) => {
   return ok(c, rows, pageMeta(page, pageSize, total));
 });
 
+/** Optional decimal: absent stays absent, so a patch never blanks a field. */
+const dec = (v: number | null | undefined) =>
+  v === undefined ? undefined : v === null ? null : new Prisma.Decimal(v);
+
+/**
+ * The register's editable columns, mapped from a validated body.
+ *
+ * Written once and shared by create and update, so a field added to the schema
+ * cannot end up settable on one and not the other. Fields are listed rather
+ * than spread: a blanket spread would let anything the schema happens to accept
+ * reach the database, which is how mass-assignment bugs start.
+ */
+function assetData(body: z.infer<typeof fixedAssetSchema>) {
+  return {
+    code: body.code,
+    name: body.name,
+    category: body.category,
+    // Set when the asset IS a truck, so its depreciation reaches that vehicle's
+    // cost of ownership. Present in the schema since August but never written
+    // until now, which left the TCO figure with nothing to find.
+    vehicleId: body.vehicleId || null,
+    acquisitionCost: new Prisma.Decimal(body.acquisitionCost),
+    residualValue: new Prisma.Decimal(body.residualValue),
+    usefulLifeMonths: body.usefulLifeMonths,
+    acquisitionDate: body.acquisitionDate,
+    inServiceDate: body.inServiceDate,
+    assetAccountCode: body.assetAccountCode,
+    accumDepCode: body.accumDepCode,
+    expenseCode: body.expenseCode,
+    warrantyProvider: body.warrantyProvider || null,
+    warrantyExpiresAt: body.warrantyExpiresAt ?? null,
+
+    // Identification
+    assetGroup: body.assetGroup || null,
+    inventoryNumber: body.inventoryNumber || null,
+    serialNumber: body.serialNumber || null,
+
+    // Operational specification
+    registrationNumber: body.registrationNumber || null,
+    make: body.make || null,
+    model: body.model || null,
+    yearMade: body.yearMade ?? null,
+    fuelType: body.fuelType || null,
+    standardKmPerL: dec(body.standardKmPerL) ?? null,
+    capacity: body.capacity || null,
+    meterReading: dec(body.meterReading) ?? null,
+    meterUnit: body.meterUnit ?? null,
+    telematicsUnitId: body.telematicsUnitId || null,
+
+    // Acquisition
+    vendorId: body.vendorId || null,
+    purchaseOrderId: body.purchaseOrderId || null,
+    capitalizationDate: body.capitalizationDate ?? null,
+
+    // Depreciation parameters
+    depreciationMethod: body.depreciationMethod,
+    decliningRatePct: dec(body.decliningRatePct) ?? null,
+    totalExpectedUnits: dec(body.totalExpectedUnits) ?? null,
+    depreciationStartDate: body.depreciationStartDate ?? null,
+
+    // Assignment and location
+    costCenter: body.costCenter || null,
+    location: body.location || null,
+    projectId: body.projectId || null,
+
+    // Compliance and insurance
+    insuranceProvider: body.insuranceProvider || null,
+    insurancePolicyNumber: body.insurancePolicyNumber || null,
+    insuredValue: dec(body.insuredValue) ?? null,
+    insuranceExpiresAt: body.insuranceExpiresAt ?? null,
+    inspectionDueAt: body.inspectionDueAt ?? null,
+
+    condition: body.condition,
+  };
+}
+
 /** Register a new asset. */
 assets.post("/", requireAuth, requirePermission("asset:write"), async (c) => {
   const user = c.get("user");
   const body = fixedAssetSchema.parse(await c.req.json());
   const asset = await prisma.fixedAsset.create({
     data: {
+      ...assetData(body),
       dataAreaId: areaForWrite(user, body.dataAreaId),
-      code: body.code,
-      name: body.name,
-      category: body.category,
-      acquisitionCost: new Prisma.Decimal(body.acquisitionCost),
-      residualValue: new Prisma.Decimal(body.residualValue),
-      usefulLifeMonths: body.usefulLifeMonths,
-      acquisitionDate: body.acquisitionDate,
-      inServiceDate: body.inServiceDate,
-      assetAccountCode: body.assetAccountCode,
-      accumDepCode: body.accumDepCode,
-      expenseCode: body.expenseCode,
-      warrantyProvider: body.warrantyProvider || null,
-      warrantyExpiresAt: body.warrantyExpiresAt ?? null,
       createdById: user.id,
     },
   });
   await logActivity({ userId: user.id, action: "CREATE", target: `FixedAsset:${asset.id}` });
   return created(c, asset);
+});
+
+/**
+ * Correct a register entry.
+ *
+ * There was no update route at all before this, so an asset could be created
+ * and never amended: a mistyped serial number or a renewed insurance policy
+ * meant a new record. Accumulated depreciation and the disposal fields are
+ * deliberately not editable here; those move only through a depreciation run or
+ * a disposal, which post to the ledger.
+ */
+assets.patch("/:id", requireAuth, requirePermission("asset:write"), async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+  const raw = await c.req.json();
+  const version = requireVersion(raw);
+
+  // 404 rather than 403 for another tenant's asset, as everywhere else.
+  const existing = await prisma.fixedAsset.findFirst({
+    where: { id, ...areaScope(user) },
+    select: { id: true },
+  });
+  if (!existing) throw new AuthError("Not found", 404);
+
+  const body = fixedAssetSchema.parse(raw);
+  const asset = await updateWithVersion(prisma.fixedAsset, id, version, user.id, assetData(body));
+  await logActivity({ userId: user.id, action: "UPDATE", target: `FixedAsset:${id}` });
+  return ok(c, asset);
 });
 
 // ── Custody / assignment (M19) ──

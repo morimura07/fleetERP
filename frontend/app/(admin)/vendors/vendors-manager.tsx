@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus } from "lucide-react";
+import { Plus, Contact } from "lucide-react";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
+import { PartyProfilePanel } from "@frontend/components/data/party-profile-panel";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
@@ -35,6 +36,7 @@ const columns: Column<Vendor>[] = [
 
 export function VendorsManager() {
   const { toast } = useToast();
+  const [profileFor, setProfileFor] = useState<Vendor | null>(null);
   const [open, setOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const form = useForm<VendorInput>({ resolver: zodResolver(vendorSchema) });
@@ -63,6 +65,13 @@ export function VendorsManager() {
         searchPlaceholder="Search by code, name, or TIN"
         refreshKey={refreshKey}
         toolbar={<Button onClick={openCreate}><Plus className="h-4 w-4" />New Vendor</Button>}
+        rowActions={(row) => (
+          <div className="flex justify-end">
+            <Button variant="ghost" size="icon" title="Locations and contacts" onClick={() => setProfileFor(row)}>
+              <Contact className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -138,8 +147,22 @@ export function VendorsManager() {
               <div className="space-y-1.5 md:col-span-2"><Label>EDI / API Endpoint</Label><Input {...form.register("ediEndpoint")} /></div>
             </FormSection>
 
+            <FormSection title="Credit, Tax & Customs">
+              <div className="space-y-1.5"><Label>Credit Limit</Label><Input inputMode="decimal" {...form.register("creditLimit")} /></div>
+              <div className="space-y-1.5"><Label>Tax Jurisdiction</Label><Input placeholder="TZ-DSM" {...form.register("taxJurisdiction")} /></div>
+              <div className="space-y-1.5"><Label>Safety Rating</Label><Input {...form.register("safetyRating")} /></div>
+              <div className="space-y-1.5"><Label>Customs Broker Code</Label><Input {...form.register("customsBrokerCode")} /></div>
+              <div className="space-y-1.5"><Label>Customs Bond Number</Label><Input {...form.register("customsBondNumber")} /></div>
+            </FormSection>
+
             <DialogFooter><Button type="submit" disabled={form.formState.isSubmitting}>Save</Button></DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={profileFor !== null} onOpenChange={(o) => !o && setProfileFor(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader><DialogTitle>{profileFor?.legalName}</DialogTitle></DialogHeader>
+          {profileFor && <PartyProfilePanel partyType="vendors" partyId={profileFor.id} />}
         </DialogContent>
       </Dialog>
     </>

@@ -143,3 +143,71 @@ export async function monthlyPaymentPdf(
   doc.fontSize(12).text(`Total: ${total.toLocaleString()}`, { align: "right" });
   return render(doc);
 }
+
+// ───────── Generic data export ─────────
+
+/**
+ * A data table sized for an export rather than a one-page form.
+ *
+ * Separate from `table()` above, which is tuned for the short portrait sheets
+ * (dispatch, daily report, payments) and repeats no header when it spills onto
+ * a second page. An export can run to hundreds of rows across a dozen columns,
+ * where a page of unlabelled numbers is useless, so this one is landscape and
+ * redraws the header on every page.
+ */
+export async function dataTablePdf(
+  title: string,
+  headers: string[],
+  rows: string[][],
+  /** Relative column weights; defaults to equal width. */
+  weights?: number[],
+): Promise<Buffer> {
+  const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 32 });
+  if (existsSync(JP_FONT)) {
+    doc.registerFont("jp", JP_FONT);
+    doc.font("jp");
+  }
+
+  const left = 32;
+  const usable = doc.page.width - 64;
+  const w = weights?.length === headers.length ? weights : headers.map(() => 1);
+  const total = w.reduce((a, b) => a + b, 0);
+  const widths = w.map((x) => (x / total) * usable);
+
+  const rowH = 18;
+  const bottom = doc.page.height - 44;
+  let y = 0;
+
+  const header = () => {
+    doc.fontSize(14).fillColor("#0f172a").text(title, left, 32);
+    doc
+      .fontSize(8)
+      .fillColor("#64748b")
+      .text(`${rows.length} row${rows.length === 1 ? "" : "s"} · generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`, left, 50);
+    y = 68;
+    drawRow(headers, true);
+  };
+
+  const drawRow = (cells: string[], isHeader = false) => {
+    let x = left;
+    if (isHeader) doc.rect(left, y, usable, rowH).fill("#e2e8f0");
+    doc.fontSize(isHeader ? 8 : 8.5).fillColor("#0f172a");
+    cells.forEach((cell, i) => {
+      doc.text(cell ?? "", x + 3, y + 5, { width: widths[i] - 6, height: rowH, ellipsis: true, lineBreak: false });
+      x += widths[i];
+    });
+    doc.rect(left, y, usable, rowH).strokeColor("#cbd5e1").lineWidth(0.5).stroke();
+    y += rowH;
+  };
+
+  header();
+  for (const r of rows) {
+    if (y + rowH > bottom) {
+      doc.addPage();
+      header();
+    }
+    drawRow(r);
+  }
+
+  return render(doc);
+}

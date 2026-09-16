@@ -343,6 +343,11 @@ enum DriverDocType {
   COMESA_PERMIT // cross-border transit permit
   YELLOW_FEVER // health certificate
   WORK_PERMIT
+  MEDICAL_CERTIFICATE
+  HAZMAT
+  TWIC
+  FORKLIFT
+  DEFENSIVE_DRIVING
   OTHER
 }
 
@@ -647,7 +652,6 @@ enum PosPaymentMethod {
  * Tenant boundary (parent company). An Organization owns a group of legal
  * entities; two organizations on the same database must never see each other,
  * and each has its own ADMIN. Only SUPER_ADMIN sees across organizations.
- *
  * Isolation is still carried by `dataAreaId` on every business record — the
  * organization simply decides *which* dataAreaIds a user may reach, resolved in
  * `lib/scope.ts`. No business table changes.
@@ -670,13 +674,13 @@ model Organization {
 }
 
 model Company {
-  id             String        @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  code           String        @unique // = dataAreaId (e.g. HQ01, KE01)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  code           String       @unique // = dataAreaId (e.g. HQ01, KE01)
   name           String
-  baseCurrency   String        @default("USD")
-  country        String        @default("TZ") // ISO country
+  baseCurrency   String       @default("USD")
+  country        String       @default("TZ") // ISO country
 
   // Commercial profile (client amendments, Aug 2026).
   kind               CompanyKind @default(OPERATING)
@@ -685,13 +689,13 @@ model Company {
   industry           String?
   paymentTerm        PaymentTerm @default(NET_30)
   creditLimit        Decimal?    @db.Decimal(18, 2)
-  isActive       Boolean       @default(true)
-  isSandbox      Boolean       @default(false) // demo/sandbox partition — safe to reset (M32)
+  isActive           Boolean     @default(true)
+  isSandbox          Boolean     @default(false) // demo/sandbox partition — safe to reset (M32)
   // Sandbox access window: after this instant every login into the partition is
   // refused. Null = no expiry. Only meaningful when `isSandbox`.
-  sandboxExpiresAt DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  sandboxExpiresAt   DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
 
   version     Int     @default(0)
   createdById String?
@@ -802,30 +806,38 @@ model Driver {
   cargoQualifications String? // trailer / cargo types certified
   languagePref        String?
 
+  // ── Fuel card (client requirements, Sept 2026, HR §2) ──
+  fuelCardNumber String?
+  fuelCardIssuer String?
+  /// Spending ceiling per period, in the driver'"'"'s entity currency.
+  fuelCardLimit  Decimal? @db.Decimal(18, 2)
+
+  events DriverEvent[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  availability      DriverAvailability[]
-  holidays          Holiday[]
-  dispatches        Dispatch[]
-  dailyReports      DailyReport[]
-  payments          Payment[]
-  trips             Trip[]
-  secondDriverTrips Trip[]               @relation("TripSecondDriver")
-  defaultForVehicles Vehicle[]           @relation("VehicleDefaultDriver")
-  transfers         MoneyTransfer[]
-  documents         DriverDocument[]
-  employee          Employee?
-  expenseClaims     ExpenseClaim[]
-  version           Int                  @default(0) // optimistic concurrency (PRD §7.1)
-  createdById       String? // audit: creator user id
-  updatedById       String? // audit: last-modifier user id
+  availability       DriverAvailability[]
+  holidays           Holiday[]
+  dispatches         Dispatch[]
+  dailyReports       DailyReport[]
+  payments           Payment[]
+  trips              Trip[]
+  secondDriverTrips  Trip[]               @relation("TripSecondDriver")
+  defaultForVehicles Vehicle[]            @relation("VehicleDefaultDriver")
+  transfers          MoneyTransfer[]
+  documents          DriverDocument[]
+  employee           Employee?
+  expenseClaims      ExpenseClaim[]
+  version            Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById        String? // audit: creator user id
+  updatedById        String? // audit: last-modifier user id
+  incidentReports    DamageReport[]
+  dockEvents         DockEvent[]
 
   @@index([status])
   @@index([dataAreaId])
   @@map("drivers")
-  incidentReports DamageReport[]
-  dockEvents      DockEvent[]
 }
 
 // 稼働設定 (per weekday working hours)
@@ -882,10 +894,14 @@ model Vehicle {
   status           VehicleStatus @default(AVAILABLE)
 
   // ── Identification & specs (spec: Vehicles §1) ──
-  vin         String? // VIN / chassis number
-  yearMade    Int?
-  vehicleType String? // Flatbed / Tanker / Box Van / Reefer
-  bodyType    String? // rigid / articulated tractor / trailer
+  vin           String? // VIN / chassis number
+  yearMade      Int?
+  vehicleType   String? // Flatbed / Tanker / Box Van / Reefer
+  /// Equipment class, as a fixed list rather than the free text above.
+  /// Master Planning matches a forecast to the trucks that can actually serve
+  /// it, which needs both sides drawn from the same vocabulary.
+  equipmentType EquipmentType?
+  bodyType      String? // rigid / articulated tractor / trailer
 
   // ── Physical & technical (spec: Vehicles §2) ──
   tareWeightKg     Decimal? @db.Decimal(12, 2)
@@ -916,7 +932,7 @@ model Vehicle {
   // The driver normally paired with this truck. Pre-fills the trip form when the
   // vehicle is picked, so dispatch confirms rather than retypes (client review).
   defaultDriverId String?
-  defaultDriver   Driver? @relation("VehicleDefaultDriver", fields: [defaultDriverId], references: [id], onDelete: SetNull)
+  defaultDriver   Driver?         @relation("VehicleDefaultDriver", fields: [defaultDriverId], references: [id], onDelete: SetNull)
 
   // ── Maintenance & workshop (spec: Vehicles §5) ──
   odometerKm      Int?
@@ -937,23 +953,25 @@ model Vehicle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  maintenances  VehicleMaintenance[]
-  fixedAsset    FixedAsset?          // the asset register entry for this truck, when one exists
-  serviceOrders ServiceOrder[]
-  dispatches    Dispatch[]
-  trips         Trip[]
-  position      VehiclePosition?
-  dockEvents    DockEvent[]
-  version       Int                  @default(0) // optimistic concurrency (PRD §7.1)
-  createdById   String? // audit: creator user id
-  updatedById   String? // audit: last-modifier user id
+  maintenances    VehicleMaintenance[]
+  fixedAsset      FixedAsset? // the asset register entry for this truck, when one exists
+  serviceOrders   ServiceOrder[]
+  dispatches      Dispatch[]
+  trips           Trip[]
+  position        VehiclePosition?
+  dockEvents      DockEvent[]
+  version         Int                  @default(0) // optimistic concurrency (PRD §7.1)
+  createdById     String? // audit: creator user id
+  updatedById     String? // audit: last-modifier user id
+  incidentReports DamageReport[]
+  expenseLines    ExpenseLine[]
 
   @@index([defaultDriverId])
   @@index([status])
   @@index([dataAreaId])
+  // Capacity is always counted per equipment class within one tenant.
+  @@index([dataAreaId, equipmentType])
   @@map("vehicles")
-  incidentReports DamageReport[]
-  expenseLines    ExpenseLine[]
 }
 
 model VehicleMaintenance {
@@ -1009,22 +1027,48 @@ model Client {
   slaExpiry            DateTime? @db.Date
   accountManager       String? // sales rep / account owner
 
+  // ── Commercial profile (client requirements, Sept 2026) ──
+  /// Where tax is assessed. Distinct from taxExempt: a customer can be exempt
+  /// in one jurisdiction and liable in another.
+  taxJurisdiction   String?
+  bankName          String?
+  bankAccountNumber String?
+  bankSwift         String?
+  bankIban          String?
+  /// Modes this customer ships by. A list, because most use more than one.
+  preferredModes    TransportMode[]
+  /// Delivery terms deciding who carries cost and risk at each leg.
+  incoterm          Incoterm?
+  serviceAreas      String?
+  /// e.g. "no deliveries before 08:00; no weekend offload".
+  deliveryWindows   String?
+  safetyRating      String?
+  customsBrokerCode String?
+  customsBondNumber String?
+  /// Customer portal we upload to. URL and account name only: a password
+  /// would have to be stored reversibly to be usable, and holding another
+  /// company's credentials recoverably is not a risk worth taking.
+  portalUrl         String?
+  portalUsername    String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  jobs        DeliveryJob[]
-  orders      Order[]
-  quotes      SalesQuote[]
-  projects    Project[]
-  version     Int           @default(0) // optimistic concurrency (PRD §7.1)
-  createdById String? // audit: creator user id
-  updatedById String? // audit: last-modifier user id
+  jobs            DeliveryJob[]
+  orders          Order[]
+  quotes          SalesQuote[]
+  projects        Project[]
+  version         Int              @default(0) // optimistic concurrency (PRD §7.1)
+  createdById     String? // audit: creator user id
+  updatedById     String? // audit: last-modifier user id
+  damageReports   DamageReport[]
+  demandForecasts DemandForecast[]
+  partySites      PartySite[]
+  partyContacts   PartyContact[]
 
   @@index([companyName])
   @@index([dataAreaId])
   @@map("clients")
-  damageReports     DamageReport[]
-  demandForecasts   DemandForecast[]
 }
 
 // ───────────────────────── DeliveryJob (配送案件) ─────────────────────────
@@ -1456,6 +1500,7 @@ model Trip {
   damageReports DamageReport[]
   version       Int            @default(0) // optimistic concurrency (PRD §7.1)
   updatedById   String? // audit: last-modifier user id
+  expenseLines  ExpenseLine[]
 
   @@index([driverId, scheduledStart])
   @@index([vehicleId, scheduledStart])
@@ -1463,7 +1508,6 @@ model Trip {
   @@index([status])
   @@index([reconStatus])
   @@map("trips")
-  expenseLines ExpenseLine[]
 }
 
 // A single operational cost on a trip. When posted, references its journal entry.
@@ -1532,6 +1576,13 @@ model Vendor {
   rateAgreement  String? // default rates / FSC formula / lane pricing note
   ediEndpoint    String? // EDI profile / webhook URL
 
+  // ── Commercial profile (client requirements, Sept 2026) ──
+  creditLimit       Decimal? @db.Decimal(18, 2) // our exposure limit with them
+  taxJurisdiction   String?
+  safetyRating      String? // carrier safety rating or compliance grade
+  customsBrokerCode String?
+  customsBondNumber String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1541,6 +1592,10 @@ model Vendor {
   version        Int             @default(0) // optimistic concurrency (PRD §7.1)
   createdById    String? // audit: creator user id
   updatedById    String? // audit: last-modifier user id
+  fixedAssets    FixedAsset[]
+  partySites     PartySite[]
+  partyContacts  PartyContact[]
+  expenseLines   ExpenseLine[]
 
   @@unique([dataAreaId, code])
   @@index([group])
@@ -1942,6 +1997,9 @@ model DriverDocument {
   driver      Driver        @relation(fields: [driverId], references: [id], onDelete: Cascade)
   type        DriverDocType
   number      String? // document / certificate number
+  /// Issuing body or examiner registry number. A medical certificate
+  /// without its examiner is not evidence of anything.
+  issuer      String?
   issuedAt    DateTime?     @db.Date
   expiresAt   DateTime      @db.Date
   note        String?
@@ -2236,18 +2294,18 @@ model PurchaseOrder {
   vendorInvoiceId String?
   vendorInvoice   VendorInvoice? @relation("PoVendorInvoice", fields: [vendorInvoiceId], references: [id], onDelete: SetNull)
 
-
   approvedById String?
   approvedAt   DateTime?
 
   lines    PurchaseOrderLine[]
   receipts GoodsReceipt[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  version     Int      @default(0) // optimistic concurrency (PRD §7.1)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  version     Int          @default(0) // optimistic concurrency (PRD §7.1)
   createdById String?
   updatedById String?
+  fixedAssets FixedAsset[]
 
   @@unique([dataAreaId, poNumber])
   @@index([vendorId])
@@ -2336,9 +2394,42 @@ model Employee {
   overnightAllowance Decimal @default(0) @db.Decimal(18, 2)
   phoneAllowance     Decimal @default(0) @db.Decimal(18, 2)
   otherAllowance     Decimal @default(0) @db.Decimal(18, 2)
+
+  // ── Personal (client requirements, Sept 2026, HR §1) ──
+  dateOfBirth    DateTime? @db.Date
+  gender         String?
+  religion       String?
+  nationality    String? // ISO 2-letter
+  passportNumber String?
+
+  // ── Contact. Employee had none of these; only Driver did. ──
+  phone                 String?
+  email                 String?
+  address               String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  /// Entitled to the phone voucher, as distinct from the amount paid.
+  phoneVoucherEligible  Boolean @default(false)
+
+  // ── Guarantor and vetting ──
+  guarantorName         String?
+  guarantorContact      String?
+  guarantorDetails      String?
+  educationLevel        String?
+  previousEmployer      String?
+  backgroundCheckStatus BackgroundCheckStatus @default(NOT_STARTED)
+  backgroundCheckAt     DateTime?             @db.Date
+  vettingRemarks        String?
+
+  // ── Employment ──
+  /// Skilled, unskilled or non-citizen: the categories Tanzanian labour
+  /// law and work-permit rules turn on.
+  skillLevel    SkillLevel?
+  incrementDate DateTime?   @db.Date // next scheduled pay review
+  exitDate      DateTime?   @db.Date
   // Optional link to a Driver record (a driver may also be an employee).
-  driverId           String? @unique
-  driver             Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  driverId      String?     @unique
+  driver        Driver?     @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
   payslips         Payslip[]
   contracts        EmploymentContract[]
@@ -2476,9 +2567,53 @@ model ExpenseLine {
   odometerKm  Int?
   taxAmount   Decimal   @default(0) @db.Decimal(18, 2)
 
+  // ── Cost type and its detail (client requirements, Sept 2026, §3) ──
+  /// What kind of cost this is. Decides which groups below apply, and is what
+  /// makes a fuel report possible without inferring it from the account code
+  /// or the wording of the description.
+  kind ExpenseKind @default(GENERAL)
+
+  // Fuel
+  fuelVolume     Decimal?  @db.Decimal(12, 3)
+  fuelUnit       FuelUnit?
+  fuelCardNumber String?
+  fuelStation    String?
+  /// Price per litre or gallon, kept alongside the total so the two can be
+  /// reconciled: a volume and a rate that do not multiply to the amount is
+  /// the first sign of a pilferage or keying problem.
+  ratePerUnit    Decimal?  @db.Decimal(12, 4)
+
+  // Tolls and permits
+  gateLocation String?
+  permitType   PermitType?
+
+  // Repairs and maintenance
+  /// The workshop job this cost belongs to. A link rather than a number, so
+  /// the parts and labour recorded there are not re-keyed here.
+  serviceOrderId String?
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id], onDelete: SetNull)
+  partsCost      Decimal?      @db.Decimal(18, 2)
+  labourCost     Decimal?      @db.Decimal(18, 2)
+
+  // Driver per-diem and advances
+  travelDays       Int?
+  mealAllowance    Decimal? @db.Decimal(18, 2)
+  lodgingAllowance Decimal? @db.Decimal(18, 2)
+  /// Cash already advanced to the driver and recovered against this line.
+  advanceDeducted  Decimal? @db.Decimal(18, 2)
+
+  // Subcontracted transport
+  carrierVendorId String?
+  carrierVendor   Vendor?  @relation(fields: [carrierVendorId], references: [id], onDelete: SetNull)
+  bolReference    String?
+  agreedRate      Decimal? @db.Decimal(18, 2)
+
   @@index([expenseClaimId])
   @@index([vehicleId])
   @@index([tripId])
+  @@index([serviceOrderId])
+  @@index([carrierVendorId])
+  @@index([kind])
   @@map("expense_lines")
 }
 
@@ -2525,6 +2660,72 @@ model FixedAsset {
   warrantyProvider  String?
   warrantyExpiresAt DateTime? @db.Date
 
+  // ── Identification (client requirements, Sept 2026, §1) ──
+  /// Sub-group within the category, e.g. "Heavy Duty Trucks" under VEHICLE.
+  assetGroup      String?
+  /// Physical tag stuck on the item, which is rarely the same as `code`.
+  inventoryNumber String?
+  serialNumber    String? // serial or chassis number from the manufacturer
+
+  // ── Operational specification (§2) ──
+  /// Registration for an asset that carries one but is not a fleet Vehicle,
+  /// such as a yard forklift. When `vehicleId` is set the plate on the
+  /// vehicle record is authoritative and this stays empty.
+  registrationNumber String?
+  make               String?
+  model              String?
+  yearMade           Int?
+  fuelType           String?
+  /// Expected consumption in the unit the fleet already uses, km per litre.
+  standardKmPerL     Decimal?   @db.Decimal(8, 2)
+  /// Payload, gross weight or seats. Descriptive and deliberately free text:
+  /// it means different things per category, and the numeric fleet figures
+  /// live on the linked Vehicle where they can be calculated with.
+  capacity           String?
+  meterReading       Decimal?   @db.Decimal(12, 2) // reading when first entered
+  meterUnit          MeterUnit?
+  /// GPS or ELD unit fitted to this asset.
+  telematicsUnitId   String?
+
+  // ── Acquisition (§3) ──
+  /// Who it was bought from. A link rather than a name, so the asset appears
+  /// in the vendor's history and a rename cannot orphan it.
+  vendorId           String?
+  vendor             Vendor?        @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  purchaseOrderId    String?
+  purchaseOrder      PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  /// When it went on the balance sheet, which can differ from both the
+  /// purchase date and the date it entered service.
+  capitalizationDate DateTime?      @db.Date
+
+  // ── Depreciation parameters (§4) ──
+  depreciationMethod    DepreciationMethod @default(STRAIGHT_LINE)
+  /// Annual rate for declining balance, as a percentage.
+  decliningRatePct      Decimal?           @db.Decimal(6, 2)
+  /// Lifetime output for units-of-production, in `meterUnit`.
+  totalExpectedUnits    Decimal?           @db.Decimal(14, 2)
+  /// Output recorded so far, which drives the units-of-production charge.
+  unitsProduced         Decimal            @default(0) @db.Decimal(14, 2)
+  /// When depreciation starts, if not the in-service date.
+  depreciationStartDate DateTime?          @db.Date
+
+  // ── Assignment and location (§5) ──
+  costCenter String?
+  location   String? // depot, yard or terminal it is normally stationed at
+  projectId  String?
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  // ── Compliance and insurance (§6) ──
+  insuranceProvider     String?
+  insurancePolicyNumber String?
+  insuredValue          Decimal?  @db.Decimal(18, 2)
+  insuranceExpiresAt    DateTime? @db.Date
+  /// Next statutory inspection or licence renewal.
+  inspectionDueAt       DateTime? @db.Date
+
+  // ── Origin (§7) ──
+  condition AssetCondition @default(NEW)
+
   entries     DepreciationEntry[]
   assignments AssetAssignment[]
 
@@ -2537,6 +2738,12 @@ model FixedAsset {
   @@unique([dataAreaId, code])
   @@index([dataAreaId])
   @@index([dataAreaId, status])
+  @@index([vendorId])
+  @@index([purchaseOrderId])
+  @@index([projectId])
+  // Expiry sweeps: what falls due in the next thirty days, per tenant.
+  @@index([dataAreaId, insuranceExpiresAt])
+  @@index([dataAreaId, inspectionDueAt])
   @@map("fixed_assets")
 }
 
@@ -2600,11 +2807,12 @@ model ServiceOrder {
   parts ServicePart[]
   labor ServiceLabor[]
 
-  version     Int      @default(0)
-  createdById String?
-  updatedById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  version      Int           @default(0)
+  createdById  String?
+  updatedById  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  expenseLines ExpenseLine[]
 
   @@unique([dataAreaId, orderNumber])
   @@index([dataAreaId])
@@ -2850,8 +3058,8 @@ model DockEvent {
   // Gate and yard detail (client amendments, Aug 2026). Dwell time and the
   // detention flag are computed by pairing arrival with departure, so neither
   // is stored: a stored duration would go stale as soon as a time is corrected.
-  driverId     String?
-  driver       Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  driverId      String?
+  driver        Driver?      @relation(fields: [driverId], references: [id], onDelete: SetNull)
   trailerNumber String?
   dockBay       String? // bay, gate or yard slot
   activity      DockActivity @default(OTHER)
@@ -2892,14 +3100,14 @@ model DamageReport {
   // Incident detail (client amendments, Aug 2026). The screen is presented as
   // "Incident Report" because it covers loss, shortage and claims, not just damage.
   clientId     String?
-  client       Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  client       Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
   vehicleId    String?
-  vehicle      Vehicle?       @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   driverId     String?
-  driver       Driver?        @relation(fields: [driverId], references: [id], onDelete: SetNull)
-  incidentType IncidentType   @default(TRANSIT_DAMAGE)
+  driver       Driver?       @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  incidentType IncidentType  @default(TRANSIT_DAMAGE)
   location     String? // where it happened or was discovered
-  rootCause    IncidentCause  @default(UNDETERMINED)
+  rootCause    IncidentCause @default(UNDETERMINED)
   liableParty  String?
 
   // Insurance recovery. `damageRatio` is deliberately not stored: it is
@@ -3065,7 +3273,8 @@ model Project {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  orders Order[]
+  orders      Order[]
+  fixedAssets FixedAsset[]
 
   @@unique([dataAreaId, projectCode])
   @@index([dataAreaId])
@@ -3098,14 +3307,18 @@ model DemandForecast {
   // converts a load count into a truck count, so it belongs on the forecast
   // rather than being assumed globally.
   clientId         String?
-  client           Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  client           Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
   contractName     String?
   cargoType        String?
   equipmentClass   EquipmentType? // flatbed, tanker, 40ft skeleton …
   originHub        String?
   destinationHub   String?
-  turnaroundDays   Decimal?       @db.Decimal(6, 2)
-  projectedRevenue Decimal?       @db.Decimal(18, 2)
+  turnaroundDays   Decimal?         @db.Decimal(6, 2)
+  /// Which version of the future this row describes. Planners keep an
+  /// optimistic, a base and a pessimistic set side by side and switch between
+  /// them, so the scenario belongs on the row rather than on a separate plan.
+  scenario         ForecastScenario @default(BASE)
+  projectedRevenue Decimal?         @db.Decimal(18, 2)
 
   version     Int      @default(0)
   createdById String?
@@ -3328,4 +3541,300 @@ model AssetAssignment {
   @@index([assetId])
   @@index([assetId, returnedAt])
   @@map("asset_assignments")
+}
+
+/// What a document is, so a list of ten files is readable at a glance and a
+/// compliance view can ask for "the insurance policy" rather than guessing.
+enum AttachmentKind {
+  RECEIPT
+  INVOICE
+  PHOTO
+  CONTRACT
+  CERTIFICATE
+  POLICE_REPORT
+  SURVEY_REPORT
+  PROOF_OF_DELIVERY
+  LICENCE
+  OTHER
+}
+
+/// A file hung off any business record.
+///
+/// The client asked for document upload on every related field. One table
+/// polymorphic over the owner beats a nullable FK per model: the alternative is
+/// twelve columns here, or an attachment table per module, and either way adding
+/// the thirteenth attachable record means a migration.
+///
+/// `entityType` is a plain string with no foreign key, because Postgres cannot
+/// reference twelve tables from one column. What keeps it honest is the
+/// allowlist in `services/attachment.ts`, which also checks the owning record is
+/// inside the caller's tenant before the row is written.
+model Attachment {
+  id         String @id @default(cuid())
+  dataAreaId String @default("HQ01")
+
+  /// Prisma model name of the owner, e.g. "FixedAsset". Validated on write.
+  entityType String
+  entityId   String
+
+  fileName  String
+  fileUrl   String
+  mimeType  String
+  sizeBytes Int
+  kind      AttachmentKind @default(OTHER)
+  note      String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([dataAreaId, entityType, entityId])
+  @@index([entityType, entityId])
+  @@map("attachments")
+}
+
+/// Planning scenarios kept side by side, so a corridor can hold three
+/// forecasts for the same period without one overwriting another.
+enum ForecastScenario {
+  OPTIMISTIC
+  BASE
+  PESSIMISTIC
+}
+
+/// What a meter on an asset counts. A truck runs on distance, a generator on
+/// hours, and units-of-production depreciation needs to know which.
+enum MeterUnit {
+  KILOMETRES
+  HOURS
+}
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+  DECLINING_BALANCE
+  UNITS_OF_PRODUCTION
+}
+
+enum AssetCondition {
+  NEW
+  USED
+  RECONDITIONED
+}
+
+/// What a location is used for. Drives nothing yet; it is how an operator
+/// tells two addresses apart when picking a delivery point.
+enum SiteKind {
+  HEADQUARTERS
+  BRANCH
+  WAREHOUSE
+  FACTORY
+  PORT
+  YARD
+  OTHER
+}
+
+enum ContactRole {
+  PRIMARY
+  BILLING
+  OPERATIONS
+  CLAIMS
+  OTHER
+}
+
+enum TransportMode {
+  FTL // full truckload
+  LTL // less than truckload
+  RAIL
+  OCEAN
+  AIR
+  INTERMODAL
+}
+
+/// Incoterms 2020.
+enum Incoterm {
+  EXW
+  FCA
+  CPT
+  CIP
+  DAP
+  DPU
+  DDP
+  FAS
+  FOB
+  CFR
+  CIF
+}
+
+/// A trading partner's location: head office, depot, port or delivery point.
+///
+/// One table with two nullable foreign keys rather than a polymorphic owner
+/// column, because an address that outlives the company it belongs to is a
+/// worse problem than a slightly wider table. A database check constraint
+/// enforces that exactly one of them is set.
+model PartySite {
+  id         String @id @default(cuid())
+  dataAreaId String @default("HQ01")
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  name       String // "Mwanza depot"
+  kind       SiteKind @default(BRANCH)
+  street     String?
+  city       String?
+  region     String? // state, province or region
+  postalCode String?
+  country    String? // ISO 2-letter
+  phone      String?
+  email      String?
+  /// The registered or main address, as opposed to a branch.
+  isPrimary  Boolean  @default(false)
+  notes      String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId, clientId])
+  @@index([dataAreaId, vendorId])
+  @@map("party_sites")
+}
+
+/// A named person at a trading partner, and what they want to hear about.
+model PartyContact {
+  id         String @id @default(cuid())
+  dataAreaId String @default("HQ01")
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  name      String
+  title     String?
+  phone     String?
+  mobile    String?
+  email     String?
+  role      ContactRole @default(OTHER)
+  isPrimary Boolean     @default(false)
+
+  // ── Communication preferences ──
+  /// Automated delivery status notifications.
+  notifyDeliveryStatus Boolean @default(false)
+  /// Where invoices are routed.
+  notifyInvoices       Boolean @default(false)
+  notes                String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId, clientId])
+  @@index([dataAreaId, vendorId])
+  @@map("party_contacts")
+}
+
+/// The kinds of cost a transport operation actually incurs. Each carries its
+/// own detail on ExpenseLine; GENERAL carries none and is the default, so
+/// every existing line stays valid.
+enum ExpenseKind {
+  GENERAL
+  FUEL
+  TOLL_PERMIT
+  REPAIR
+  PER_DIEM
+  SUBCONTRACT
+}
+
+enum FuelUnit {
+  LITRE
+  GALLON
+}
+
+enum PermitType {
+  ROAD_TOLL
+  WEIGHBRIDGE
+  CROSS_BORDER
+  OVERWEIGHT
+  LATRA
+  OTHER
+}
+
+enum BackgroundCheckStatus {
+  NOT_STARTED
+  PENDING
+  CLEARED
+  FLAGGED
+}
+
+enum SkillLevel {
+  SKILLED
+  UNSKILLED
+  NON_CITIZEN
+}
+
+/// A dated entry in a driver'"'"'s qualification file.
+enum DriverEventKind {
+  ROAD_TEST
+  MVR_CHECK // motor vehicle record check
+  VIOLATION // traffic violation or fine
+  DRUG_ALCOHOL_TEST
+  TRAINING // safety seminar, eco-driving, compliance refresher
+}
+
+enum DriverEventOutcome {
+  PASS
+  FAIL
+  NEGATIVE // drug and alcohol: clear
+  POSITIVE // drug and alcohol: not clear
+  REFUSED
+  PENDING
+  NOT_APPLICABLE
+}
+
+/// The driver qualification file as a log rather than a set of flags.
+///
+/// Road tests, record checks, violations, drug and alcohol tests and training
+/// all recur, and a compliance officer needs the history: when the last one
+/// was, what it found, and when the next is due. A single date column per
+/// kind on Driver would keep only the latest and lose the pattern, which is
+/// the thing an insurer or a regulator asks for.
+model DriverEvent {
+  id         String @id @default(cuid())
+  dataAreaId String @default("HQ01")
+  driverId   String
+  driver     Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  kind        DriverEventKind
+  occurredAt  DateTime           @db.Date
+  /// When this needs doing again, e.g. an annual MVR check or a training
+  /// refresher. Null for a one-off such as a violation.
+  renewalDue  DateTime?          @db.Date
+  title       String // "Annual MVR check", "Speeding, Morogoro Rd", "Eco-driving refresher"
+  outcome     DriverEventOutcome @default(NOT_APPLICABLE)
+  /// Citation number, test reference, course code.
+  reference   String?
+  /// Fine or cost, where there is one.
+  amount      Decimal?           @db.Decimal(18, 2)
+  /// Why a drug or alcohol test was taken: random, post-accident, reasonable suspicion.
+  reason      String?
+  /// Referred to a substance abuse professional after a positive result.
+  sapReferral Boolean            @default(false)
+  /// The driver was at fault, for a violation or an accident.
+  atFault     Boolean            @default(false)
+  note        String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId, driverId, kind])
+  @@index([dataAreaId, renewalDue])
+  @@map("driver_events")
 }

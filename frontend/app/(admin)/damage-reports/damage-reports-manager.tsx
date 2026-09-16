@@ -1,10 +1,12 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus } from "lucide-react";
+import { Paperclip, Plus } from "lucide-react";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { KpiRibbon } from "@frontend/components/data/kpi-ribbon";
+import { AttachmentsPanel } from "@frontend/components/data/attachments-panel";
+import { ExportMenu } from "@frontend/components/data/export-menu";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
@@ -90,7 +92,25 @@ export function IncidentReportsManager({
   const [corridor, setCorridor] = useState<string>(NONE);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [evidence, setEvidence] = useState<Record<string, number>>({});
+  const [docsFor, setDocsFor] = useState<IncidentRow | null>(null);
   const form = useForm<DamageReportInput>({ resolver: zodResolver(damageReportSchema) });
+
+  /**
+   * Evidence counts for the rows on screen, in one request rather than one per
+   * row. Called by the table as each page loads.
+   */
+  const loadEvidence = useCallback(async (visible: IncidentRow[]) => {
+    if (visible.length === 0) return setEvidence({});
+    try {
+      const counts = await apiFetch<Record<string, number>>(
+        `/api/attachments/counts?entityType=DamageReport&ids=${visible.map((r) => r.id).join(",")}`,
+      );
+      setEvidence(counts);
+    } catch {
+      setEvidence({});
+    }
+  }, []);
 
   const filters = useMemo(
     () => ({
@@ -153,6 +173,15 @@ export function IncidentReportsManager({
     { key: "ratio", header: "Ratio", render: (r) => <span className="tabular-nums text-xs">{damageRatio(r)}</span> },
     { key: "claimStatus", header: "Claim", render: (r) => <Badge variant={CLAIM_STATUS_VARIANT[r.claimStatus]}>{CLAIM_STATUS_LABEL[r.claimStatus]}</Badge> },
     { key: "status", header: "Status", render: (r) => <Badge variant={DAMAGE_STATUS_VARIANT[r.status]}>{DAMAGE_STATUS_LABEL[r.status]}</Badge> },
+    {
+      key: "evidence", header: "Evidence",
+      render: (r) => (
+        <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2" onClick={() => setDocsFor(r)}>
+          <Paperclip className="h-3.5 w-3.5" />
+          <span className="tabular-nums">{evidence[r.id] ?? 0}</span>
+        </Button>
+      ),
+    },
   ];
 
   return (
@@ -222,6 +251,7 @@ export function IncidentReportsManager({
         filters={filters}
         searchPlaceholder="Search report no. or description"
         refreshKey={refreshKey}
+        onRows={loadEvidence}
         toolbar={
           <div className="flex items-center gap-2">
             <Select value={claimFilter} onValueChange={setClaimFilter}>
@@ -233,6 +263,7 @@ export function IncidentReportsManager({
                 ))}
               </SelectContent>
             </Select>
+            <ExportMenu endpoint="/api/operational-kpi/damage-reports" filters={filters} />
             <Button onClick={openCreate}><Plus className="h-4 w-4" />Log Incident</Button>
           </div>
         }
@@ -389,6 +420,21 @@ export function IncidentReportsManager({
 
             <DialogFooter><Button type="submit" disabled={form.formState.isSubmitting}>Log Incident</Button></DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={docsFor !== null} onOpenChange={(o) => !o && setDocsFor(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Evidence for {docsFor?.reportNumber}</DialogTitle>
+          </DialogHeader>
+          {docsFor && (
+            <AttachmentsPanel
+              entityType="DamageReport"
+              entityId={docsFor.id}
+              // Keeps the row badge honest without reloading the whole table.
+              onCountChange={(n) => setEvidence((e) => ({ ...e, [docsFor.id]: n }))}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </>
