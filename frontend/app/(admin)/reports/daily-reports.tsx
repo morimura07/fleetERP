@@ -1,7 +1,6 @@
 "use client";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
-import { Button } from "@frontend/components/ui/button";
-import { Download } from "lucide-react";
+import { DownloadButton } from "@frontend/components/data/download-button";
 import { formatDate } from "@frontend/lib/utils";
 
 interface Report {
@@ -18,7 +17,7 @@ const columns: Column<Report>[] = [
   { key: "mileage", header: "Distance (km)" },
   {
     key: "pdf", header: "", render: (r) => (
-      <Button variant="ghost" size="icon" asChild><a href={`/api/exports/report-pdf/${r.id}`}><Download className="h-4 w-4" /></a></Button>
+      <DownloadButton variant="ghost" size="icon" path={`/api/exports/report-pdf/${r.id}`} fileName={`daily-report-${r.id}.pdf`} aria-label="Download PDF" />
     ),
   },
 ];
