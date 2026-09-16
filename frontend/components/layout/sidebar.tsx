@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Users, Truck, Building2, Package,
   CalendarClock, FileText, Wallet, ScrollText, Settings,
-  ClipboardList, ClipboardCheck, Route, BookOpen, BookText,
+  ClipboardList, ClipboardCheck, Gavel, Route, BookOpen, BookText,
   ReceiptText, HandCoins, Store, Contact,
   Percent, AlarmClock,
   Landmark, PiggyBank, Combine, Coins, TrendingUp, CalendarCheck, FlaskConical,
@@ -82,6 +82,7 @@ const GROUPS: NavGroup[] = [
       { href: "/inventory", label: "Inventory", icon: Boxes, perm: "inventory:read" },
       { href: "/warehouses", label: "Warehouses", icon: Warehouse, perm: "warehouse:read" },
       { href: "/requisitions", label: "Requisitions", icon: ClipboardCheck, perm: "procurement:read" },
+      { href: "/rfqs", label: "RFQs & Bids", icon: Gavel, perm: "procurement:read" },
       { href: "/procurement", label: "Purchase Orders", icon: ShoppingCart, perm: "procurement:read" },
       { href: "/product-attributes", label: "Product Attributes", icon: Tags, perm: "inventory:read" },
       { href: "/units", label: "Units of Measure", icon: Ruler, perm: "inventory:read" },

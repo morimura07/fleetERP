@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Plus, Trash2, CheckCircle2, PackageCheck, Scale } from "lucide-react";
+import { useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import { PoDetail } from "./po-detail";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
@@ -43,11 +44,12 @@ export function ProcurementManager({ vendors, items }: { vendors: Vendor[]; item
   const [vendorId, setVendorId] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
+  const [costCenter, setCostCenter] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([emptyLine()]);
   const [busy, setBusy] = useState(false);
 
   function openCreate() {
-    setVendorId(""); setCurrency("USD"); setOrderDate(new Date().toISOString().slice(0, 10));
+    setVendorId(""); setCurrency("USD"); setOrderDate(new Date().toISOString().slice(0, 10)); setCostCenter("");
     setLines([emptyLine()]);
     setCreateOpen(true);
   }
@@ -71,7 +73,7 @@ export function ProcurementManager({ vendors, items }: { vendors: Vendor[]; item
     setBusy(true);
     try {
       const payload = {
-        vendorId, currency, orderDate,
+        vendorId, currency, orderDate, costCenter: costCenter || null,
         lines: lines
           .filter((l) => l.description && Number(l.quantity) > 0)
           .map((l) => ({
@@ -130,6 +132,7 @@ export function ProcurementManager({ vendors, items }: { vendors: Vendor[]; item
               </div>
               <div className="space-y-1.5"><Label>Currency</Label><Input maxLength={3} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} /></div>
               <div className="space-y-1.5"><Label>Order Date</Label><Input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Cost centre</Label><Input placeholder="Budget cost centre" value={costCenter} onChange={(e) => setCostCenter(e.target.value)} /></div>
             </div>
 
             <div className="space-y-2">
@@ -168,120 +171,12 @@ export function ProcurementManager({ vendors, items }: { vendors: Vendor[]; item
 
       {/* PO detail + lifecycle actions */}
       {detailId && (
-        <PODetail
+        <PoDetail
           id={detailId}
           onClose={() => setDetailId(null)}
           onChange={() => setRefreshKey((k) => k + 1)}
         />
       )}
     </>
-  );
-}
-
-type PODetailData = {
-  id: string; poNumber: string; status: PurchaseOrderStatus; matchStatus: MatchStatus; currency: string; subtotal: string;
-  vendor: { legalName: string; code: string };
-  vendorInvoice: { invoiceNumber: string; subtotal: string } | null;
-  lines: { id: string; description: string; quantity: string; qtyReceived: string; unitPrice: string; lineTotal: string; stockItem: { code: string; unit: string } | null }[];
-};
-
-function PODetail({ id, onClose, onChange }: { id: string; onClose: () => void; onChange: () => void }) {
-  const { toast } = useToast();
-  const [po, setPo] = useState<PODetailData | null>(null);
-  const [invoiceId, setInvoiceId] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function load() {
-    try { setPo(await apiFetch<PODetailData>(`/api/procurement/${id}`)); }
-    catch (e) { toast({ title: "Error", description: e instanceof ApiError ? e.message : "Failed", variant: "destructive" }); }
-  }
-  // load on mount
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [id]);
-
-  async function act(path: string, body?: unknown, label = "Done") {
-    setBusy(true);
-    try {
-      const res = await apiFetch<{ status?: string; variances?: unknown[] }>(`/api/procurement/${id}/${path}`, {
-        method: "POST", body: body ? JSON.stringify(body) : undefined,
-      });
-      if (path === "match") {
-        toast({ title: res.status === "MATCHED" ? "Matched ✓" : "Variance found", variant: res.status === "MATCHED" ? "success" : "destructive" });
-      } else {
-        toast({ title: label, variant: "success" });
-      }
-      onChange();
-      await load();
-    } catch (e) {
-      toast({ title: "Error", description: e instanceof ApiError ? e.message : "Failed", variant: "destructive" });
-    } finally { setBusy(false); }
-  }
-
-  async function receiveAll() {
-    if (!po) return;
-    const lines = po.lines
-      .map((l) => ({ purchaseOrderLineId: l.id, quantity: Number(l.quantity) - Number(l.qtyReceived) }))
-      .filter((l) => l.quantity > 0);
-    if (lines.length === 0) { toast({ title: "Nothing outstanding to receive" }); return; }
-    await act("receive", { lines }, "Goods received");
-  }
-
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>{po ? po.poNumber : "Loading…"}</DialogTitle></DialogHeader>
-        {po && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              <span className="text-muted-foreground">Vendor: <span className="font-medium text-foreground">{po.vendor.legalName}</span></span>
-              <Badge variant={PO_STATUS_VARIANT[po.status]}>{PO_STATUS_LABEL[po.status]}</Badge>
-              <Badge variant={MATCH_STATUS_VARIANT[po.matchStatus]}>{MATCH_STATUS_LABEL[po.matchStatus]}</Badge>
-              <span className="ml-auto font-semibold tabular-nums">{money(po.subtotal, po.currency)}</span>
-            </div>
-
-            <div className="rounded-md border">
-              <table className="w-full text-sm">
-                <thead className="bg-elevated/50 text-[11px] uppercase text-muted-foreground">
-                  <tr><th className="p-2 text-left">Description</th><th className="p-2 text-right">Ordered</th><th className="p-2 text-right">Received</th><th className="p-2 text-right">Unit</th><th className="p-2 text-right">Total</th></tr>
-                </thead>
-                <tbody>
-                  {po.lines.map((l) => (
-                    <tr key={l.id} className="border-t">
-                      <td className="p-2">{l.description}</td>
-                      <td className="p-2 text-right tabular-nums">{parseFloat(l.quantity)}</td>
-                      <td className="p-2 text-right tabular-nums">{parseFloat(l.qtyReceived)}</td>
-                      <td className="p-2 text-right tabular-nums">{parseFloat(l.unitPrice)}</td>
-                      <td className="p-2 text-right tabular-nums">{parseFloat(l.lineTotal).toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Match against a vendor invoice */}
-            {(po.status === "RECEIVED" || po.status === "PARTIAL") && (
-              <div className="flex items-end gap-2">
-                <div className="flex-1 space-y-1.5">
-                  <Label>Vendor Invoice ID (for 3-way match)</Label>
-                  <Input placeholder="paste vendor invoice id" value={invoiceId} onChange={(e) => setInvoiceId(e.target.value)} />
-                </div>
-                <Button variant="outline" disabled={busy || !invoiceId} onClick={() => act("match", { vendorInvoiceId: invoiceId })}>
-                  <Scale className="h-4 w-4" />Match
-                </Button>
-              </div>
-            )}
-
-            <DialogFooter className="gap-2">
-              {po.status === "DRAFT" && (
-                <Button variant="outline" disabled={busy} onClick={() => act("approve", undefined, "Approved")}><CheckCircle2 className="h-4 w-4" />Approve</Button>
-              )}
-              {(po.status === "APPROVED" || po.status === "PARTIAL") && (
-                <Button disabled={busy} onClick={receiveAll}><PackageCheck className="h-4 w-4" />Receive all</Button>
-              )}
-              <Button variant="outline" onClick={onClose}>Close</Button>
-            </DialogFooter>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
   );
 }

@@ -17,9 +17,12 @@ import { useToast } from "@frontend/components/ui/toast";
 import { vendorSchema, type VendorInput } from "@frontend/lib/validations";
 import { VENDOR_GROUP_LABEL, PAYMENT_TERM_LABEL, PAYMENT_METHOD_LABEL } from "@frontend/lib/labels";
 import { apiFetch, ApiError } from "@frontend/lib/fetcher";
-import type { VendorGroup, PaymentTerm, PaymentMethod } from "@frontend/lib/enums";
+import type { VendorGroup, PaymentTerm, PaymentMethod, AvlStatus, AvlRegion, KycStatus } from "@frontend/lib/enums";
+import { AVL_STATUS_LABEL, AVL_STATUS_VARIANT, KYC_STATUS_LABEL } from "@frontend/lib/labels";
+import { AvlDialog } from "./avl-dialog";
+import { ShieldCheck } from "lucide-react";
 
-interface Vendor extends VendorInput { id: string; }
+interface Vendor extends VendorInput { id: string; avlStatus: AvlStatus; avlRegion: AvlRegion | null; kycStatus: KycStatus; kycVerifiedAt: string | null; kycNote: string | null; categories: string[]; }
 
 const GROUPS = Object.keys(VENDOR_GROUP_LABEL) as VendorGroup[];
 const TERMS = Object.keys(PAYMENT_TERM_LABEL) as PaymentTerm[];
@@ -31,12 +34,14 @@ const columns: Column<Vendor>[] = [
   { key: "group", header: "Group", render: (r) => <Badge variant="outline">{VENDOR_GROUP_LABEL[r.group as VendorGroup]}</Badge> },
   { key: "paymentTerm", header: "Terms", render: (r) => PAYMENT_TERM_LABEL[r.paymentTerm as PaymentTerm] },
   { key: "tin", header: "TIN", render: (r) => r.tin || "—" },
+  { key: "avlStatus", header: "AVL", render: (r) => <span className="flex flex-wrap gap-1"><Badge variant={AVL_STATUS_VARIANT[r.avlStatus]}>{AVL_STATUS_LABEL[r.avlStatus]}</Badge><span className="text-xs text-muted-foreground">KYC {KYC_STATUS_LABEL[r.kycStatus].toLowerCase()}</span></span> },
   { key: "isActive", header: "Status", render: (r) => r.isActive ? <Badge variant="success">Active</Badge> : <Badge variant="secondary">Inactive</Badge> },
 ];
 
 export function VendorsManager() {
   const { toast } = useToast();
   const [profileFor, setProfileFor] = useState<Vendor | null>(null);
+  const [avlFor, setAvlFor] = useState<Vendor | null>(null);
   const [open, setOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const form = useForm<VendorInput>({ resolver: zodResolver(vendorSchema) });
@@ -66,7 +71,10 @@ export function VendorsManager() {
         refreshKey={refreshKey}
         toolbar={<Button onClick={openCreate}><Plus className="h-4 w-4" />New Vendor</Button>}
         rowActions={(row) => (
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-1">
+            <Button variant="ghost" size="icon" title="Approved vendor list and KYC" onClick={() => setAvlFor(row)}>
+              <ShieldCheck className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" title="Locations and contacts" onClick={() => setProfileFor(row)}>
               <Contact className="h-4 w-4" />
             </Button>
@@ -159,6 +167,7 @@ export function VendorsManager() {
           </form>
         </DialogContent>
       </Dialog>
+      {avlFor && <AvlDialog vendor={avlFor} onClose={() => setAvlFor(null)} onSaved={() => setRefreshKey((k) => k + 1)} />}
       <Dialog open={profileFor !== null} onOpenChange={(o) => !o && setProfileFor(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader><DialogTitle>{profileFor?.legalName}</DialogTitle></DialogHeader>
