@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, XCircle, PackageCheck, Scale, Send, FileDown, Truck, Factory, Handshake, Ban, Pencil, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, XCircle, PackageCheck, Scale, Send, FileDown, Truck, Factory, Handshake, Ban, Pencil, Plus, Trash2, Link2, History } from "lucide-react";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
@@ -31,6 +31,9 @@ export interface PoData {
   lines: Line[];
   receipts: { id: string; receiptNumber: string; receivedAt: string; status: GrnStatus; gateEntryNo: string | null }[];
   vendorInvoice: { invoiceNumber: string; subtotal: string } | null;
+  matchReport: { status: string; poTotal: string; acceptedTotal: string; invoiceSubtotal: string; variances: { description: string; reason: string }[] } | null;
+  matchedAt: string | null;
+  supplierTokenExpiresAt: string | null;
   approvals: Approval[];
   savings: { initial: string | null; final: string; saved: string | null; savedPct: string | null };
 }
@@ -52,6 +55,8 @@ export function PoDetail({ id, onClose, onChange }: { id: string; onClose: () =>
   const [receiving, setReceiving] = useState(false);
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [gate, setGate] = useState<{ allowed: boolean; reason: string | null } | null>(null);
+  const [link, setLink] = useState<{ path: string; expiresAt: string } | null>(null);
+  const [timeline, setTimeline] = useState<{ at: string; kind: string; ref: string; title: string; detail: string | null; by: string | null }[] | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -86,8 +91,24 @@ export function PoDetail({ id, onClose, onChange }: { id: string; onClose: () =>
     } catch (e) { fail(e); }
   }
 
+  async function issueLink() {
+    try {
+      const l = await apiFetch<{ path: string; expiresAt: string }>(`/api/procurement/${id}/supplier-link`, { method: "POST", body: JSON.stringify({ days: 30 }) });
+      setLink(l); await load();
+      toast({ title: "Supplier link issued", description: "Copy it into the email to the supplier; it expires in 30 days", variant: "success" });
+    } catch (e) { fail(e); }
+  }
+  async function revokeLink() {
+    try { await apiFetch(`/api/procurement/${id}/supplier-link`, { method: "DELETE" }); setLink(null); await load(); toast({ title: "Supplier link revoked", variant: "success" }); }
+    catch (e) { fail(e); }
+  }
+  async function showTimeline() {
+    try { setTimeline((await apiFetch<{ entries: NonNullable<typeof timeline> }>(`/api/procurement/${id}/timeline`)).entries); } catch (e) { fail(e); }
+  }
+
   if (!po) return null;
   const pending = po.approvals.find((a) => a.status === "PENDING");
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const canChange = ["DRAFT", "APPROVED", "ISSUED", "ACKNOWLEDGED", "IN_PRODUCTION"].includes(po.status) && po.receipts.length === 0;
 
   return (
@@ -165,7 +186,46 @@ export function PoDetail({ id, onClose, onChange }: { id: string; onClose: () =>
             </div>
           )}
           {gate && !gate.allowed && <p className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-sm text-amber-500">{gate.reason}</p>}
-          {po.vendorInvoice && <p className="text-xs text-muted-foreground">Matched against invoice {po.vendorInvoice.invoiceNumber} for {money(po.vendorInvoice.subtotal, po.currency)}</p>}
+          {po.matchReport && (
+            <div className={`rounded-md border p-3 text-sm ${po.matchReport.status === "MATCHED" ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">Three-way match: {po.matchReport.status.toLowerCase()}</span>
+                {po.vendorInvoice && <span className="text-muted-foreground">invoice {po.vendorInvoice.invoiceNumber} {money(po.matchReport.invoiceSubtotal, po.currency)} against {money(po.matchReport.acceptedTotal, po.currency)} accepted at PO prices</span>}
+                {po.matchedAt && <span className="ml-auto text-xs text-muted-foreground">{when(po.matchedAt)}</span>}
+              </div>
+              {po.matchReport.variances.length > 0 && (
+                <ul className="mt-1 list-disc pl-5 text-xs">
+                  {po.matchReport.variances.map((v, i) => <li key={i}><span className="font-medium">{v.description}</span>: {v.reason}</li>)}
+                </ul>
+              )}
+              {po.matchReport.status === "VARIANCE" && <p className="mt-1 text-xs text-muted-foreground">The bill is on payment hold until a corrected bill matches or Finance releases it under Payables.</p>}
+            </div>
+          )}
+          {(link || po.supplierTokenExpiresAt) && (
+            <div className="rounded-md border p-3 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link2 className="h-4 w-4" />
+                <span className="font-medium">Supplier link</span>
+                {link ? <code className="break-all rounded bg-elevated px-1 text-xs">{origin}{link.path}</code> : <span className="text-muted-foreground">issued; the address was shown when it was created</span>}
+                <span className="text-xs text-muted-foreground">valid until {(link?.expiresAt ?? po.supplierTokenExpiresAt ?? "").slice(0, 10)}</span>
+                <Button variant="ghost" size="sm" className="ml-auto" onClick={revokeLink}>Revoke</Button>
+              </div>
+            </div>
+          )}
+          {timeline && (
+            <div className="max-h-72 overflow-y-auto rounded-md border">
+              <div className="sticky top-0 border-b bg-elevated/80 px-3 py-1.5 text-xs font-medium uppercase text-muted-foreground">Audit trail · {timeline.length} entries</div>
+              {timeline.map((e, i) => (
+                <div key={i} className="flex flex-wrap gap-2 border-t px-3 py-1 text-xs">
+                  <span className="w-36 shrink-0 text-muted-foreground">{when(e.at)}</span>
+                  <Badge variant="secondary">{e.kind}</Badge>
+                  <span className="font-mono">{e.ref}</span>
+                  <span>{e.title}{e.detail ? <span className="text-muted-foreground"> · {e.detail}</span> : null}</span>
+                  {e.by && <span className="ml-auto text-muted-foreground">{e.by}</span>}
+                </div>
+              ))}
+            </div>
+          )}
 
           <AttachmentsPanel entityType="PurchaseOrder" entityId={po.id} />
 
@@ -193,6 +253,8 @@ export function PoDetail({ id, onClose, onChange }: { id: string; onClose: () =>
             )}
             {po.status === "APPROVED" && <Button disabled={busy} onClick={() => act("issue", "Issued to the supplier")}><Send className="h-4 w-4" />Issue</Button>}
             {!["DRAFT", "PENDING_APPROVAL"].includes(po.status) && <Button variant="outline" onClick={downloadPdf}><FileDown className="h-4 w-4" />PDF</Button>}
+            {["APPROVED", "ISSUED", "ACKNOWLEDGED", "IN_PRODUCTION"].includes(po.status) && <Button variant="outline" disabled={busy} onClick={issueLink}><Link2 className="h-4 w-4" />{po.supplierTokenExpiresAt ? "Reissue supplier link" : "Supplier link"}</Button>}
+            <Button variant="outline" onClick={showTimeline}><History className="h-4 w-4" />Audit trail</Button>
             {po.status === "ISSUED" && (
               <>
                 <Button variant="outline" disabled={busy} onClick={() => act("acknowledge", "Supplier rejected", { accept: false, note })}><XCircle className="h-4 w-4" />Supplier rejects</Button>

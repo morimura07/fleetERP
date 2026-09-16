@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { AuthError } from "@backend/lib/errors";
+import { policyFor } from "@backend/services/doa";
 
 /**
  * Procurement (M15) — purchase orders, goods receipt, and 3-way match.
@@ -17,8 +18,15 @@ import { AuthError } from "@backend/lib/errors";
 
 const D = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v);
 
-/** Default match tolerance: 1% on price, exact on quantity. */
+/** Default match tolerances when no policy is given: 1% on price, exact on quantity. */
 const PRICE_TOLERANCE = 0.01;
+
+export interface MatchTolerances {
+  /** Allowed gap between the PO value of what was accepted and the invoice, as a fraction. */
+  price: number;
+  /** Allowed gap between ordered and accepted per line, as a fraction. */
+  quantity: number;
+}
 
 export interface MatchVarianceLine {
   description: string;
@@ -31,57 +39,69 @@ export interface MatchVarianceLine {
 export interface MatchResult {
   status: "MATCHED" | "VARIANCE";
   poTotal: string;
+  /** PO price x quantity accepted: what the invoice should be for. */
+  acceptedTotal: string;
   invoiceSubtotal: string;
   variances: MatchVarianceLine[];
+  tolerances: MatchTolerances;
 }
 
 /**
- * Pure 3-way match evaluation. Compares the PO (ordered qty + received qty +
- * price) against the vendor invoice subtotal. Returns MATCHED when every line is
- * fully received and the PO total agrees with the invoice subtotal within
- * tolerance; otherwise VARIANCE with the offending lines.
+ * Pure three-way match (SOP step 22). Per line, ordered against received
+ * (the accepted quantity when inspection ran); then the invoice against
+ * the PO value of what was accepted, within the policy's tolerances.
+ * Every gap is a variance line, so the report says exactly what to
+ * resolve; a variance holds the payment voucher.
  */
 export function evaluateMatch(
-  poLines: { description: string; quantity: Prisma.Decimal.Value; qtyReceived: Prisma.Decimal.Value; unitPrice: Prisma.Decimal.Value }[],
+  poLines: { description: string; quantity: Prisma.Decimal.Value; qtyReceived: Prisma.Decimal.Value; qtyAccepted?: Prisma.Decimal.Value | null; unitPrice: Prisma.Decimal.Value }[],
   invoiceSubtotal: Prisma.Decimal.Value,
+  tolerances: MatchTolerances = { price: PRICE_TOLERANCE, quantity: 0 },
 ): MatchResult {
   const variances: MatchVarianceLine[] = [];
   let poTotal = new Prisma.Decimal(0);
+  let acceptedTotal = new Prisma.Decimal(0);
 
   for (const l of poLines) {
     const ordered = D(l.quantity);
-    const received = D(l.qtyReceived);
+    const received = l.qtyAccepted != null ? D(l.qtyAccepted) : D(l.qtyReceived);
     poTotal = poTotal.plus(ordered.times(l.unitPrice));
-    if (!received.equals(ordered)) {
+    acceptedTotal = acceptedTotal.plus(received.times(l.unitPrice));
+    const gap = received.minus(ordered).abs();
+    const allowed = ordered.times(tolerances.quantity);
+    if (gap.greaterThan(allowed)) {
       variances.push({
         description: l.description,
         orderedQty: ordered.toFixed(3),
         receivedQty: received.toFixed(3),
         poUnitPrice: D(l.unitPrice).toFixed(4),
-        reason: received.lessThan(ordered) ? "under-received" : "over-received",
+        reason: received.lessThan(ordered)
+          ? `under-received by ${ordered.minus(received)}${allowed.isZero() ? "" : ` (tolerance ${allowed.toDecimalPlaces(3)})`}`
+          : `over-received by ${received.minus(ordered)}${allowed.isZero() ? "" : ` (tolerance ${allowed.toDecimalPlaces(3)})`}`,
       });
     }
   }
 
   const sub = D(invoiceSubtotal);
-  // Price/total agreement within tolerance.
-  const diff = poTotal.minus(sub).abs();
-  const allowed = poTotal.times(PRICE_TOLERANCE);
-  if (diff.greaterThan(allowed)) {
+  const diff = acceptedTotal.minus(sub).abs();
+  const allowedPrice = acceptedTotal.times(tolerances.price);
+  if (diff.greaterThan(allowedPrice)) {
     variances.push({
-      description: "(total)",
+      description: "(invoice)",
       orderedQty: "",
       receivedQty: "",
       poUnitPrice: "",
-      reason: `PO total ${poTotal.toFixed(2)} vs invoice ${sub.toFixed(2)} exceeds ${PRICE_TOLERANCE * 100}% tolerance`,
+      reason: `invoice ${sub.toFixed(2)} against ${acceptedTotal.toFixed(2)} accepted at PO prices; gap ${diff.toFixed(2)} exceeds the ${(tolerances.price * 100).toFixed(2)}% tolerance (${allowedPrice.toFixed(2)})`,
     });
   }
 
   return {
     status: variances.length === 0 ? "MATCHED" : "VARIANCE",
     poTotal: poTotal.toFixed(2),
+    acceptedTotal: acceptedTotal.toFixed(2),
     invoiceSubtotal: sub.toFixed(2),
     variances,
+    tolerances,
   };
 }
 
@@ -150,11 +170,13 @@ export async function createPurchaseOrder(input: CreatePoInput) {
 }
 
 /**
- * 3-way match a PO against a vendor invoice. On MATCHED, links the invoice and
- * (if fully received) CLOSES the PO. VARIANCE is recorded but the PO is not
- * closed — a human resolves it.
+ * Three-way match a PO against a vendor invoice with the company's
+ * tolerances. MATCHED links the invoice, clears any payment hold, and
+ * closes a fully received order. VARIANCE keeps the report on the order
+ * and puts the invoice on payment hold, which payVendorInvoice refuses to
+ * pay until the hold is cleared by a later match or an authorised release.
  */
-export async function matchPurchaseOrder(poId: string, vendorInvoiceId: string) {
+export async function matchPurchaseOrder(poId: string, vendorInvoiceId: string, userId?: string | null) {
   const [po, inv] = await Promise.all([
     prisma.purchaseOrder.findUnique({ where: { id: poId }, include: { lines: true } }),
     prisma.vendorInvoice.findUnique({ where: { id: vendorInvoiceId } }),
@@ -162,17 +184,47 @@ export async function matchPurchaseOrder(poId: string, vendorInvoiceId: string) 
   if (!po) throw new AuthError("Purchase order not found", 404);
   if (!inv) throw new AuthError("Vendor invoice not found", 404);
   if (po.dataAreaId !== inv.dataAreaId) throw new AuthError("PO and invoice are in different entities", 422);
+  if (inv.vendorId !== po.vendorId) throw new AuthError("The invoice is from a different vendor than the order", 422);
+  if (inv.currency !== po.currency) throw new AuthError(`The invoice is in ${inv.currency} and the order in ${po.currency}`, 422);
 
-  const result = evaluateMatch(po.lines, inv.subtotal);
+  const policy = await policyFor(po.dataAreaId);
+  const inspected = po.lines.some((l) => D(l.qtyAccepted).greaterThan(0)) || policy.qaBeforeStock;
+  const result = evaluateMatch(
+    po.lines.map((l) => ({ ...l, qtyAccepted: inspected ? l.qtyAccepted : null })),
+    inv.subtotal,
+    { price: D(policy.priceTolerancePct).dividedBy(100).toNumber(), quantity: D(policy.quantityTolerancePct).dividedBy(100).toNumber() },
+  );
 
-  await prisma.purchaseOrder.update({
-    where: { id: po.id },
-    data: {
-      matchStatus: result.status,
-      vendorInvoiceId: inv.id,
-      ...(result.status === "MATCHED" && po.status === "RECEIVED" ? { status: "CLOSED" } : {}),
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.purchaseOrder.update({
+      where: { id: po.id },
+      data: {
+        matchStatus: result.status,
+        vendorInvoiceId: inv.id,
+        matchReport: result as unknown as Prisma.InputJsonValue,
+        matchedAt: new Date(),
+        matchedById: userId ?? null,
+        ...(result.status === "MATCHED" && po.status === "RECEIVED" ? { status: "CLOSED" } : {}),
+      },
+    });
+    await tx.vendorInvoice.update({
+      where: { id: inv.id },
+      data: result.status === "VARIANCE"
+        ? { paymentHold: true, paymentHoldReason: `Three-way match variance on ${po.poNumber}: ${result.variances.map((v) => `${v.description} ${v.reason}`).join("; ")}`, paymentHoldSetAt: new Date(), paymentHoldClearedById: null }
+        : { paymentHold: false, paymentHoldReason: null, paymentHoldClearedById: userId ?? null },
+    });
   });
 
   return result;
+}
+
+/** An authorised person lifts the payment hold without a clean match, with a reason on record. */
+export async function releasePaymentHold(invoiceId: string, userId: string, reason: string) {
+  const inv = await prisma.vendorInvoice.findUnique({ where: { id: invoiceId }, select: { id: true, paymentHold: true, paymentHoldReason: true } });
+  if (!inv) throw new AuthError("Vendor invoice not found", 404);
+  if (!inv.paymentHold) throw new AuthError("This bill is not on hold", 409);
+  return prisma.vendorInvoice.update({
+    where: { id: invoiceId },
+    data: { paymentHold: false, paymentHoldReason: `Released: ${reason} (was: ${inv.paymentHoldReason ?? "hold"})`, paymentHoldClearedById: userId },
+  });
 }

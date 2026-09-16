@@ -138,6 +138,8 @@ export async function payVendorInvoice(
     if (!inv) throw new AuthError("Vendor invoice not found", 404);
     if (inv.status === "DRAFT") throw new AuthError("Post the bill before paying it", 409);
     if (inv.status === "PAID") throw new AuthError("This bill is already fully paid", 409);
+    // Payment voucher hold (client requirements, Sept 2026, SOP step 22).
+    if (inv.paymentHold) throw new AuthError(`This bill is on payment hold: ${inv.paymentHoldReason ?? "three-way match variance"}. Match it again or release the hold first.`, 409);
 
     const amount = D(input.amount);
     const outstanding = D(inv.total).minus(inv.paidAmount);
