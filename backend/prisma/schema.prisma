@@ -507,6 +507,8 @@ enum AttendanceSource {
   MANUAL
   MOBILE
   BIOMETRIC
+  RFID // badge or key fob at the gate
+  EVV // electronic visit verification at a customer site
 }
 
 enum TimesheetStatus {
@@ -960,6 +962,8 @@ model Vehicle {
   trips           Trip[]
   position        VehiclePosition?
   dockEvents      DockEvent[]
+  timeEntries   TimeEntry[]
+  rosterEntries RosterEntry[]
   version         Int                  @default(0) // optimistic concurrency (PRD §7.1)
   createdById     String? // audit: creator user id
   updatedById     String? // audit: last-modifier user id
@@ -1497,6 +1501,8 @@ model Trip {
 
   expenses      TripExpense[]
   dockEvents    DockEvent[]
+  timeEntries   TimeEntry[]
+  rosterEntries RosterEntry[]
   damageReports DamageReport[]
   version       Int            @default(0) // optimistic concurrency (PRD §7.1)
   updatedById   String? // audit: last-modifier user id
@@ -2453,6 +2459,7 @@ model Employee {
   wcfNumber  String? // Workers Compensation Fund
 
   deductionOptIns EmployeeDeductionOptIn[]
+  rosterEntries   RosterEntry[]
   // Optional link to a Driver record (a driver may also be an employee).
   driverId        String?                  @unique
   driver          Driver?                  @relation(fields: [driverId], references: [id], onDelete: SetNull)
@@ -3033,6 +3040,28 @@ model TimeEntry {
   source   AttendanceSource @default(MANUAL)
   note     String?
 
+  // ── Shift context (client requirements, Sept 2026, Time Management §2-3) ──
+  shiftCodeId String?
+  shiftCode   ShiftCode? @relation(fields: [shiftCodeId], references: [id], onDelete: SetNull)
+  tripId      String?
+  trip        Trip?      @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  vehicleId   String?
+  vehicle     Vehicle?   @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  /// What the roster said when the person clocked in. A snapshot rather
+  /// than a lookup, so lateness is still checkable after the roster changes.
+  scheduledStart DateTime?
+  scheduledEnd   DateTime?
+
+  // ── Where each punch happened ──
+  clockInLat    Decimal? @db.Decimal(9, 6)
+  clockInLng    Decimal? @db.Decimal(9, 6)
+  clockInPlace  String? // yard, depot, customer site as named by the person
+  clockOutLat   Decimal? @db.Decimal(9, 6)
+  clockOutLng   Decimal? @db.Decimal(9, 6)
+  clockOutPlace String?
+
+  activities ShiftActivity[]
+
   // Set when the entry is rolled into a submitted/approved timesheet.
   timesheetId String?
   timesheet   Timesheet? @relation(fields: [timesheetId], references: [id], onDelete: SetNull)
@@ -3046,6 +3075,9 @@ model TimeEntry {
   @@index([dataAreaId])
   @@index([employeeId, workDate])
   @@index([timesheetId])
+  @@index([shiftCodeId])
+  @@index([tripId])
+  @@index([vehicleId])
   @@map("time_entries")
 }
 
@@ -3063,6 +3095,21 @@ model Timesheet {
   overtimeHours Decimal         @default(0) @db.Decimal(10, 2)
   overtimeRate  Decimal         @default(0) @db.Decimal(18, 2) // per-hour OT pay rate
   overtimePay   Decimal         @default(0) @db.Decimal(18, 2) // overtimeHours × overtimeRate
+
+  // ── Widened (client requirements, Sept 2026, Time Management §6) ──
+  /// Rest-day and public-holiday hours, paid at the policy's rest-day multiple.
+  premiumHours    Decimal @default(0) @db.Decimal(10, 2)
+  premiumPay      Decimal @default(0) @db.Decimal(18, 2)
+  /// Hours inside the policy's night window, paid the night percentage on top.
+  nightHours      Decimal @default(0) @db.Decimal(10, 2)
+  nightPay        Decimal @default(0) @db.Decimal(18, 2)
+  /// Sum of the per-shift allowances of the shift codes worked.
+  shiftAllowances Decimal @default(0) @db.Decimal(18, 2)
+  drivingHours    Decimal @default(0) @db.Decimal(10, 2)
+  waitingHours    Decimal @default(0) @db.Decimal(10, 2)
+  breakHours      Decimal @default(0) @db.Decimal(10, 2)
+  /// The rate the sheet was priced at, so it can be explained later.
+  hourlyRate      Decimal @default(0) @db.Decimal(18, 2)
 
   reviewedById String?
   reviewedAt   DateTime?
@@ -3997,4 +4044,169 @@ model EmployeeDeductionOptIn {
 
   @@unique([employeeId, code])
   @@map("employee_deduction_opt_ins")
+}
+
+// ───────────────────────── Time management (client requirements, Sept 2026) ─────────────────────────
+
+/// What a person was doing during part of a shift: the task types the
+/// document lists, plus the rest kinds that come off paid time.
+enum ShiftActivityKind {
+  DRIVING
+  LOADING
+  UNLOADING
+  REFUELING
+  BORDER_CROSSING
+  INSPECTION // pre-trip and post-trip
+  WAITING // detention at a warehouse, border or in traffic
+  BREAK // mandatory rest inside the shift; unpaid
+  REST // sleeper berth or layover; unpaid
+  YARD_MOVE
+  OTHER
+}
+
+/// A roster code: Day, Night, Regional. Carries the planned window and the
+/// flat allowance paid for working it, if any.
+model ShiftCode {
+  id         String  @id @default(cuid())
+  dataAreaId String  @default("HQ01")
+  code       String // DAY, NIGHT, REG
+  name       String
+  /// Local time of day, "HH:MM". An end before the start crosses midnight.
+  startTime String
+  endTime   String
+  isNight   Boolean @default(false)
+  /// Paid once per shift worked under this code, e.g. a night or regional allowance.
+  shiftAllowance Decimal @default(0) @db.Decimal(18, 2)
+  note      String?
+  isActive  Boolean @default(true)
+
+  rosterEntries RosterEntry[]
+  timeEntries   TimeEntry[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, code])
+  @@map("shift_codes")
+}
+
+/// The plan: this person works this shift on this day, on this trip and
+/// vehicle if known. Clock-in snapshots the window onto the TimeEntry.
+model RosterEntry {
+  id          String    @id @default(cuid())
+  dataAreaId  String    @default("HQ01")
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date        DateTime  @db.Date
+  shiftCodeId String
+  shiftCode   ShiftCode @relation(fields: [shiftCodeId], references: [id], onDelete: Restrict)
+  tripId      String?
+  trip        Trip?     @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  vehicleId   String?
+  vehicle     Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  note        String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([dataAreaId, date])
+  @@index([shiftCodeId])
+  @@index([tripId])
+  @@index([vehicleId])
+  @@map("roster_entries")
+}
+
+/// One task inside a shift, with when and where. Duty status is derived from
+/// the kind (DRIVING is on-duty driving, BREAK is off-duty, REST is sleeper
+/// berth, YARD_MOVE is yard moves, the rest on-duty not driving), so it is
+/// not stored. Hours of service are computed from these.
+model ShiftActivity {
+  id          String            @id @default(cuid())
+  dataAreaId  String            @default("HQ01")
+  timeEntryId String
+  timeEntry   TimeEntry         @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+  kind        ShiftActivityKind
+  startedAt   DateTime
+  endedAt     DateTime? // null = in progress
+  lat         Decimal?          @db.Decimal(9, 6)
+  lng         Decimal?          @db.Decimal(9, 6)
+  place       String? // loading dock, service station, border post
+  note        String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([timeEntryId])
+  @@index([dataAreaId, startedAt])
+  @@map("shift_activities")
+}
+
+/// A public holiday for a company. Hours worked on one are premium hours.
+/// Distinct from Holiday above, which is a driver's day off.
+model PublicHoliday {
+  id          String   @id @default(cuid())
+  dataAreaId  String   @default("HQ01")
+  date        DateTime @db.Date
+  name        String
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@unique([dataAreaId, date])
+  @@map("public_holidays")
+}
+
+/// Working-time rules for a company, as settings rather than constants, in
+/// the same spirit as StatutoryScheme. One row per company, created with
+/// Tanzanian defaults (Employment and Labour Relations Act 2004: 9 hours a
+/// day, 45 a week, overtime at 1.5, rest days at 2, night work 5% on top)
+/// the first time it is needed, and edited from there.
+model TimePolicy {
+  id         String @id @default(cuid())
+  dataAreaId String @unique
+
+  // ── Pay rules ──
+  standardDailyHours  Decimal @default(9) @db.Decimal(5, 2)
+  standardWeeklyHours Decimal @default(45) @db.Decimal(5, 2)
+  overtimeMultiplier  Decimal @default(1.5) @db.Decimal(5, 2)
+  restDayMultiplier   Decimal @default(2) @db.Decimal(5, 2)
+  /// Percentage of the hourly rate added for each hour inside the night window.
+  nightPremiumPct     Decimal @default(5) @db.Decimal(5, 2)
+  /// Weekdays that are rest days, as comma-separated MON..SUN.
+  restDays   String @default("SUN")
+  nightStart String @default("22:00") // local time, HH:MM
+  nightEnd   String @default("06:00")
+  /// Hours the hourly rate is derived over when an employee has only a basic
+  /// pay: 45 x 52 / 12.
+  standardMonthlyHours Decimal @default(195) @db.Decimal(6, 2)
+
+  // ── Hours of service ──
+  maxDrivingHoursPerShift Decimal @default(9) @db.Decimal(5, 2)
+  maxDutyHoursPerShift    Decimal @default(13) @db.Decimal(5, 2)
+  /// After this many hours of driving without a break, one is due.
+  breakAfterDrivingHours  Decimal @default(4.5) @db.Decimal(5, 2)
+  minBreakMinutes         Int     @default(30)
+  maxWeeklyDutyHours      Decimal @default(60) @db.Decimal(5, 2)
+  /// Within this many hours of a limit, the fatigue status is a warning.
+  warnBeforeLimitHours    Decimal @default(1) @db.Decimal(5, 2)
+
+  source     String?
+  verifiedAt DateTime? @db.Date
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("time_policies")
 }

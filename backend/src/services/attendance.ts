@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import type { AttendanceSource } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { AuthError } from "@backend/lib/errors";
 
@@ -62,7 +63,7 @@ export interface TimeEntryInput {
   workDate: Date;
   clockIn: Date;
   clockOut?: Date | null;
-  source?: "MANUAL" | "MOBILE" | "BIOMETRIC";
+  source?: AttendanceSource;
   note?: string | null;
   createdById?: string | null;
 }

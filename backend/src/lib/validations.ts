@@ -48,6 +48,8 @@ export const resetPasswordSchema = z
 const os = (max: number) => z.string().max(max).optional().or(z.literal(""));
 // Like `os` but also accepts null (forms send null for empty optional fields).
 const optText = (max: number) => z.string().max(max).nullish().or(z.literal(""));
+const geoLat = z.coerce.number().min(-90).max(90);
+const geoLng = z.coerce.number().min(-180).max(180);
 
 export const driverSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -1383,24 +1385,150 @@ export const timeEntrySchema = z.object({
   workDate: z.coerce.date(),
   clockIn: z.coerce.date(),
   clockOut: z.coerce.date().optional().nullable(),
-  source: z.enum(["MANUAL", "MOBILE", "BIOMETRIC"]).default("MANUAL"),
+  source: z.enum(["MANUAL", "MOBILE", "BIOMETRIC", "RFID", "EVV"]).default("MANUAL"),
   note: z.string().max(200).optional().nullable(),
+  // Shift context (client requirements, Sept 2026, Time Management §2-3).
+  shiftCodeId: z.string().optional().nullable(),
+  tripId: z.string().optional().nullable(),
+  vehicleId: z.string().optional().nullable(),
+  clockInLat: geoLat.optional().nullable(),
+  clockInLng: geoLng.optional().nullable(),
+  clockInPlace: optText(120),
+  clockOutLat: geoLat.optional().nullable(),
+  clockOutLng: geoLng.optional().nullable(),
+  clockOutPlace: optText(120),
 });
 
 export const clockOutSchema = z.object({
   at: z.coerce.date(),
+  lat: geoLat.optional().nullable(),
+  lng: geoLng.optional().nullable(),
+  place: optText(120),
 });
 
+/**
+ * The period sheet is priced from the employee's own rates and the company's
+ * time policy; the old per-call overtime rate is kept as an override for a
+ * one-off agreed rate.
+ */
 export const buildTimesheetSchema = z.object({
   dataAreaId: z.string().min(1).max(10).default("HQ01"),
   employeeId: z.string().min(1, "Employee is required"),
   period: z.string().regex(/^\d{4}-\d{2}$/, "Period must be YYYY-MM"),
-  overtimeRate: z.coerce.number().min(0, "Overtime rate cannot be negative").default(0),
+  overtimeRate: z.coerce.number().min(0, "Overtime rate cannot be negative").optional().nullable(),
 });
 
 export type TimeEntryInput = z.infer<typeof timeEntrySchema>;
 export type ClockOutInput = z.infer<typeof clockOutSchema>;
 export type BuildTimesheetInput = z.infer<typeof buildTimesheetSchema>;
+
+// ── Time management (client requirements, Sept 2026) ─────────────────────────
+
+const clockTime = z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "Use HH:MM");
+const weekdayList = z
+  .string()
+  .max(40)
+  .refine((s) => s.split(",").every((d) => ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN", ""].includes(d.trim().toUpperCase())), {
+    message: "Rest days must be a comma-separated list of MON..SUN",
+  });
+
+export const shiftCodeSchema = z.object({
+  code: z.string().min(1, "Code is required").max(12).transform((s) => s.trim().toUpperCase()),
+  name: z.string().min(1, "Name is required").max(80),
+  startTime: clockTime,
+  endTime: clockTime,
+  isNight: z.coerce.boolean().default(false),
+  shiftAllowance: z.coerce.number().min(0).default(0),
+  note: optText(300),
+  isActive: z.coerce.boolean().default(true),
+});
+
+export const rosterEntrySchema = z.object({
+  employeeId: z.string().min(1, "Employee is required"),
+  date: z.coerce.date(),
+  shiftCodeId: z.string().min(1, "Shift code is required"),
+  tripId: z.string().optional().nullable(),
+  vehicleId: z.string().optional().nullable(),
+  note: optText(300),
+});
+
+/** Plan the same shift for several people over a date range in one call. */
+export const rosterPlanSchema = z
+  .object({
+    employeeIds: z.array(z.string().min(1)).min(1, "Pick at least one employee").max(200),
+    shiftCodeId: z.string().min(1, "Shift code is required"),
+    from: z.coerce.date(),
+    to: z.coerce.date(),
+    /** Weekdays to plan; empty means every day in the range. */
+    weekdays: z.array(z.enum(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"])).default([]),
+    replace: z.coerce.boolean().default(false),
+  })
+  .refine((d) => d.to >= d.from, { message: "End date must not be before start date", path: ["to"] })
+  .refine((d) => (d.to.getTime() - d.from.getTime()) / 86_400_000 <= 92, { message: "Plan at most 92 days at a time", path: ["to"] });
+
+export const SHIFT_ACTIVITY_KINDS = [
+  "DRIVING", "LOADING", "UNLOADING", "REFUELING", "BORDER_CROSSING",
+  "INSPECTION", "WAITING", "BREAK", "REST", "YARD_MOVE", "OTHER",
+] as const;
+
+export const shiftActivitySchema = z.object({
+  kind: z.enum(SHIFT_ACTIVITY_KINDS),
+  startedAt: z.coerce.date(),
+  endedAt: z.coerce.date().optional().nullable(),
+  lat: geoLat.optional().nullable(),
+  lng: geoLng.optional().nullable(),
+  place: optText(120),
+  note: optText(300),
+});
+
+/** Close the open task, optionally saying where. */
+export const endActivitySchema = z.object({
+  at: z.coerce.date().optional(),
+  lat: geoLat.optional().nullable(),
+  lng: geoLng.optional().nullable(),
+  place: optText(120),
+});
+
+export const publicHolidaySchema = z.object({
+  date: z.coerce.date(),
+  name: z.string().min(1, "Name is required").max(80),
+});
+
+const hours = (max: number) => z.coerce.number().min(0).max(max);
+
+export const timePolicySchema = z
+  .object({
+    standardDailyHours: hours(24),
+    standardWeeklyHours: hours(168),
+    overtimeMultiplier: z.coerce.number().min(1).max(5),
+    restDayMultiplier: z.coerce.number().min(1).max(5),
+    nightPremiumPct: z.coerce.number().min(0).max(100),
+    restDays: weekdayList,
+    nightStart: clockTime,
+    nightEnd: clockTime,
+    standardMonthlyHours: z.coerce.number().positive().max(744),
+    maxDrivingHoursPerShift: hours(24),
+    maxDutyHoursPerShift: hours(24),
+    breakAfterDrivingHours: hours(24),
+    minBreakMinutes: z.coerce.number().int().min(0).max(240),
+    maxWeeklyDutyHours: hours(168),
+    warnBeforeLimitHours: hours(24),
+    source: optText(500),
+    verifiedAt: z.coerce.date().optional().nullable(),
+  })
+  .partial()
+  .refine((d) => d.maxDrivingHoursPerShift == null || d.maxDutyHoursPerShift == null || d.maxDrivingHoursPerShift <= d.maxDutyHoursPerShift, {
+    message: "Driving limit cannot exceed the duty limit",
+    path: ["maxDrivingHoursPerShift"],
+  });
+
+export type ShiftCodeInput = z.infer<typeof shiftCodeSchema>;
+export type RosterEntryInput = z.infer<typeof rosterEntrySchema>;
+export type RosterPlanInput = z.infer<typeof rosterPlanSchema>;
+export type ShiftActivityInput = z.infer<typeof shiftActivitySchema>;
+export type EndActivityInput = z.infer<typeof endActivitySchema>;
+export type PublicHolidayInput = z.infer<typeof publicHolidaySchema>;
+export type TimePolicyInput = z.infer<typeof timePolicySchema>;
 
 // ── Credit & Collections workflow (M7) ──
 export const dunningSchema = z.object({

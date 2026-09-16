@@ -129,7 +129,7 @@ attendance.post("/timesheets/build", requireAuth, requirePermission("attendance:
   const user = c.get("user");
   const body = buildTimesheetSchema.parse(await c.req.json());
   const dataAreaId = areaForWrite(user, body.dataAreaId);
-  const sheet = await buildTimesheet(dataAreaId, body.employeeId, body.period, body.overtimeRate, user.id);
+  const sheet = await buildTimesheet(dataAreaId, body.employeeId, body.period, body.overtimeRate ?? 0, user.id);
   await logActivity({ userId: user.id, action: "BUILD", target: `Timesheet:${sheet.id}`, detail: { period: body.period } });
   return ok(c, sheet);
 });
