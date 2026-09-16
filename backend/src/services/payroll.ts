@@ -4,7 +4,7 @@ import { AuthError } from "@backend/lib/errors";
 import { createJournalEntry } from "@backend/services/ledger";
 import { computePayslip } from "@backend/services/payslip-engine";
 import { schemeFor } from "@backend/services/statutory-schemes";
-import { approvedOvertimeByEmployee } from "@backend/services/attendance";
+import { approvedTimeEarningsByEmployee } from "@backend/services/attendance";
 
 /**
  * Payroll (M9) — monthly pay runs with statutory deductions and ledger posting.
@@ -51,10 +51,11 @@ export async function computePayRun(
   });
   if (employees.length === 0) throw new AuthError("No active employees to run payroll for", 422);
 
-  // Approved overtime for this period (Time & Attendance M26) is added as a
-  // taxable earning before statutory deductions are computed.
+  // Approved time-based earnings for this period (overtime, rest-day and
+  // night premium, shift allowances) are taxable earnings added before the
+  // statutory deductions are computed. Each is its own payslip line.
   const period = `${year}-${String(month).padStart(2, "0")}`;
-  const overtime = await approvedOvertimeByEmployee(dataAreaId, period);
+  const timeEarnings = await approvedTimeEarningsByEmployee(dataAreaId, period);
 
   // One scheme load per country in the run, not per employee.
   const schemes = new Map<string, Awaited<ReturnType<typeof schemeFor>>>();
@@ -68,6 +69,7 @@ export async function computePayRun(
     // recorded before the field existed has only a gross salary, which is
     // then treated as all basic: the same figure the old engine used.
     const basic = e.basicPay ?? e.grossSalary;
+    const time = timeEarnings.get(e.id);
     const result = computePayslip(
       {
         basicPay: basic,
@@ -82,8 +84,11 @@ export async function computePayRun(
           { code: "MILEAGE", label: "Mileage bonus", amount: e.mileageBonus },
           { code: "PHONE", label: "Phone allowance", amount: e.phoneAllowance },
           { code: "OTHER", label: "Other allowance", amount: e.otherAllowance },
+          { code: "PREMIUM", label: "Rest day and holiday premium", amount: time?.premiumPay ?? 0 },
+          { code: "NIGHT", label: "Night work premium", amount: time?.nightPay ?? 0 },
+          { code: "SHIFT_ALLOWANCE", label: "Shift allowances", amount: time?.shiftAllowances ?? 0 },
         ],
-        overtimePay: overtime.get(e.id) ?? 0,
+        overtimePay: time?.overtimePay ?? 0,
       },
       scheme,
       e.deductionOptIns.map((o) => ({ code: o.code, amountOverride: o.amountOverride })),
