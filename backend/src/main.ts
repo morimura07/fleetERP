@@ -79,6 +79,9 @@ app.use(
     origin: (process.env.CORS_ORIGIN ?? "http://localhost:3000").split(",").map((o) => o.trim()),
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "X-Data-Area"],
+    // The export menu names the downloaded file from this header; without
+    // exposing it a cross-origin browser sees only "export.csv".
+    exposeHeaders: ["Content-Disposition"],
   }),
 );
 
@@ -166,6 +169,19 @@ refreshRuntime().catch((e) => console.error("[rbac] hydrate on startup failed; u
 // with an empty map an ADMIN sees only their own entity rather than the whole
 // organization — narrower than intended, never wider.
 refreshOrganizations().catch((e) => console.error("[org] hydrate on startup failed; admins are limited to their own entity", e));
+
+// A rejection nobody awaited (a fire-and-forget audit log, a notification)
+// must not take the process down mid-request, and must not vanish either:
+// log it with the same tag the request errors use so the two read as one
+// stream. A synchronous throw outside any request is different: state is
+// unknown, so log and let the process manager restart the service.
+process.on("unhandledRejection", (reason) => {
+  console.error("[api] unhandled rejection", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[api] uncaught exception, exiting", err);
+  process.exit(1);
+});
 
 const port = Number(process.env.PORT ?? 4000);
 serve({ fetch: app.fetch, port });

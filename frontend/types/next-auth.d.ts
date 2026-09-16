@@ -10,6 +10,8 @@ declare module "next-auth" {
     } & DefaultSession["user"];
     /** Backend API bearer token, forwarded on server-side fetches. */
     accessToken: string;
+    /** When the backend token stops working, as epoch seconds. Read from its `exp` claim. */
+    accessTokenExpires: number | null;
   }
 
   interface User {
@@ -26,5 +28,6 @@ declare module "next-auth/jwt" {
     role: Role;
     driverId: string | null;
     accessToken?: string;
+    accessTokenExpires?: number | null;
   }
 }
