@@ -297,7 +297,9 @@ export function consolidate(input: ConsolidationInput): ConsolidationOutput {
  * the opposite of its translated balance on its parent account. Balanced only
  * when the group's IC balances net to zero, which the caller must check.
  */
-export function eliminationJournal(lines: RunLine[]): { parentAccount: string; debit: Prisma.Decimal; credit: Prisma.Decimal; memo: string }[] {
+export type EliminationSource = Pick<RunLine, "intercompany" | "eliminationBase" | "parentAccount" | "subsidiary" | "subAccount" | "subAccountName">;
+
+export function eliminationJournal(lines: EliminationSource[]): { parentAccount: string; debit: Prisma.Decimal; credit: Prisma.Decimal; memo: string }[] {
   const out: { parentAccount: string; debit: Prisma.Decimal; credit: Prisma.Decimal; memo: string }[] = [];
   for (const l of lines) {
     if (!l.intercompany || l.eliminationBase.isZero()) continue;
