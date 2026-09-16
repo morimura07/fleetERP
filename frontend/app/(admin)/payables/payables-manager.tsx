@@ -19,6 +19,7 @@ interface Bill {
   id: string; invoiceNumber: string; vendor: { legalName: string };
   invoiceDate: string; dueDate: string | null; currency: string;
   total: string; paidAmount: string; status: InvoiceStatus;
+  paymentHold: boolean; paymentHoldReason: string | null;
 }
 
 const num = (v: string) => parseFloat(v).toLocaleString();
@@ -70,6 +71,21 @@ export function PayablesManager({ vendors }: { vendors: VendorOpt[] }) {
     }
   }
 
+  async function releaseHold(b: Bill) {
+    const reason = window.prompt(`Release the payment hold on ${b.invoiceNumber}?
+
+Held because: ${b.paymentHoldReason ?? "three-way match variance"}
+
+Reason for releasing (recorded):`);
+    if (!reason || reason.trim().length < 3) return;
+    try {
+      await apiFetch(`/api/payables/${b.id}`, { method: "POST", body: JSON.stringify({ action: "release-hold", reason: reason.trim() }) });
+      toast({ title: "Hold released", variant: "success" }); setRefreshKey((k) => k + 1);
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof ApiError ? e.message : "Failed", variant: "destructive" });
+    }
+  }
+
   async function post(b: Bill) {
     try {
       await apiFetch(`/api/payables/${b.id}`, { method: "POST", body: JSON.stringify({ action: "post" }) });
@@ -106,7 +122,7 @@ export function PayablesManager({ vendors }: { vendors: VendorOpt[] }) {
     { key: "dueDate", header: "Due", render: (r) => r.dueDate ? formatDate(r.dueDate) : "—" },
     { key: "total", header: "Total", render: (r) => `${r.currency} ${num(r.total)}` },
     { key: "paidAmount", header: "Paid", render: (r) => num(r.paidAmount) },
-    { key: "status", header: "Status", render: (r) => <Badge variant={INVOICE_STATUS_VARIANT[r.status]}>{INVOICE_STATUS_LABEL[r.status]}</Badge> },
+    { key: "status", header: "Status", render: (r) => <span className="flex flex-wrap gap-1"><Badge variant={INVOICE_STATUS_VARIANT[r.status]}>{INVOICE_STATUS_LABEL[r.status]}</Badge>{r.paymentHold && <Badge variant="destructive" title={r.paymentHoldReason ?? undefined}>Payment hold</Badge>}</span> },
   ];
 
   return (
@@ -120,7 +136,8 @@ export function PayablesManager({ vendors }: { vendors: VendorOpt[] }) {
         rowActions={(row) => (
           <div className="flex justify-end gap-1">
             {row.status === "DRAFT" && <Button variant="outline" size="sm" onClick={() => post(row)}><FileText className="h-4 w-4" />Post</Button>}
-            {(row.status === "POSTED" || row.status === "PARTIALLY_PAID") && <Button variant="outline" size="sm" onClick={() => openPay(row)}><Banknote className="h-4 w-4" />Pay</Button>}
+            {row.paymentHold && <Button variant="outline" size="sm" title={row.paymentHoldReason ?? undefined} onClick={() => releaseHold(row)}>Release hold</Button>}
+            {(row.status === "POSTED" || row.status === "PARTIALLY_PAID") && !row.paymentHold && <Button variant="outline" size="sm" onClick={() => openPay(row)}><Banknote className="h-4 w-4" />Pay</Button>}
           </div>
         )}
       />

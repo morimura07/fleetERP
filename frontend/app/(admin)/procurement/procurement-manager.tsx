@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { PoDetail } from "./po-detail";
 import { ReturnsPanel } from "./returns-panel";
+import { DashboardPanel } from "./dashboard-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@frontend/components/ui/tabs";
 import { DataTable, type Column } from "@frontend/components/data/data-table";
 import { Button } from "@frontend/components/ui/button";
@@ -114,6 +115,7 @@ export function ProcurementManager({ vendors, items }: { vendors: Vendor[]; item
         <TabsList>
           <TabsTrigger value="orders">Purchase orders</TabsTrigger>
           <TabsTrigger value="returns">Returns to vendor</TabsTrigger>
+          <TabsTrigger value="dashboard">KPIs &amp; scorecards</TabsTrigger>
         </TabsList>
         <TabsContent value="orders" className="pt-4">
       <DataTable<PORow>
@@ -126,6 +128,7 @@ export function ProcurementManager({ vendors, items }: { vendors: Vendor[]; item
       />
         </TabsContent>
         <TabsContent value="returns" className="pt-4"><ReturnsPanel /></TabsContent>
+        <TabsContent value="dashboard" className="pt-4"><DashboardPanel /></TabsContent>
       </Tabs>
 
       {/* New PO dialog */}

@@ -5,7 +5,9 @@ import { ROUTE_GUARDS, can } from "@frontend/lib/rbac";
 
 const { auth } = NextAuth(authConfig);
 
-const PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password"];
+const PUBLIC_PATHS = ["/login", "/forgot-password", "/reset-password", "/supplier"];
+/** Public pages that are not sign-in pages: a signed-in user may open them too. */
+const OPEN_PATHS = ["/supplier"];
 
 export default auth((req) => {
   const { nextUrl } = req;
@@ -39,6 +41,7 @@ export default auth((req) => {
     // EXCEPTION: an expired backend token bounced us here (?reason=expired).
     // The NextAuth cookie still looks valid, so don't ricochet back to a page
     // that will 401 again — let /login render so the user can re-authenticate.
+    if (OPEN_PATHS.some((p) => path.startsWith(p))) return NextResponse.next();
     if (isPublic && nextUrl.searchParams.get("reason") !== "expired") {
       return NextResponse.redirect(new URL("/dashboard", nextUrl));
     }
