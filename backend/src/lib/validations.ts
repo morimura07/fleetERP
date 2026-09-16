@@ -805,6 +805,43 @@ export const consolidationMapSchema = z.object({
   subsidiary: z.string().min(1, "Subsidiary entity is required").max(10),
   subAccount: z.string().min(1).max(20),
   parentAccount: z.string().min(1).max(20),
+  // IAS 21 (client requirements, Sept 2026, Consolidation §3). A null rate
+  // type means the default for the account's type.
+  rateType: z.enum(["SPOT", "AVERAGE", "HISTORICAL"]).optional().nullable(),
+  intercompany: z.coerce.boolean().default(false),
+  icPartner: optText(10),
+  note: optText(300),
+});
+
+/** What may change on a mapping row. Its identity (entity + account) does not. */
+export const consolidationMapUpdateSchema = z.object({
+  parentAccount: z.string().min(1).max(20).optional(),
+  rateType: z.enum(["SPOT", "AVERAGE", "HISTORICAL"]).optional().nullable(),
+  intercompany: z.coerce.boolean().optional(),
+  icPartner: optText(10),
+  note: optText(300),
+});
+
+export const consolidationEntitySchema = z.object({
+  parentArea: z.string().min(1).max(10).default("HQ01"),
+  subsidiary: z.string().min(1, "Subsidiary entity is required").max(10),
+  sharePct: z.coerce.number().min(0, "Share cannot be negative").max(100, "Share cannot exceed 100%").default(100),
+  ctaAccount: z.string().min(1).max(20).default("3900"),
+  isActive: z.coerce.boolean().default(true),
+});
+
+/** "2026-08", "2026-Q3", "2026", or an as-of date "2026-08-31". */
+export const consolidationPeriod = z
+  .string()
+  .regex(/^(\d{4}(-\d{2}(-\d{2})?)?|\d{4}-Q[1-4])$/, "Period must be YYYY-MM, YYYY-Qn, YYYY or a date");
+
+export const consolidationRunSchema = z.object({
+  parentArea: z.string().min(1).max(10).default("HQ01"),
+  baseCurrency: currencyCode.default("USD"),
+  period: consolidationPeriod,
+  /** Empty means every configured subsidiary. */
+  subsidiaries: z.array(z.string().min(1).max(10)).max(50).default([]),
+  memo: optText(300),
 });
 
 export type DriverInput = z.infer<typeof driverSchema>;
@@ -827,6 +864,9 @@ export type BankAccountInput = z.infer<typeof bankAccountSchema>;
 export type MoneyTransferInput = z.infer<typeof moneyTransferSchema>;
 export type BudgetInput = z.infer<typeof budgetSchema>;
 export type ConsolidationMapInput = z.infer<typeof consolidationMapSchema>;
+export type ConsolidationMapUpdateInput = z.infer<typeof consolidationMapUpdateSchema>;
+export type ConsolidationEntityInput = z.infer<typeof consolidationEntitySchema>;
+export type ConsolidationRunInput = z.infer<typeof consolidationRunSchema>;
 export type DriverDocumentInput = z.infer<typeof driverDocumentSchema>;
 export type WaypointInput = z.infer<typeof waypointSchema>;
 export type TripReconInput = z.infer<typeof tripReconSchema>;

@@ -1294,6 +1294,7 @@ model JournalEntry {
   stockMovement          StockMovement?     @relation("StockMovementPosting")
   payRun                 PayRun?            @relation("PayRunPosting")
   expenseClaim           ExpenseClaim?      @relation("ExpenseClaimPosting")
+  consolidationRun       ConsolidationRun?  @relation("ConsolidationPosting")
   depreciationEntry      DepreciationEntry? @relation("DepreciationPosting")
   assetDisposal          FixedAsset?        @relation("AssetDisposalPosting")
   serviceOrder           ServiceOrder?      @relation("ServiceOrderPosting")
@@ -1985,6 +1986,22 @@ model ConsolidationMap {
   subsidiary    String // source entity (TZ01, KE01 …)
   subAccount    String // account code in the subsidiary
   parentAccount String // account code in the parent
+
+  // ── IAS 21 (client requirements, Sept 2026, Consolidation §3) ──
+  /// Which rate translates this account. Null means the default for its
+  /// type: closing (SPOT) for assets and liabilities, AVERAGE for income
+  /// and expenses, HISTORICAL for equity.
+  rateType     RateType?
+  /// An intercompany balance (a loan to a sister company, transport charged
+  /// within the group). Eliminated in full on consolidation.
+  intercompany Boolean   @default(false)
+  icPartner    String? // the other entity's code, for the mismatch report
+  note         String?
+
+  version     Int       @default(0)
+  createdById String?
+  updatedById String?
+  updatedAt   DateTime  @default(now()) @updatedAt
   createdAt     DateTime @default(now())
 
   @@unique([parentArea, subsidiary, subAccount])
@@ -4209,4 +4226,109 @@ model TimePolicy {
   updatedAt   DateTime @updatedAt
 
   @@map("time_policies")
+}
+
+// ───────────────────────── Consolidation runs (client requirements, Sept 2026) ─────────────────────────
+
+enum ConsolidationStatus {
+  DRAFT // created; not yet translated
+  SIMULATED // translated and saved; nothing posted
+  POSTED // elimination entries posted to the parent ledger; locked
+}
+
+/// A subsidiary in a group: how much of it the parent owns, and where its
+/// translation adjustment is presented.
+model ConsolidationEntity {
+  id         String  @id @default(cuid())
+  parentArea String  @default("HQ01")
+  subsidiary String
+  /// Ownership share applied on roll-up. Below 100 the subsidiary is
+  /// consolidated proportionately.
+  sharePct   Decimal @default(100) @db.Decimal(5, 2)
+  /// Parent equity account that carries the cumulative translation adjustment.
+  ctaAccount String  @default("3900")
+  isActive   Boolean @default(true)
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([parentArea, subsidiary])
+  @@map("consolidation_entities")
+}
+
+/// One consolidation of a group for a period. The lines are a snapshot of
+/// what the ledgers, mappings and rates said when it was run, so a posted
+/// run can be explained after any of them change.
+model ConsolidationRun {
+  id           String              @id @default(cuid())
+  parentArea   String              @default("HQ01")
+  baseCurrency String              @default("USD")
+  /// "2026-08", "2026-Q3", "2026", or an as-of date "2026-08-31".
+  period       String
+  periodStart  DateTime            @db.Date
+  periodEnd    DateTime            @db.Date // inclusive
+  subsidiaries String[]
+  status       ConsolidationStatus @default(DRAFT)
+  ranAt        DateTime?
+  postedAt     DateTime?
+  postingEntryId String?       @unique
+  postingEntry   JournalEntry? @relation("ConsolidationPosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
+  /// Unmapped accounts, missing rates, intercompany mismatch: what an
+  /// accountant must look at before trusting the figures.
+  warnings Json?
+  memo     String?
+
+  lines ConsolidationRunLine[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([parentArea, period])
+  @@index([parentArea, status])
+  @@map("consolidation_runs")
+}
+
+/// One account of one entity in a run. Local figures are the entity's
+/// ledger; base figures are translated at the line's rate type; the
+/// elimination removes intercompany balances; consolidated applies the
+/// ownership share. Debit balances positive, credit balances negative.
+model ConsolidationRunLine {
+  id    String           @id @default(cuid())
+  runId String
+  run   ConsolidationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  subsidiary        String
+  subAccount        String
+  subAccountName    String
+  parentAccount     String
+  parentAccountName String
+  accountType       AccountType
+  currency          String // the entity's local currency, ISO 4217
+  rateType          RateType
+  rate              Decimal? @db.Decimal(18, 6) // closing rate used for the ending figure; null = none configured
+
+  beginningLocal Decimal @default(0) @db.Decimal(18, 2)
+  debitLocal     Decimal @default(0) @db.Decimal(18, 2)
+  creditLocal    Decimal @default(0) @db.Decimal(18, 2)
+  endingLocal    Decimal @default(0) @db.Decimal(18, 2)
+  beginningBase  Decimal @default(0) @db.Decimal(18, 2)
+  activityBase   Decimal @default(0) @db.Decimal(18, 2)
+  endingBase     Decimal @default(0) @db.Decimal(18, 2)
+  eliminationBase  Decimal @default(0) @db.Decimal(18, 2)
+  sharePct         Decimal @default(100) @db.Decimal(5, 2)
+  consolidatedBase Decimal @default(0) @db.Decimal(18, 2)
+
+  intercompany Boolean @default(false)
+  /// The translation adjustment line for an entity, derived from the others.
+  isCta        Boolean @default(false)
+  sortOrder    Int     @default(0)
+
+  @@index([runId])
+  @@map("consolidation_run_lines")
 }
