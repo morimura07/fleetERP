@@ -396,7 +396,12 @@ enum StockMovementType {
 // Procurement (M15)
 enum PurchaseOrderStatus {
   DRAFT
-  APPROVED
+  PENDING_APPROVAL // in the DOA queue
+  APPROVED // matrix signed; not yet sent to the supplier
+  ISSUED // transmitted to the supplier
+  ACKNOWLEDGED // supplier accepted and committed a delivery date
+  IN_PRODUCTION
+  DISPATCHED
   PARTIAL // some lines received
   RECEIVED // all lines fully received
   CLOSED // matched & billed
@@ -1294,6 +1299,7 @@ model JournalEntry {
   stockMovement          StockMovement?     @relation("StockMovementPosting")
   payRun                 PayRun?            @relation("PayRunPosting")
   expenseClaim           ExpenseClaim?      @relation("ExpenseClaimPosting")
+  consolidationRun       ConsolidationRun?  @relation("ConsolidationPosting")
   depreciationEntry      DepreciationEntry? @relation("DepreciationPosting")
   assetDisposal          FixedAsset?        @relation("AssetDisposalPosting")
   serviceOrder           ServiceOrder?      @relation("ServiceOrderPosting")
@@ -1589,6 +1595,16 @@ model Vendor {
   customsBrokerCode String?
   customsBondNumber String?
 
+  // ── Approved vendor list and KYC (client requirements, Sept 2026, Procurement §2) ──
+  avlStatus     AvlStatus  @default(PENDING)
+  avlRegion     AvlRegion?
+  kycStatus     KycStatus  @default(NOT_STARTED)
+  kycVerifiedAt DateTime?
+  kycVerifiedById String?
+  kycNote       String?
+  /// What they supply, for RFQ vendor selection: "TYRES", "FUEL", "SPARES".
+  categories    String[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1601,6 +1617,8 @@ model Vendor {
   fixedAssets    FixedAsset[]
   partySites     PartySite[]
   partyContacts  PartyContact[]
+  rfqInvitations RfqVendor[]
+  quotations     Quotation[]
   expenseLines   ExpenseLine[]
 
   @@unique([dataAreaId, code])
@@ -1985,6 +2003,22 @@ model ConsolidationMap {
   subsidiary    String // source entity (TZ01, KE01 …)
   subAccount    String // account code in the subsidiary
   parentAccount String // account code in the parent
+
+  // ── IAS 21 (client requirements, Sept 2026, Consolidation §3) ──
+  /// Which rate translates this account. Null means the default for its
+  /// type: closing (SPOT) for assets and liabilities, AVERAGE for income
+  /// and expenses, HISTORICAL for equity.
+  rateType     RateType?
+  /// An intercompany balance (a loan to a sister company, transport charged
+  /// within the group). Eliminated in full on consolidation.
+  intercompany Boolean   @default(false)
+  icPartner    String? // the other entity's code, for the mismatch report
+  note         String?
+
+  version     Int       @default(0)
+  createdById String?
+  updatedById String?
+  updatedAt   DateTime  @default(now()) @updatedAt
   createdAt     DateTime @default(now())
 
   @@unique([parentArea, subsidiary, subAccount])
@@ -2169,6 +2203,8 @@ model StockItem {
 
   movements    StockMovement[]
   poLines      PurchaseOrderLine[]
+  requisitionLines RequisitionLine[]
+  rfqLines         RfqLine[]
   balances     StockBalance[]
   serviceParts ServicePart[]
   posLines     PosSaleLine[]
@@ -2313,9 +2349,37 @@ model PurchaseOrder {
   updatedById String?
   fixedAssets FixedAsset[]
 
+  // ── Sourcing trail (client requirements, Sept 2026, Procurement §1-2) ──
+  requisitionId String?
+  requisition   Requisition? @relation(fields: [requisitionId], references: [id], onDelete: SetNull)
+  rfqId         String?
+  rfq           Rfq?         @relation(fields: [rfqId], references: [id], onDelete: SetNull)
+  quotationId   String?      @unique
+  quotation     Quotation?   @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+
+  /// Budget commitment target for a manual order; an awarded order takes its requisition's.
+  costCenter    String?
+
+  // ── Lifecycle (SOP steps 13-15) ──
+  issuedAt              DateTime?
+  acknowledgedAt        DateTime?
+  committedDeliveryDate DateTime? @db.Date // the supplier's promise
+  supplierNote          String?
+  inProductionAt        DateTime?
+  dispatchedAt          DateTime?
+
+  // ── Savings and the tier (SOP steps 10-12) ──
+  /// The winning quote before negotiation; subtotal is the negotiated figure.
+  initialQuoteTotal Decimal? @db.Decimal(18, 2)
+  amountBase        Decimal? @db.Decimal(18, 2) // in the tier currency when last approved
+  baseCurrency      String?
+  changeOrders      Int      @default(0)
+
   @@unique([dataAreaId, poNumber])
   @@index([vendorId])
   @@index([status])
+  @@index([requisitionId])
+  @@index([rfqId])
   @@map("purchase_orders")
 }
 
@@ -4209,4 +4273,510 @@ model TimePolicy {
   updatedAt   DateTime @updatedAt
 
   @@map("time_policies")
+}
+
+// ───────────────────────── Consolidation runs (client requirements, Sept 2026) ─────────────────────────
+
+enum ConsolidationStatus {
+  DRAFT // created; not yet translated
+  SIMULATED // translated and saved; nothing posted
+  POSTED // elimination entries posted to the parent ledger; locked
+}
+
+/// A subsidiary in a group: how much of it the parent owns, and where its
+/// translation adjustment is presented.
+model ConsolidationEntity {
+  id         String  @id @default(cuid())
+  parentArea String  @default("HQ01")
+  subsidiary String
+  /// Ownership share applied on roll-up. Below 100 the subsidiary is
+  /// consolidated proportionately.
+  sharePct   Decimal @default(100) @db.Decimal(5, 2)
+  /// Parent equity account that carries the cumulative translation adjustment.
+  ctaAccount String  @default("3900")
+  isActive   Boolean @default(true)
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([parentArea, subsidiary])
+  @@map("consolidation_entities")
+}
+
+/// One consolidation of a group for a period. The lines are a snapshot of
+/// what the ledgers, mappings and rates said when it was run, so a posted
+/// run can be explained after any of them change.
+model ConsolidationRun {
+  id           String              @id @default(cuid())
+  parentArea   String              @default("HQ01")
+  baseCurrency String              @default("USD")
+  /// "2026-08", "2026-Q3", "2026", or an as-of date "2026-08-31".
+  period       String
+  periodStart  DateTime            @db.Date
+  periodEnd    DateTime            @db.Date // inclusive
+  subsidiaries String[]
+  status       ConsolidationStatus @default(DRAFT)
+  ranAt        DateTime?
+  postedAt     DateTime?
+  postingEntryId String?       @unique
+  postingEntry   JournalEntry? @relation("ConsolidationPosting", fields: [postingEntryId], references: [id], onDelete: SetNull)
+  /// Unmapped accounts, missing rates, intercompany mismatch: what an
+  /// accountant must look at before trusting the figures.
+  warnings Json?
+  memo     String?
+
+  lines ConsolidationRunLine[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([parentArea, period])
+  @@index([parentArea, status])
+  @@map("consolidation_runs")
+}
+
+/// One account of one entity in a run. Local figures are the entity's
+/// ledger; base figures are translated at the line's rate type; the
+/// elimination removes intercompany balances; consolidated applies the
+/// ownership share. Debit balances positive, credit balances negative.
+model ConsolidationRunLine {
+  id    String           @id @default(cuid())
+  runId String
+  run   ConsolidationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  subsidiary        String
+  subAccount        String
+  subAccountName    String
+  parentAccount     String
+  parentAccountName String
+  accountType       AccountType
+  currency          String // the entity's local currency, ISO 4217
+  rateType          RateType
+  rate              Decimal? @db.Decimal(18, 6) // closing rate used for the ending figure; null = none configured
+
+  beginningLocal Decimal @default(0) @db.Decimal(18, 2)
+  debitLocal     Decimal @default(0) @db.Decimal(18, 2)
+  creditLocal    Decimal @default(0) @db.Decimal(18, 2)
+  endingLocal    Decimal @default(0) @db.Decimal(18, 2)
+  beginningBase  Decimal @default(0) @db.Decimal(18, 2)
+  activityBase   Decimal @default(0) @db.Decimal(18, 2)
+  endingBase     Decimal @default(0) @db.Decimal(18, 2)
+  eliminationBase  Decimal @default(0) @db.Decimal(18, 2)
+  sharePct         Decimal @default(100) @db.Decimal(5, 2)
+  consolidatedBase Decimal @default(0) @db.Decimal(18, 2)
+
+  intercompany Boolean @default(false)
+  /// The translation adjustment line for an entity, derived from the others.
+  isCta        Boolean @default(false)
+  sortOrder    Int     @default(0)
+
+  @@index([runId])
+  @@map("consolidation_run_lines")
+}
+
+// ───────────────────────── Procurement: requisitions and delegation of authority (client requirements, Sept 2026) ─────────────────────────
+
+enum RequisitionStatus {
+  DRAFT
+  PENDING_REVIEW // technical review by the user department
+  PENDING_BUDGET // funds insufficient; waiting for allocation or a Finance override
+  PENDING_APPROVAL // in the DOA queue
+  APPROVED
+  SOURCING // an RFQ is out
+  ORDERED // a purchase order was raised from it
+  REJECTED
+  CANCELLED
+}
+
+enum BudgetGateStatus {
+  NOT_CHECKED
+  WITHIN // funds available
+  SOFT_BLOCK // over budget; may proceed with a warning
+  HARD_BLOCK // over budget; needs a Finance override
+  OVERRIDDEN // a Finance Head let it through
+}
+
+/// A purchase requisition: what a department needs, before anyone asks a
+/// vendor. Carries its own budget gate and its DOA approval.
+model Requisition {
+  id         String            @id @default(cuid())
+  dataAreaId String            @default("HQ01")
+  prNumber   String // PR-000001
+  title      String
+  department String?
+  costCenter String?
+  neededBy   DateTime?         @db.Date
+  currency   String            @default("USD")
+  subtotal   Decimal           @default(0) @db.Decimal(18, 2)
+  /// The subtotal in the DOA tier currency at the day's rate, for the trail.
+  amountBase Decimal?          @db.Decimal(18, 2)
+  baseCurrency String?
+  status     RequisitionStatus @default(DRAFT)
+  justification String?
+
+  requestedById String?
+  submittedAt   DateTime?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  reviewNote    String?
+
+  // ── Budget gate (SOP step 2) ──
+  budgetStatus       BudgetGateStatus @default(NOT_CHECKED)
+  budgetNote         String? // what the check found
+  budgetOverrideById String?
+  budgetOverrideAt   DateTime?
+  budgetOverrideNote String?
+
+  approvedAt      DateTime?
+  rejectedReason  String?
+
+  lines          RequisitionLine[]
+  purchaseOrders PurchaseOrder[]
+  rfqs           Rfq[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, prNumber])
+  @@index([dataAreaId, status])
+  @@map("requisitions")
+}
+
+model RequisitionLine {
+  id            String      @id @default(cuid())
+  requisitionId String
+  requisition   Requisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  stockItemId   String?
+  stockItem     StockItem?  @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
+  description   String
+  uom           String      @default("PIECE")
+  quantity      Decimal     @db.Decimal(18, 3)
+  estUnitPrice  Decimal     @default(0) @db.Decimal(18, 4)
+  lineTotal     Decimal     @default(0) @db.Decimal(18, 2)
+  expenseCode   String      @default("5100")
+  specification String? // technical specification; documents attach to the requisition
+  sortOrder     Int         @default(0)
+
+  rfqLines RfqLine[]
+
+  @@index([requisitionId])
+  @@index([stockItemId])
+  @@map("requisition_lines")
+}
+
+enum DoaMode {
+  SEQUENTIAL // each role in order
+  PARALLEL // every role, any order
+  ANY // one of the roles is enough
+}
+
+/// One tier of the delegation-of-authority matrix, as settings. The
+/// customer's own roles approve; the thresholds carry a currency and other
+/// currencies are converted at the day's rate, as Priyam asked.
+model DoaTier {
+  id         String  @id @default(cuid())
+  dataAreaId String  @default("HQ01")
+  name       String // "Under 5,000", "Board"
+  minAmount  Decimal @default(0) @db.Decimal(18, 2)
+  maxAmount  Decimal? @db.Decimal(18, 2) // null = no ceiling
+  currency   String  @default("USD")
+  /// Role keys (RbacRole.key or a system role name) that may approve.
+  approverRoles String[]
+  mode          DoaMode @default(SEQUENTIAL)
+  /// How many approvals are needed: all listed roles, or this many of them.
+  minSignatures Int     @default(1)
+  requiresBudgetSignOff Boolean @default(false)
+  requiresBidSummary    Boolean @default(false)
+  autoRelease           Boolean @default(false) // single-level: approval releases the PO at once
+  sortOrder  Int     @default(0)
+  isActive   Boolean @default(true)
+
+  requests ApprovalRequest[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId, sortOrder])
+  @@map("doa_tiers")
+}
+
+enum ApprovalSubject {
+  REQUISITION
+  AWARD // a recommended bid, before the PO
+  PURCHASE_ORDER // a change order re-opening the tier
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUPERSEDED // re-triggered by a later change
+}
+
+enum DecisionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED // not needed once the request resolved
+}
+
+/// One trip through the DOA matrix for one subject. Immutable once
+/// resolved; a change order creates a new request and marks this one
+/// superseded, so the trail shows every tier that was ever opened.
+model ApprovalRequest {
+  id          String          @id @default(cuid())
+  dataAreaId  String          @default("HQ01")
+  subjectType ApprovalSubject
+  subjectId   String
+  subjectRef  String // PR-000001, PO-000123, for the queue
+  amount      Decimal         @db.Decimal(18, 2)
+  currency    String
+  amountBase  Decimal         @db.Decimal(18, 2) // in the tier currency
+  baseCurrency String
+  rate        Decimal?        @db.Decimal(18, 6)
+  tierId      String?
+  tier        DoaTier?        @relation(fields: [tierId], references: [id], onDelete: SetNull)
+  tierName    String // snapshot
+  status      ApprovalStatus  @default(PENDING)
+  reason      String? // "initial", "change order +12%"
+  requestedById String?
+  resolvedAt    DateTime?
+
+  decisions ApprovalDecision[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dataAreaId, status])
+  @@index([subjectType, subjectId])
+  @@map("approval_requests")
+}
+
+/// One required signature on a request: which role, in which step, and
+/// who eventually gave it.
+model ApprovalDecision {
+  id        String          @id @default(cuid())
+  requestId String
+  request   ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  step      Int // 1-based order for SEQUENTIAL tiers; all 1 otherwise
+  roleKey   String
+  status    DecisionStatus  @default(PENDING)
+  userId    String?
+  userName  String?
+  note      String?
+  decidedAt DateTime?
+
+  @@index([requestId])
+  @@map("approval_decisions")
+}
+
+/// Procurement rules for a company, as settings.
+model ProcurementPolicy {
+  id         String @id @default(cuid())
+  dataAreaId String @unique
+  /// Quotes needed before a PO may progress; fewer needs a single-source justification.
+  minQuotes Int @default(3)
+  /// Three-way match tolerances.
+  priceTolerancePct    Decimal @default(1) @db.Decimal(5, 2)
+  quantityTolerancePct Decimal @default(0) @db.Decimal(5, 2)
+  /// Receiving more than ordered, up to this much, is accepted.
+  overDeliveryTolerancePct Decimal @default(0) @db.Decimal(5, 2)
+  /// A change order beyond either of these re-opens the DOA tier.
+  retriggerVariancePct    Decimal @default(5) @db.Decimal(5, 2)
+  retriggerVarianceAmount Decimal @default(0) @db.Decimal(18, 2) // 0 = percentage only
+  /// Working days from requisition approval to PO transmission.
+  poTurnaroundSlaDays Int @default(2)
+  /// Imports need the shipping documents before goods can be received.
+  shippingDocsBeforeGrn Boolean @default(true)
+  /// Currency the DOA thresholds are read in when a tier has none.
+  thresholdCurrency String @default("USD")
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("procurement_policies")
+}
+
+// ───────────────────────── Procurement: sourcing (client requirements, Sept 2026) ─────────────────────────
+
+enum AvlStatus {
+  PENDING // onboarding; may not be invited to quote
+  APPROVED
+  SUSPENDED
+}
+
+enum AvlRegion {
+  LOCAL
+  REGIONAL // Africa
+  INTERNATIONAL
+}
+
+enum KycStatus {
+  NOT_STARTED
+  SUBMITTED // documents uploaded, awaiting verification
+  VERIFIED
+  REJECTED
+}
+
+enum RfqStatus {
+  DRAFT
+  SENT // invitations out; quotes may be entered
+  CLOSED // deadline passed or closed by hand; comparison and award
+  AWARDED
+  CANCELLED
+}
+
+enum RfqVendorStatus {
+  INVITED
+  QUOTED
+  DECLINED
+}
+
+/// A request for quotation: the lines to be priced and the vendors asked.
+model Rfq {
+  id            String       @id @default(cuid())
+  dataAreaId    String       @default("HQ01")
+  rfqNumber     String // RFQ-000001
+  requisitionId String?
+  requisition   Requisition? @relation(fields: [requisitionId], references: [id], onDelete: SetNull)
+  title         String
+  currency      String       @default("USD")
+  status        RfqStatus    @default(DRAFT)
+  deadline      DateTime?
+  sentAt        DateTime?
+  closedAt      DateTime?
+  notes         String?
+
+  // ── Single-source justification (the override to the three-quote rule) ──
+  singleSourceJustification String?
+  singleSourceApprovedById  String?
+  singleSourceApprovedAt    DateTime?
+
+  awardedQuotationId String?
+  awardedAt          DateTime?
+  awardedById        String?
+
+  lines      RfqLine[]
+  vendors    RfqVendor[]
+  quotations Quotation[]
+  purchaseOrders PurchaseOrder[]
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataAreaId, rfqNumber])
+  @@index([dataAreaId, status])
+  @@index([requisitionId])
+  @@map("rfqs")
+}
+
+model RfqLine {
+  id                String           @id @default(cuid())
+  rfqId             String
+  rfq               Rfq              @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  requisitionLineId String?
+  requisitionLine   RequisitionLine? @relation(fields: [requisitionLineId], references: [id], onDelete: SetNull)
+  stockItemId       String?
+  stockItem         StockItem?       @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
+  description       String
+  uom               String           @default("PIECE")
+  quantity          Decimal          @db.Decimal(18, 3)
+  expenseCode       String           @default("5100")
+  specification     String?
+  sortOrder         Int              @default(0)
+
+  quotationLines QuotationLine[]
+
+  @@index([rfqId])
+  @@index([requisitionLineId])
+  @@index([stockItemId])
+  @@map("rfq_lines")
+}
+
+/// A vendor asked to quote on an RFQ.
+model RfqVendor {
+  id        String          @id @default(cuid())
+  rfqId     String
+  rfq       Rfq             @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  vendorId  String
+  vendor    Vendor          @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  status    RfqVendorStatus @default(INVITED)
+  invitedAt DateTime        @default(now())
+  note      String?
+
+  @@unique([rfqId, vendorId])
+  @@index([vendorId])
+  @@map("rfq_vendors")
+}
+
+/// What one vendor quoted. Prices are per RFQ line; a negotiated price sits
+/// beside the first one so the saving is visible.
+model Quotation {
+  id         String   @id @default(cuid())
+  dataAreaId String   @default("HQ01")
+  rfqId      String
+  rfq        Rfq      @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  vendorId   String
+  vendor     Vendor   @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  quoteRef   String? // the vendor's own reference
+  currency   String   @default("USD")
+  receivedAt DateTime @default(now())
+  validUntil DateTime? @db.Date
+  deliveryDays Int?
+  paymentTerms String?
+  incoterm     String?
+  subtotal           Decimal  @default(0) @db.Decimal(18, 2) // as first quoted
+  negotiatedSubtotal Decimal? @db.Decimal(18, 2) // after negotiation; null = not negotiated
+  technicalScore  Decimal? @db.Decimal(5, 2) // 0-100
+  commercialScore Decimal? @db.Decimal(5, 2)
+  notes           String?
+  isRecommended   Boolean  @default(false)
+
+  lines         QuotationLine[]
+  purchaseOrder PurchaseOrder?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([rfqId, vendorId])
+  @@index([dataAreaId])
+  @@map("quotations")
+}
+
+model QuotationLine {
+  id          String    @id @default(cuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  rfqLineId   String
+  rfqLine     RfqLine   @relation(fields: [rfqLineId], references: [id], onDelete: Cascade)
+  unitPrice           Decimal  @db.Decimal(18, 4)
+  negotiatedUnitPrice Decimal? @db.Decimal(18, 4)
+  lineTotal           Decimal  @db.Decimal(18, 2)
+  leadDays            Int?
+  note                String?
+
+  @@unique([quotationId, rfqLineId])
+  @@index([rfqLineId])
+  @@map("quotation_lines")
 }

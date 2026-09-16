@@ -775,6 +775,43 @@ export const consolidationMapSchema = z.object({
   subsidiary: z.string().min(1, "Subsidiary entity is required").max(10),
   subAccount: z.string().min(1).max(20),
   parentAccount: z.string().min(1).max(20),
+  // IAS 21 (client requirements, Sept 2026, Consolidation §3). A null rate
+  // type means the default for the account's type.
+  rateType: z.enum(["SPOT", "AVERAGE", "HISTORICAL"]).optional().nullable(),
+  intercompany: z.coerce.boolean().default(false),
+  icPartner: optText(10),
+  note: optText(300),
+});
+
+/** What may change on a mapping row. Its identity (entity + account) does not. */
+export const consolidationMapUpdateSchema = z.object({
+  parentAccount: z.string().min(1).max(20).optional(),
+  rateType: z.enum(["SPOT", "AVERAGE", "HISTORICAL"]).optional().nullable(),
+  intercompany: z.coerce.boolean().optional(),
+  icPartner: optText(10),
+  note: optText(300),
+});
+
+export const consolidationEntitySchema = z.object({
+  parentArea: z.string().min(1).max(10).default("HQ01"),
+  subsidiary: z.string().min(1, "Subsidiary entity is required").max(10),
+  sharePct: z.coerce.number().min(0, "Share cannot be negative").max(100, "Share cannot exceed 100%").default(100),
+  ctaAccount: z.string().min(1).max(20).default("3900"),
+  isActive: z.coerce.boolean().default(true),
+});
+
+/** "2026-08", "2026-Q3", "2026", or an as-of date "2026-08-31". */
+export const consolidationPeriod = z
+  .string()
+  .regex(/^(\d{4}(-\d{2}(-\d{2})?)?|\d{4}-Q[1-4])$/, "Period must be YYYY-MM, YYYY-Qn, YYYY or a date");
+
+export const consolidationRunSchema = z.object({
+  parentArea: z.string().min(1).max(10).default("HQ01"),
+  baseCurrency: currencyCode.default("USD"),
+  period: consolidationPeriod,
+  /** Empty means every configured subsidiary. */
+  subsidiaries: z.array(z.string().min(1).max(10)).max(50).default([]),
+  memo: optText(300),
 });
 
 export type DriverInput = z.infer<typeof driverSchema>;
@@ -797,6 +834,9 @@ export type BankAccountInput = z.infer<typeof bankAccountSchema>;
 export type MoneyTransferInput = z.infer<typeof moneyTransferSchema>;
 export type BudgetInput = z.infer<typeof budgetSchema>;
 export type ConsolidationMapInput = z.infer<typeof consolidationMapSchema>;
+export type ConsolidationMapUpdateInput = z.infer<typeof consolidationMapUpdateSchema>;
+export type ConsolidationEntityInput = z.infer<typeof consolidationEntitySchema>;
+export type ConsolidationRunInput = z.infer<typeof consolidationRunSchema>;
 export type DriverDocumentInput = z.infer<typeof driverDocumentSchema>;
 export type WaypointInput = z.infer<typeof waypointSchema>;
 export type TripReconInput = z.infer<typeof tripReconSchema>;
@@ -872,6 +912,7 @@ export const purchaseOrderSchema = z.object({
   orderDate: z.coerce.date(),
   expectedAt: z.coerce.date().optional().nullable(),
   memo: z.string().max(300).optional().or(z.literal("")),
+  costCenter: z.string().max(80).optional().or(z.literal("")),
   lines: z.array(poLineSchema).min(1, "At least one line is required"),
 });
 
@@ -1673,3 +1714,175 @@ export const posSaleSchema = z.object({
 
 export type PosLineInput = z.infer<typeof posLineSchema>;
 export type PosSaleInput = z.infer<typeof posSaleSchema>;
+
+// ── Procurement: requisitions and delegation of authority (client requirements, Sept 2026) ──
+
+export const requisitionLineSchema = z.object({
+  stockItemId: z.string().optional().nullable(),
+  description: z.string().min(1, "Description is required").max(200),
+  uom: z.string().max(12).optional().or(z.literal("")),
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+  estUnitPrice: z.coerce.number().min(0).optional(),
+  expenseCode: z.string().max(20).optional().or(z.literal("")),
+  specification: optText(2000),
+});
+
+export const requisitionSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  title: z.string().min(1, "Title is required").max(150),
+  department: optText(80),
+  costCenter: optText(80),
+  neededBy: z.coerce.date().optional().nullable(),
+  currency: currencyCode.default("USD"),
+  justification: optText(1000),
+  lines: z.array(requisitionLineSchema).min(1, "Add at least one line").max(200),
+});
+
+export const reviewSchema = z.object({
+  pass: z.boolean(),
+  note: optText(500),
+});
+
+export const decisionSchema = z.object({
+  approve: z.boolean(),
+  note: optText(500),
+});
+
+export const budgetOverrideSchema = z.object({
+  note: z.string().min(3, "Say why the budget is being overridden").max(500),
+});
+
+const doaTierBase = z.object({
+    name: z.string().min(1, "Name is required").max(60),
+    minAmount: z.coerce.number().min(0),
+    maxAmount: z.coerce.number().min(0).optional().nullable(),
+    currency: currencyCode.default("USD"),
+    approverRoles: z.array(z.string().min(1).max(40)).min(1, "Pick at least one approver role").max(10),
+    mode: z.enum(["SEQUENTIAL", "PARALLEL", "ANY"]).default("SEQUENTIAL"),
+    minSignatures: z.coerce.number().int().min(1).max(10).default(1),
+    requiresBudgetSignOff: z.coerce.boolean().default(false),
+    requiresBidSummary: z.coerce.boolean().default(false),
+    autoRelease: z.coerce.boolean().default(false),
+    sortOrder: z.coerce.number().int().min(0).default(0),
+    isActive: z.coerce.boolean().default(true),
+});
+
+export const doaTierSchema = doaTierBase
+  .refine((t) => t.maxAmount == null || t.maxAmount >= t.minAmount, { message: "Maximum must not be below minimum", path: ["maxAmount"] })
+  .refine((t) => t.minSignatures <= t.approverRoles.length, { message: "Cannot need more signatures than there are roles", path: ["minSignatures"] });
+
+/** A partial edit; the service re-checks the band and signature rules on the merged row. */
+export const doaTierUpdateSchema = doaTierBase.partial();
+
+export const procurementPolicySchema = z
+  .object({
+    minQuotes: z.coerce.number().int().min(1).max(10),
+    priceTolerancePct: z.coerce.number().min(0).max(100),
+    quantityTolerancePct: z.coerce.number().min(0).max(100),
+    overDeliveryTolerancePct: z.coerce.number().min(0).max(100),
+    retriggerVariancePct: z.coerce.number().min(0).max(100),
+    retriggerVarianceAmount: z.coerce.number().min(0),
+    poTurnaroundSlaDays: z.coerce.number().int().min(0).max(60),
+    shippingDocsBeforeGrn: z.coerce.boolean(),
+    thresholdCurrency: currencyCode,
+  })
+  .partial();
+
+export type RequisitionLineInput = z.infer<typeof requisitionLineSchema>;
+export type RequisitionInput = z.infer<typeof requisitionSchema>;
+export type ReviewInput = z.infer<typeof reviewSchema>;
+export type DecisionInput = z.infer<typeof decisionSchema>;
+export type DoaTierInput = z.infer<typeof doaTierSchema>;
+export type DoaTierUpdateInput = z.infer<typeof doaTierUpdateSchema>;
+export type ProcurementPolicyInput = z.infer<typeof procurementPolicySchema>;
+
+// ── Procurement: sourcing (client requirements, Sept 2026) ──
+
+export const vendorAvlSchema = z.object({
+  avlStatus: z.enum(["PENDING", "APPROVED", "SUSPENDED"]).optional(),
+  avlRegion: z.enum(["LOCAL", "REGIONAL", "INTERNATIONAL"]).optional().nullable(),
+  categories: z.array(z.string().min(1).max(40)).max(20).optional(),
+  kycStatus: z.enum(["NOT_STARTED", "SUBMITTED", "VERIFIED", "REJECTED"]).optional(),
+  kycNote: optText(500),
+});
+
+export const rfqLineSchema = z.object({
+  stockItemId: z.string().optional().nullable(),
+  description: z.string().min(1, "Description is required").max(200),
+  uom: z.string().max(12).optional().or(z.literal("")),
+  quantity: z.coerce.number().positive("Quantity must be positive"),
+  expenseCode: z.string().max(20).optional().or(z.literal("")),
+  specification: optText(2000),
+});
+
+export const rfqSchema = z.object({
+  dataAreaId: z.string().min(1).max(10).default("HQ01"),
+  requisitionId: z.string().optional().nullable(),
+  title: z.string().min(1, "Title is required").max(150),
+  currency: currencyCode.default("USD"),
+  deadline: z.coerce.date().optional().nullable(),
+  notes: optText(1000),
+  /** Empty with a requisition means "copy its lines". */
+  lines: z.array(rfqLineSchema).max(200).default([]),
+  vendorIds: z.array(z.string().min(1)).max(50).default([]),
+});
+
+export const quotationLineSchema = z.object({
+  rfqLineId: z.string().min(1),
+  unitPrice: z.coerce.number().min(0),
+  leadDays: z.coerce.number().int().min(0).optional().nullable(),
+  note: optText(300),
+});
+
+export const quotationSchema = z.object({
+  vendorId: z.string().min(1, "Vendor is required"),
+  quoteRef: optText(60),
+  currency: currencyCode.optional(),
+  receivedAt: z.coerce.date().optional(),
+  validUntil: z.coerce.date().optional().nullable(),
+  deliveryDays: z.coerce.number().int().min(0).optional().nullable(),
+  paymentTerms: optText(80),
+  incoterm: optText(20),
+  notes: optText(1000),
+  lines: z.array(quotationLineSchema).min(1, "Price every line"),
+});
+
+export const negotiationSchema = z.object({
+  lines: z.array(z.object({ rfqLineId: z.string().min(1), negotiatedUnitPrice: z.coerce.number().min(0).nullable() })).min(1),
+  notes: optText(1000),
+});
+
+export const quoteScoreSchema = z.object({
+  technicalScore: z.coerce.number().min(0).max(100).optional(),
+  commercialScore: z.coerce.number().min(0).max(100).optional(),
+  isRecommended: z.coerce.boolean().optional(),
+});
+
+export const singleSourceSchema = z.object({
+  justification: z.string().min(10, "Say why a single source is justified").max(1000),
+});
+
+export const awardSchema = z.object({
+  quotationId: z.string().min(1, "Pick the winning quotation"),
+  note: optText(300),
+});
+
+export const acknowledgeSchema = z.object({
+  accept: z.boolean(),
+  committedDeliveryDate: z.coerce.date().optional().nullable(),
+  note: optText(500),
+});
+
+export const changeOrderSchema = z.object({
+  reason: z.string().min(3, "Say why the order is changing").max(500),
+  lines: z.array(poLineSchema).min(1, "At least one line is required"),
+});
+
+export type VendorAvlInput = z.infer<typeof vendorAvlSchema>;
+export type RfqInput = z.infer<typeof rfqSchema>;
+export type QuotationInput = z.infer<typeof quotationSchema>;
+export type NegotiationInput = z.infer<typeof negotiationSchema>;
+export type QuoteScoreInput = z.infer<typeof quoteScoreSchema>;
+export type AwardInput = z.infer<typeof awardSchema>;
+export type AcknowledgeInput = z.infer<typeof acknowledgeSchema>;
+export type ChangeOrderInput = z.infer<typeof changeOrderSchema>;

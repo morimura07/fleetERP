@@ -1,5 +1,5 @@
 import type {
-  JobStatus, DriverStatus, DriverType, OwnershipStatus, FuelType, FacilityType, VehicleStatus, Role, ContractType, AccountType, AccountSubType, PostingType, JournalDocType, JournalStatus, OrderStatus, TripStatus, CorridorType, EquipmentType, TripExpenseType, InvoiceStatus, PaymentTerm, VendorGroup, PaymentMethod, CustomerAccountGroup, PartyStatus, DunningLevel, DisputeStatus, CollectionActivityType, RateType, BankAccountType, DisbursementType, TransferStatus, BudgetKind, BudgetControl, DriverDocType, ReconStatus, StockCategory, StockUnit, PurchaseOrderStatus, MatchStatus, EmployeeStatus, PayRunStatus, ExpenseClaimStatus, AssetCategory, AssetStatus, ServiceOrderStatus, ServiceKind, EmploymentType, ContractStatus, LeaveType, LeaveStatus, EmployeeDocType, AttendanceSource, TimesheetStatus, DockEventKind, DamageStatus, LeadStage, QuoteStatus, ProjectStatus, ForecastStatus, PosSaleStatus, PosPaymentMethod, PeriodStatus, AttributeDataType, UomDimension, IncidentType, IncidentCause, ClaimStatus, DockActivity, DockSource, CompanyKind, ShiftActivityKind, DutyStatus, FatigueStatus,} from "@frontend/lib/enums";
+  JobStatus, DriverStatus, DriverType, OwnershipStatus, FuelType, FacilityType, VehicleStatus, Role, ContractType, AccountType, AccountSubType, PostingType, JournalDocType, JournalStatus, OrderStatus, TripStatus, CorridorType, EquipmentType, TripExpenseType, InvoiceStatus, PaymentTerm, VendorGroup, PaymentMethod, CustomerAccountGroup, PartyStatus, DunningLevel, DisputeStatus, CollectionActivityType, RateType, BankAccountType, DisbursementType, TransferStatus, BudgetKind, BudgetControl, DriverDocType, ReconStatus, StockCategory, StockUnit, PurchaseOrderStatus, MatchStatus, EmployeeStatus, PayRunStatus, ExpenseClaimStatus, AssetCategory, AssetStatus, ServiceOrderStatus, ServiceKind, EmploymentType, ContractStatus, LeaveType, LeaveStatus, EmployeeDocType, AttendanceSource, TimesheetStatus, DockEventKind, DamageStatus, LeadStage, QuoteStatus, ProjectStatus, ForecastStatus, PosSaleStatus, PosPaymentMethod, PeriodStatus, AttributeDataType, UomDimension, IncidentType, IncidentCause, ClaimStatus, DockActivity, DockSource, CompanyKind, ShiftActivityKind, DutyStatus, FatigueStatus, AvlStatus, AvlRegion, KycStatus, RfqStatus} from "@frontend/lib/enums";
 
 type BadgeVariant = "default" | "secondary" | "success" | "warning" | "info" | "destructive";
 
@@ -423,8 +423,13 @@ export const STOCK_UNIT_LABEL: Record<StockUnit, string> = {
 
 export const PO_STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
   DRAFT: "Draft",
+  PENDING_APPROVAL: "Pending approval",
   APPROVED: "Approved",
-  PARTIAL: "Partially Received",
+  ISSUED: "Issued",
+  ACKNOWLEDGED: "Acknowledged",
+  IN_PRODUCTION: "In production",
+  DISPATCHED: "Dispatched",
+  PARTIAL: "Partially received",
   RECEIVED: "Received",
   CLOSED: "Closed",
   CANCELLED: "Cancelled",
@@ -432,12 +437,25 @@ export const PO_STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
 
 export const PO_STATUS_VARIANT: Record<PurchaseOrderStatus, BadgeVariant> = {
   DRAFT: "secondary",
+  PENDING_APPROVAL: "warning",
   APPROVED: "info",
+  ISSUED: "info",
+  ACKNOWLEDGED: "info",
+  IN_PRODUCTION: "info",
+  DISPATCHED: "info",
   PARTIAL: "warning",
   RECEIVED: "success",
   CLOSED: "default",
   CANCELLED: "destructive",
 };
+
+export const AVL_STATUS_LABEL: Record<AvlStatus, string> = { PENDING: "Onboarding", APPROVED: "Approved", SUSPENDED: "Suspended" };
+export const AVL_STATUS_VARIANT: Record<AvlStatus, BadgeVariant> = { PENDING: "secondary", APPROVED: "success", SUSPENDED: "destructive" };
+export const AVL_REGION_LABEL: Record<AvlRegion, string> = { LOCAL: "Local", REGIONAL: "Regional (Africa)", INTERNATIONAL: "International" };
+export const KYC_STATUS_LABEL: Record<KycStatus, string> = { NOT_STARTED: "Not started", SUBMITTED: "Submitted", VERIFIED: "Verified", REJECTED: "Rejected" };
+export const KYC_STATUS_VARIANT: Record<KycStatus, BadgeVariant> = { NOT_STARTED: "secondary", SUBMITTED: "info", VERIFIED: "success", REJECTED: "destructive" };
+export const RFQ_STATUS_LABEL: Record<RfqStatus, string> = { DRAFT: "Draft", SENT: "Sent", CLOSED: "Closed", AWARDED: "Awarded", CANCELLED: "Cancelled" };
+export const RFQ_STATUS_VARIANT: Record<RfqStatus, BadgeVariant> = { DRAFT: "secondary", SENT: "info", CLOSED: "warning", AWARDED: "success", CANCELLED: "destructive" };
 
 export const MATCH_STATUS_LABEL: Record<MatchStatus, string> = {
   UNMATCHED: "Unmatched",
