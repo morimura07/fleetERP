@@ -56,7 +56,13 @@ export async function matrixStatus(dataAreaId: string) {
     if (!r.exists) problems.push(`Role "${r.key}" does not exist yet; create it under Roles and assign it to the right people.`);
     else if (r.holders === 0 && !held.has(r.key)) problems.push(`Nobody holds the role "${r.name ?? r.key}"; requests needing it will wait forever.`);
   }
-  return { tiers, roles, problems };
+  // Every role a tier could name, for the settings screen's picker.
+  const allCustom = await prisma.rbacRole.findMany({ select: { key: true, name: true, isSystem: true }, orderBy: { name: "asc" } });
+  const availableRoles = [
+    ...allCustom.map((r) => ({ key: r.key, name: r.name })),
+    ...systemRoles.filter((k) => !allCustom.some((r) => r.key === k)).map((k) => ({ key: k, name: k })),
+  ];
+  return { tiers, roles, problems, availableRoles };
 }
 
 /** The roles a user signs with: their custom role, and their system role. */
