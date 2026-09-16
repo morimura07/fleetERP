@@ -165,8 +165,13 @@ export const vehicleSchema = z.object({
 
 // ───────── Phase 3: Driver compliance documents (M11) ─────────
 export const driverDocumentSchema = z.object({
-  type: z.enum(["LICENSE", "PASSPORT", "COMESA_PERMIT", "YELLOW_FEVER", "WORK_PERMIT", "OTHER"]),
+  type: z.enum([
+    "LICENSE", "PASSPORT", "COMESA_PERMIT", "YELLOW_FEVER", "WORK_PERMIT",
+    "MEDICAL_CERTIFICATE", "HAZMAT", "TWIC", "FORKLIFT", "DEFENSIVE_DRIVING", "OTHER",
+  ]),
   number: z.string().max(60).optional(),
+  /// Issuing body or examiner registry number.
+  issuer: z.string().max(120).optional().or(z.literal("")),
   issuedAt: z.coerce.date().optional().nullable(),
   expiresAt: z.coerce.date(),
   note: z.string().max(255).optional(),
@@ -937,7 +942,51 @@ export const employeeSchema = z.object({
   overnightAllowance: z.coerce.number().min(0).default(0),
   phoneAllowance: z.coerce.number().min(0).default(0),
   otherAllowance: z.coerce.number().min(0).default(0),
+
+  // ── Personal (client requirements, Sept 2026, HR §1) ──
+  dateOfBirth: z.coerce.date().optional().nullable(),
+  gender: os(20),
+  religion: os(40),
+  nationality: z.string().length(2).optional().or(z.literal("")),
+  passportNumber: os(40),
+  // ── Contact ──
+  phone: os(40),
+  email: z.string().email().optional().or(z.literal("")),
+  address: os(255),
+  emergencyContactName: os(120),
+  emergencyContactPhone: os(40),
+  phoneVoucherEligible: z.boolean().default(false),
+  // ── Guarantor and vetting ──
+  guarantorName: os(120),
+  guarantorContact: os(120),
+  guarantorDetails: os(500),
+  educationLevel: os(80),
+  previousEmployer: os(150),
+  backgroundCheckStatus: z.enum(["NOT_STARTED", "PENDING", "CLEARED", "FLAGGED"]).default("NOT_STARTED"),
+  backgroundCheckAt: z.coerce.date().optional().nullable(),
+  vettingRemarks: os(500),
+  // ── Employment ──
+  skillLevel: z.enum(["SKILLED", "UNSKILLED", "NON_CITIZEN"]).nullish(),
+  incrementDate: z.coerce.date().optional().nullable(),
+  exitDate: z.coerce.date().optional().nullable(),
 });
+
+// ── Driver qualification file (client requirements, Sept 2026, HR §2) ──
+
+export const driverEventSchema = z.object({
+  kind: z.enum(["ROAD_TEST", "MVR_CHECK", "VIOLATION", "DRUG_ALCOHOL_TEST", "TRAINING"]),
+  occurredAt: z.coerce.date(),
+  renewalDue: z.coerce.date().optional().nullable(),
+  title: z.string().min(1, "Title is required").max(150),
+  outcome: z.enum(["PASS", "FAIL", "NEGATIVE", "POSITIVE", "REFUSED", "PENDING", "NOT_APPLICABLE"]).default("NOT_APPLICABLE"),
+  reference: os(80),
+  amount: z.coerce.number().min(0).optional().nullable(),
+  reason: os(120),
+  sapReferral: z.boolean().default(false),
+  atFault: z.boolean().default(false),
+  note: os(500),
+});
+export type DriverEventInput = z.infer<typeof driverEventSchema>;
 
 export const payRunSchema = z.object({
   year: z.coerce.number().int().min(2000).max(2100),

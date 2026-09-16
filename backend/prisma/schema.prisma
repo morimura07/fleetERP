@@ -343,6 +343,11 @@ enum DriverDocType {
   COMESA_PERMIT // cross-border transit permit
   YELLOW_FEVER // health certificate
   WORK_PERMIT
+  MEDICAL_CERTIFICATE
+  HAZMAT
+  TWIC
+  FORKLIFT
+  DEFENSIVE_DRIVING
   OTHER
 }
 
@@ -800,6 +805,14 @@ model Driver {
   assignedVehicle     String? // primary tractor / vehicle ref
   cargoQualifications String? // trailer / cargo types certified
   languagePref        String?
+
+  // ── Fuel card (client requirements, Sept 2026, HR §2) ──
+  fuelCardNumber String?
+  fuelCardIssuer String?
+  /// Spending ceiling per period, in the driver'"'"'s entity currency.
+  fuelCardLimit  Decimal? @db.Decimal(18, 2)
+
+  events DriverEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1984,6 +1997,9 @@ model DriverDocument {
   driver      Driver        @relation(fields: [driverId], references: [id], onDelete: Cascade)
   type        DriverDocType
   number      String? // document / certificate number
+  /// Issuing body or examiner registry number. A medical certificate
+  /// without its examiner is not evidence of anything.
+  issuer      String?
   issuedAt    DateTime?     @db.Date
   expiresAt   DateTime      @db.Date
   note        String?
@@ -2378,9 +2394,42 @@ model Employee {
   overnightAllowance Decimal @default(0) @db.Decimal(18, 2)
   phoneAllowance     Decimal @default(0) @db.Decimal(18, 2)
   otherAllowance     Decimal @default(0) @db.Decimal(18, 2)
+
+  // ── Personal (client requirements, Sept 2026, HR §1) ──
+  dateOfBirth    DateTime? @db.Date
+  gender         String?
+  religion       String?
+  nationality    String? // ISO 2-letter
+  passportNumber String?
+
+  // ── Contact. Employee had none of these; only Driver did. ──
+  phone                 String?
+  email                 String?
+  address               String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  /// Entitled to the phone voucher, as distinct from the amount paid.
+  phoneVoucherEligible  Boolean @default(false)
+
+  // ── Guarantor and vetting ──
+  guarantorName         String?
+  guarantorContact      String?
+  guarantorDetails      String?
+  educationLevel        String?
+  previousEmployer      String?
+  backgroundCheckStatus BackgroundCheckStatus @default(NOT_STARTED)
+  backgroundCheckAt     DateTime?             @db.Date
+  vettingRemarks        String?
+
+  // ── Employment ──
+  /// Skilled, unskilled or non-citizen: the categories Tanzanian labour
+  /// law and work-permit rules turn on.
+  skillLevel    SkillLevel?
+  incrementDate DateTime?   @db.Date // next scheduled pay review
+  exitDate      DateTime?   @db.Date
   // Optional link to a Driver record (a driver may also be an employee).
-  driverId           String? @unique
-  driver             Driver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  driverId      String?     @unique
+  driver        Driver?     @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
   payslips         Payslip[]
   contracts        EmploymentContract[]
@@ -3713,4 +3762,79 @@ enum PermitType {
   OVERWEIGHT
   LATRA
   OTHER
+}
+
+enum BackgroundCheckStatus {
+  NOT_STARTED
+  PENDING
+  CLEARED
+  FLAGGED
+}
+
+enum SkillLevel {
+  SKILLED
+  UNSKILLED
+  NON_CITIZEN
+}
+
+/// A dated entry in a driver'"'"'s qualification file.
+enum DriverEventKind {
+  ROAD_TEST
+  MVR_CHECK // motor vehicle record check
+  VIOLATION // traffic violation or fine
+  DRUG_ALCOHOL_TEST
+  TRAINING // safety seminar, eco-driving, compliance refresher
+}
+
+enum DriverEventOutcome {
+  PASS
+  FAIL
+  NEGATIVE // drug and alcohol: clear
+  POSITIVE // drug and alcohol: not clear
+  REFUSED
+  PENDING
+  NOT_APPLICABLE
+}
+
+/// The driver qualification file as a log rather than a set of flags.
+///
+/// Road tests, record checks, violations, drug and alcohol tests and training
+/// all recur, and a compliance officer needs the history: when the last one
+/// was, what it found, and when the next is due. A single date column per
+/// kind on Driver would keep only the latest and lose the pattern, which is
+/// the thing an insurer or a regulator asks for.
+model DriverEvent {
+  id         String @id @default(cuid())
+  dataAreaId String @default("HQ01")
+  driverId   String
+  driver     Driver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  kind        DriverEventKind
+  occurredAt  DateTime           @db.Date
+  /// When this needs doing again, e.g. an annual MVR check or a training
+  /// refresher. Null for a one-off such as a violation.
+  renewalDue  DateTime?          @db.Date
+  title       String // "Annual MVR check", "Speeding, Morogoro Rd", "Eco-driving refresher"
+  outcome     DriverEventOutcome @default(NOT_APPLICABLE)
+  /// Citation number, test reference, course code.
+  reference   String?
+  /// Fine or cost, where there is one.
+  amount      Decimal?           @db.Decimal(18, 2)
+  /// Why a drug or alcohol test was taken: random, post-accident, reasonable suspicion.
+  reason      String?
+  /// Referred to a substance abuse professional after a positive result.
+  sapReferral Boolean            @default(false)
+  /// The driver was at fault, for a violation or an accident.
+  atFault     Boolean            @default(false)
+  note        String?
+
+  version     Int      @default(0)
+  createdById String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dataAreaId, driverId, kind])
+  @@index([dataAreaId, renewalDue])
+  @@map("driver_events")
 }
