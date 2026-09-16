@@ -51,6 +51,10 @@ export const ATTACHABLE = {
     read: "kpi:read", write: "kpi:write",
     find: (id, u) => prisma.dockEvent.findFirst({ where: { id, ...areaScope(u) }, select: area }),
   },
+  Shipment: {
+    read: "procurement:read", write: "procurement:write",
+    find: (id, u) => prisma.shipment.findFirst({ where: { id, ...areaScope(u) }, select: area }),
+  },
   Rfq: {
     read: "procurement:read", write: "procurement:write",
     find: (id, u) => prisma.rfq.findFirst({ where: { id, ...areaScope(u) }, select: area }),

@@ -1,12 +1,13 @@
 import { Hono } from "hono";
 import { Prisma, PurchaseOrderStatus } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
-import { purchaseOrderSchema, goodsReceiptSchema, matchSchema, paginationSchema, decisionSchema, acknowledgeSchema, changeOrderSchema } from "@backend/lib/validations";
+import { purchaseOrderSchema, goodsReceiptSchema, matchSchema, paginationSchema, decisionSchema, acknowledgeSchema, changeOrderSchema, inspectionSchema, rtvSchema, rtvUpdateSchema } from "@backend/lib/validations";
 import {
   createPurchaseOrder,
-  receiveGoods,
   matchPurchaseOrder,
 } from "@backend/services/procurement";
+import { receiveGoods, getReceipt, inspectLine, createRtv, updateRtv } from "@backend/services/receiving";
+import { grnGate } from "@backend/services/logistics";
 import {
   getPo, submitPo, decidePo, issuePo, acknowledgePo, markInProduction, markDispatched, cancelPo, changeOrder,
 } from "@backend/services/purchase-order";
@@ -151,13 +152,81 @@ procurement.post("/:id/receive", requireAuth, requirePermission("procurement:wri
   const existing = await prisma.purchaseOrder.findUnique({ where: { id }, select: { dataAreaId: true } });
   assertSameArea(user, existing);
   const body = goodsReceiptSchema.parse(await c.req.json());
-  const receipt = await receiveGoods(id, body.lines, {
-    receivedAt: body.receivedAt,
-    note: body.note || null,
-    createdById: user.id,
-  });
-  await logActivity({ userId: user.id, action: "RECEIVE", target: `PurchaseOrder:${id}`, detail: { receiptId: receipt.id } });
+  const receipt = await receiveGoods(id, user, body);
+  await logActivity({ userId: user.id, action: "RECEIVE", target: `PurchaseOrder:${id}`, detail: { receiptId: receipt.id, receiptNumber: receipt.receiptNumber } });
   return created(c, receipt);
+});
+
+/** Whether goods may be received now, and why not. */
+procurement.get("/:id/grn-gate", requireAuth, requirePermission("procurement:read"), async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+  const existing = await prisma.purchaseOrder.findUnique({ where: { id }, select: { dataAreaId: true } });
+  assertSameArea(user, existing);
+  return ok(c, await grnGate(id, existing.dataAreaId));
+});
+
+// ── Receipts, inspection and returns ──────────────────────────────────────────
+
+procurement.get("/receipts/:receiptId", requireAuth, requirePermission("procurement:read"), async (c) => {
+  const user = c.get("user");
+  const receiptId = c.req.param("receiptId");
+  const existing = await prisma.goodsReceipt.findUnique({ where: { id: receiptId }, select: { dataAreaId: true } });
+  assertSameArea(user, existing);
+  return ok(c, await getReceipt(receiptId));
+});
+
+/** Pass, fail or quarantine one receipt line; a pass posts stock. */
+procurement.post("/receipt-lines/:lineId/inspect", requireAuth, requirePermission("procurement:write"), async (c) => {
+  const user = c.get("user");
+  const lineId = c.req.param("lineId");
+  const existing = await prisma.goodsReceiptLine.findUnique({ where: { id: lineId }, select: { goodsReceipt: { select: { dataAreaId: true } } } });
+  assertSameArea(user, existing?.goodsReceipt ?? null);
+  const body = inspectionSchema.parse(await c.req.json());
+  const receipt = await inspectLine(lineId, user, body);
+  await logActivity({ userId: user.id, action: "INSPECT", target: `GoodsReceiptLine:${lineId}`, detail: { qaStatus: body.qaStatus, qtyAccepted: body.qtyAccepted } });
+  return ok(c, receipt);
+});
+
+/** Send rejected goods back. */
+procurement.post("/receipt-lines/:lineId/return", requireAuth, requirePermission("procurement:write"), async (c) => {
+  const user = c.get("user");
+  const lineId = c.req.param("lineId");
+  const existing = await prisma.goodsReceiptLine.findUnique({ where: { id: lineId }, select: { goodsReceipt: { select: { dataAreaId: true } } } });
+  assertSameArea(user, existing?.goodsReceipt ?? null);
+  const body = rtvSchema.parse(await c.req.json());
+  const rtv = await createRtv(lineId, user, body);
+  await logActivity({ userId: user.id, action: "RTV", target: `ReturnToVendor:${rtv.id}`, detail: { rtvNumber: rtv.rtvNumber, quantity: body.quantity } });
+  return created(c, rtv);
+});
+
+procurement.get("/returns/list", requireAuth, requirePermission("procurement:read"), async (c) => {
+  const user = c.get("user");
+  const sp = c.req.query();
+  const { page, pageSize, q } = paginationSchema.parse(sp);
+  const where: Prisma.ReturnToVendorWhereInput = {
+    ...areaScope(user),
+    ...(sp.status ? { status: sp.status as never } : {}),
+    ...(q ? { OR: [{ rtvNumber: { contains: q, mode: "insensitive" } }, { vendor: { legalName: { contains: q, mode: "insensitive" } } }] } : {}),
+  };
+  const [items, total] = await Promise.all([
+    prisma.returnToVendor.findMany({ where, include: { vendor: { select: { code: true, legalName: true } }, purchaseOrder: { select: { poNumber: true } }, goodsReceiptLine: { select: { purchaseOrderLine: { select: { description: true } } } } }, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
+    prisma.returnToVendor.count({ where }),
+  ]);
+  return ok(c, items, pageMeta(page, pageSize, total));
+});
+
+procurement.patch("/returns/:rtvId", requireAuth, requirePermission("procurement:write"), async (c) => {
+  const user = c.get("user");
+  const rtvId = c.req.param("rtvId");
+  const existing = await prisma.returnToVendor.findUnique({ where: { id: rtvId }, select: { dataAreaId: true } });
+  assertSameArea(user, existing);
+  const raw = await c.req.json();
+  const version = requireVersion(raw);
+  const body = rtvUpdateSchema.parse(raw);
+  const rtv = await updateRtv(rtvId, version, user, { ...body, creditNoteRef: body.creditNoteRef === "" ? null : body.creditNoteRef, note: body.note === "" ? null : body.note });
+  await logActivity({ userId: user.id, action: "UPDATE", target: `ReturnToVendor:${rtvId}`, detail: { status: rtv.status } });
+  return ok(c, rtv);
 });
 
 /** 3-way match the PO against a vendor invoice (finance authority). */

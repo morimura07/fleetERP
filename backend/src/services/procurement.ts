@@ -1,7 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@backend/lib/prisma";
 import { AuthError } from "@backend/lib/errors";
-import { receiveStock } from "@backend/services/inventory";
 
 /**
  * Procurement (M15) — purchase orders, goods receipt, and 3-way match.
@@ -148,95 +147,6 @@ export async function createPurchaseOrder(input: CreatePoInput) {
     },
     include: { lines: true, vendor: { select: { legalName: true } } },
   });
-}
-
-export interface ReceiptLineInput {
-  purchaseOrderLineId: string;
-  quantity: Prisma.Decimal.Value;
-}
-
-/**
- * Record a goods receipt against an APPROVED/PARTIAL PO. For each line: bump
- * qtyReceived, and (if the line is a stock item) post a RECEIPT stock movement
- * at the PO unit price. Recomputes PO status (PARTIAL vs RECEIVED).
- */
-export async function receiveGoods(
-  poId: string,
-  lines: ReceiptLineInput[],
-  opts: { receivedAt?: Date; note?: string | null; createdById?: string | null } = {},
-) {
-  const po = await prisma.purchaseOrder.findUnique({ where: { id: poId }, include: { lines: true } });
-  if (!po) throw new AuthError("Purchase order not found", 404);
-  if (!["APPROVED", "ISSUED", "ACKNOWLEDGED", "IN_PRODUCTION", "DISPATCHED", "PARTIAL"].includes(po.status)) {
-    throw new AuthError(`Goods can be received against an approved order (this one is ${po.status.toLowerCase().replace("_", " ")})`, 409);
-  }
-  if (lines.length === 0) throw new AuthError("Nothing to receive", 422);
-
-  const receiptNumber = await nextReceiptNumber(po.dataAreaId);
-
-  // Create the receipt header + lines, bump qtyReceived, and post stock in.
-  const receipt = await prisma.$transaction(async (tx) => {
-    const gr = await tx.goodsReceipt.create({
-      data: {
-        dataAreaId: po.dataAreaId,
-        receiptNumber,
-        purchaseOrderId: po.id,
-        receivedAt: opts.receivedAt ?? new Date(),
-        note: opts.note ?? null,
-        createdById: opts.createdById ?? null,
-      },
-    });
-
-    for (const rl of lines) {
-      const poLine = po.lines.find((l) => l.id === rl.purchaseOrderLineId);
-      if (!poLine) throw new AuthError("Receipt line does not belong to this PO", 422);
-      const qty = D(rl.quantity);
-      if (!qty.greaterThan(0)) throw new AuthError("Receipt quantity must be positive", 422);
-      const remaining = D(poLine.quantity).minus(poLine.qtyReceived);
-      if (qty.greaterThan(remaining)) {
-        throw new AuthError(`Receiving ${qty} exceeds the ${remaining} still outstanding on "${poLine.description}"`, 422);
-      }
-
-      let stockMovementId: string | null = null;
-      if (poLine.stockItemId) {
-        const mv = await receiveStock({
-          stockItemId: poLine.stockItemId,
-          quantity: qty,
-          unitCost: poLine.unitPrice,
-          reference: po.poNumber,
-          memo: `GRN ${receiptNumber}`,
-          createdById: opts.createdById,
-        });
-        stockMovementId = mv.id;
-      }
-
-      await tx.goodsReceiptLine.create({
-        data: {
-          goodsReceiptId: gr.id,
-          purchaseOrderLineId: poLine.id,
-          quantity: qty.toFixed(3),
-          stockMovementId,
-        },
-      });
-      await tx.purchaseOrderLine.update({
-        where: { id: poLine.id },
-        data: { qtyReceived: D(poLine.qtyReceived).plus(qty).toFixed(3) },
-      });
-    }
-
-    // Recompute PO status from line receipt state.
-    const fresh = await tx.purchaseOrderLine.findMany({ where: { purchaseOrderId: po.id } });
-    const allReceived = fresh.every((l) => D(l.qtyReceived).greaterThanOrEqualTo(l.quantity));
-    const anyReceived = fresh.some((l) => D(l.qtyReceived).greaterThan(0));
-    await tx.purchaseOrder.update({
-      where: { id: po.id },
-      data: { status: allReceived ? "RECEIVED" : anyReceived ? "PARTIAL" : po.status },
-    });
-
-    return gr;
-  });
-
-  return receipt;
 }
 
 /**
