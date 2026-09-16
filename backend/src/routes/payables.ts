@@ -4,6 +4,7 @@ import { prisma } from "@backend/lib/prisma";
 import { vendorInvoiceSchema, vendorPaymentSchema, idSchema, paginationSchema } from "@backend/lib/validations";
 import { vendorInvoiceTotal, postVendorInvoice, payVendorInvoice } from "@backend/services/ap-ar";
 import { logActivity } from "@backend/lib/activity";
+import { releasePaymentHold } from "@backend/services/procurement";
 import { can } from "@backend/lib/rbac";
 import { AuthError } from "@backend/lib/errors";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
@@ -116,5 +117,12 @@ payables.post("/:id", requireAuth, requirePermission("payable:post"), async (c) 
     await logActivity({ userId: user.id, action: "PAY", target: `VendorInvoice:${id}`, detail: { voucherNumber: entry.voucherNumber } });
     return ok(c, entry);
   }
-  throw new AuthError("action must be 'post' or 'pay'", 400);
+  if (body.action === "release-hold") {
+    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+    if (reason.length < 3) throw new AuthError("Say why the hold is being released", 422);
+    const inv = await releasePaymentHold(id, user.id, reason);
+    await logActivity({ userId: user.id, action: "RELEASE_HOLD", target: `VendorInvoice:${id}`, detail: { reason } });
+    return ok(c, inv);
+  }
+  throw new AuthError("action must be 'post', 'pay' or 'release-hold'", 400);
 });

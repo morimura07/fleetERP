@@ -8,11 +8,14 @@ import {
 } from "@backend/services/procurement";
 import { receiveGoods, getReceipt, inspectLine, createRtv, updateRtv } from "@backend/services/receiving";
 import { grnGate } from "@backend/services/logistics";
+import { vendorScorecard, scorecardsFor, procurementKpis, poTimeline } from "@backend/services/governance";
+import { issueSupplierLink, revokeSupplierLink } from "@backend/services/supplier-portal";
 import {
   getPo, submitPo, decidePo, issuePo, acknowledgePo, markInProduction, markDispatched, cancelPo, changeOrder,
 } from "@backend/services/purchase-order";
 import { purchaseOrderPdf } from "@backend/services/pdf";
 import { requireVersion } from "@backend/lib/concurrency";
+import { AuthError } from "@backend/lib/errors";
 import { logActivity } from "@backend/lib/activity";
 import { areaScope, areaForWrite, assertSameArea } from "@backend/lib/scope";
 import { requireAuth, requirePermission } from "@backend/lib/auth";
@@ -166,6 +169,63 @@ procurement.get("/:id/grn-gate", requireAuth, requirePermission("procurement:rea
   return ok(c, await grnGate(id, existing.dataAreaId));
 });
 
+// ── Governance: KPIs, scorecards, the audit vault, the supplier link ─────────
+
+/** Turnaround against the SLA, on-time delivery, savings, pipeline, spend by vendor. */
+procurement.get("/kpis/summary", requireAuth, requirePermission("procurement:read"), async (c) => {
+  const user = c.get("user");
+  const dataAreaId = areaForWrite(user, c.req.query("dataAreaId"));
+  const to = c.req.query("to") ? new Date(c.req.query("to")!) : new Date();
+  const from = c.req.query("from") ? new Date(c.req.query("from")!) : new Date(to.getTime() - 90 * 86_400_000);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) throw new AuthError("from and to must be dates", 422);
+  return ok(c, await procurementKpis(dataAreaId, from, to));
+});
+
+/** Every vendor with orders in the quarter, rated. */
+procurement.get("/scorecards/:quarter", requireAuth, requirePermission("procurement:read"), async (c) => {
+  const user = c.get("user");
+  const dataAreaId = areaForWrite(user, c.req.query("dataAreaId"));
+  return ok(c, await scorecardsFor(dataAreaId, c.req.param("quarter")));
+});
+
+procurement.get("/scorecards/:quarter/vendor/:vendorId", requireAuth, requirePermission("procurement:read"), async (c) => {
+  const user = c.get("user");
+  const vendor = await prisma.vendor.findUnique({ where: { id: c.req.param("vendorId") }, select: { dataAreaId: true } });
+  assertSameArea(user, vendor);
+  return ok(c, await vendorScorecard(c.req.param("vendorId"), c.req.param("quarter")));
+});
+
+/** The audit vault: everything that happened to one order, in order. */
+procurement.get("/:id/timeline", requireAuth, requirePermission("procurement:read"), async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+  const existing = await prisma.purchaseOrder.findUnique({ where: { id }, select: { dataAreaId: true } });
+  assertSameArea(user, existing);
+  return ok(c, await poTimeline(id));
+});
+
+/** Issue (or reissue) the supplier's secret link. Body: { days? }. */
+procurement.post("/:id/supplier-link", requireAuth, requirePermission("procurement:write"), async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+  const existing = await prisma.purchaseOrder.findUnique({ where: { id }, select: { dataAreaId: true } });
+  assertSameArea(user, existing);
+  const body = (await c.req.json().catch(() => ({}))) as { days?: unknown };
+  const days = typeof body.days === "number" && body.days >= 1 && body.days <= 180 ? body.days : 30;
+  const link = await issueSupplierLink(id, user, days);
+  await logActivity({ userId: user.id, action: "SUPPLIER_LINK", target: `PurchaseOrder:${id}`, detail: { expiresAt: link.expiresAt } });
+  return ok(c, link);
+});
+
+procurement.delete("/:id/supplier-link", requireAuth, requirePermission("procurement:write"), async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+  const existing = await prisma.purchaseOrder.findUnique({ where: { id }, select: { dataAreaId: true } });
+  assertSameArea(user, existing);
+  await logActivity({ userId: user.id, action: "SUPPLIER_LINK_REVOKED", target: `PurchaseOrder:${id}` });
+  return ok(c, await revokeSupplierLink(id, user));
+});
+
 // ── Receipts, inspection and returns ──────────────────────────────────────────
 
 procurement.get("/receipts/:receiptId", requireAuth, requirePermission("procurement:read"), async (c) => {
@@ -236,7 +296,7 @@ procurement.post("/:id/match", requireAuth, requirePermission("procurement:appro
   const existing = await prisma.purchaseOrder.findUnique({ where: { id }, select: { dataAreaId: true } });
   assertSameArea(user, existing);
   const { vendorInvoiceId } = matchSchema.parse(await c.req.json());
-  const result = await matchPurchaseOrder(id, vendorInvoiceId);
+  const result = await matchPurchaseOrder(id, vendorInvoiceId, user.id);
   await logActivity({ userId: user.id, action: "MATCH", target: `PurchaseOrder:${id}`, detail: { status: result.status } });
   return ok(c, result);
 });

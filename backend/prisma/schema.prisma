@@ -1648,6 +1648,11 @@ model VendorInvoice {
   expenseCode   String        @default("6100") // COA expense account this bill hits
   memo          String?
   status        InvoiceStatus @default(DRAFT)
+  /// Payment voucher hold: set by a three-way match variance, cleared by a match or a release.
+  paymentHold       Boolean   @default(false)
+  paymentHoldReason String?
+  paymentHoldSetAt  DateTime?
+  paymentHoldClearedById String?
 
   // Ledger links
   postingEntryId String?       @unique
@@ -2337,6 +2342,14 @@ model PurchaseOrder {
   // 3-way match: the vendor bill this PO was matched against.
   vendorInvoiceId String?
   vendorInvoice   VendorInvoice? @relation("PoVendorInvoice", fields: [vendorInvoiceId], references: [id], onDelete: SetNull)
+  /// The variance report of the last match (client requirements, Sept 2026, SOP step 22).
+  matchReport     Json?
+  matchedAt       DateTime?
+  matchedById     String?
+
+  // ── Supplier link (SOP steps 14-15): acknowledgement without a vendor login ──
+  supplierToken          String?   @unique
+  supplierTokenExpiresAt DateTime?
 
   approvedById String?
   approvedAt   DateTime?

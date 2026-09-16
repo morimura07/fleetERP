@@ -17,6 +17,7 @@ import "@backend/services/reports/finance";
 import "@backend/services/reports/operations";
 import "@backend/services/reports/telematics";
 import "@backend/services/reports/time";
+import "@backend/services/reports/procurement";
 
 export const reports = new Hono();
 
